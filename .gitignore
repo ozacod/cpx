@@ -22,6 +22,10 @@ node_modules/
 # Build output
 frontend/dist/
 frontend/build/
+web/frontend/public/docs/
+web/frontend/docs/build/
+web/frontend/docs/.docusaurus/
+web/server/static/
 
 # Vite
 frontend/.vite/
