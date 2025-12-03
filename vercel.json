@@ -1,5 +1,5 @@
 {
-  "buildCommand": "cd web/frontend && npm install && npm run build",
+  "buildCommand": "cd web/frontend && npm install && npm run build && cd docs && npm install && npm run build && cp -r build ../dist/docs",
   "outputDirectory": "web/frontend/dist",
   "functions": {
     "api/index.go": {
@@ -23,15 +23,11 @@
       "destination": "/api/index.go"
     },
     {
-      "source": "/docs",
-      "destination": "/api/index.go"
-    },
-    {
       "source": "/openapi.json",
       "destination": "/api/index.go"
     },
     {
-      "source": "/(.*)",
+      "source": "/((?!docs).*)",
       "destination": "/index.html"
     }
   ]
