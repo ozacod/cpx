@@ -6,8 +6,58 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"sort"
 	"strings"
 )
+
+// FindExecutables finds all executables in the build directory
+func FindExecutables(buildDir string) ([]string, error) {
+	var executables []string
+
+	entries, err := os.ReadDir(buildDir)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read build directory: %w", err)
+	}
+
+	for _, entry := range entries {
+		if entry.IsDir() {
+			continue
+		}
+
+		info, err := entry.Info()
+		if err != nil {
+			continue
+		}
+
+		name := entry.Name()
+
+		// Skip test executables and common non-executable files
+		if strings.Contains(name, "_test") || strings.Contains(name, "_tests") ||
+			strings.HasSuffix(name, ".a") || strings.HasSuffix(name, ".so") ||
+			strings.HasSuffix(name, ".dylib") || strings.HasSuffix(name, ".dll") ||
+			strings.HasSuffix(name, ".lib") || strings.HasSuffix(name, ".o") ||
+			strings.HasSuffix(name, ".cmake") || strings.HasSuffix(name, ".ninja") ||
+			strings.HasSuffix(name, ".make") || strings.HasSuffix(name, ".txt") {
+			continue
+		}
+
+		// Check if it's executable
+		if runtime.GOOS == "windows" {
+			if strings.HasSuffix(name, ".exe") {
+				executables = append(executables, filepath.Join(buildDir, name))
+			}
+		} else {
+			if info.Mode()&0111 != 0 {
+				executables = append(executables, filepath.Join(buildDir, name))
+			}
+		}
+	}
+
+	// Sort by name for consistent ordering
+	sort.Strings(executables)
+
+	return executables, nil
+}
 
 // RunProject builds and runs the project
 func RunProject(release bool, target string, execArgs []string, setupVcpkgEnv func() error) error {
@@ -53,59 +103,71 @@ func RunProject(release bool, target string, execArgs []string, setupVcpkgEnv fu
 		}
 	}
 
-	// Build
+	// Build specific target if provided
 	fmt.Printf("%s Compiling...%s\n", "\033[36m", "\033[0m")
-	buildCmd := exec.Command("cmake", "--build", buildDir, "--config", buildType)
+	buildArgs := []string{"--build", buildDir, "--config", buildType}
+	if target != "" {
+		buildArgs = append(buildArgs, "--target", target)
+	}
+
+	buildCmd := exec.Command("cmake", buildArgs...)
 	buildCmd.Stdout = os.Stdout
 	buildCmd.Stderr = os.Stderr
 	if err := buildCmd.Run(); err != nil {
 		return fmt.Errorf("build failed: %w", err)
 	}
 
-	// Find and run executable
-	execName := projectName
-	if runtime.GOOS == "windows" {
-		execName += ".exe"
-	}
+	// Find executable to run
+	var execPath string
 
-	execPath := filepath.Join(buildDir, execName)
-	if _, err := os.Stat(execPath); os.IsNotExist(err) {
-		// Try to find executable in build directory
-		entries, err := os.ReadDir(buildDir)
-		if err != nil {
-			return fmt.Errorf("failed to read build directory: %w", err)
+	// If target specified, look for that specific executable
+	if target != "" {
+		targetName := target
+		if runtime.GOOS == "windows" && !strings.HasSuffix(targetName, ".exe") {
+			targetName += ".exe"
+		}
+		execPath = filepath.Join(buildDir, targetName)
+		if _, err := os.Stat(execPath); os.IsNotExist(err) {
+			return fmt.Errorf("target executable '%s' not found in %s", target, buildDir)
+		}
+	} else {
+		// Look for project name executable first
+		execName := projectName
+		if runtime.GOOS == "windows" {
+			execName += ".exe"
 		}
 
-		found := false
-		for _, entry := range entries {
-			if !entry.IsDir() {
-				info, err := entry.Info()
-				if err != nil {
-					continue
+		execPath = filepath.Join(buildDir, execName)
+		if _, err := os.Stat(execPath); os.IsNotExist(err) {
+			// Find all executables
+			executables, err := FindExecutables(buildDir)
+			if err != nil {
+				return err
+			}
+
+			if len(executables) == 0 {
+				return fmt.Errorf("no executable found in %s. Make sure the project builds an executable", buildDir)
+			}
+
+			if len(executables) == 1 {
+				execPath = executables[0]
+			} else {
+				// Multiple executables found, list them
+				fmt.Printf("%s Multiple executables found:%s\n", "\033[33m", "\033[0m")
+				for i, exec := range executables {
+					fmt.Printf("  [%d] %s\n", i+1, filepath.Base(exec))
 				}
-				// Check if it's executable (Unix) or .exe (Windows)
-				if runtime.GOOS == "windows" {
-					if strings.HasSuffix(entry.Name(), ".exe") {
-						execPath = filepath.Join(buildDir, entry.Name())
-						found = true
-						break
-					}
-				} else {
-					if info.Mode()&0111 != 0 && !strings.Contains(entry.Name(), "_test") && !strings.Contains(entry.Name(), "_tests") {
-						execPath = filepath.Join(buildDir, entry.Name())
-						found = true
-						break
-					}
-				}
+				fmt.Printf("\nUse --target <name> to specify which one to run\n")
+				// Run the first one by default
+				execPath = executables[0]
+				fmt.Printf("%s Running first: %s%s\n", "\033[33m", filepath.Base(execPath), "\033[0m")
 			}
 		}
-
-		if !found {
-			return fmt.Errorf("executable not found in %s. Make sure the project builds an executable", buildDir)
-		}
 	}
 
-	fmt.Printf("%s Running '%s'...%s\n", "\033[36m", execPath, "\033[0m")
+	fmt.Printf("%s Running '%s'...%s\n", "\033[36m", filepath.Base(execPath), "\033[0m")
+	fmt.Println(strings.Repeat("─", 40))
+
 	runCmd := exec.Command(execPath, execArgs...)
 	runCmd.Stdout = os.Stdout
 	runCmd.Stderr = os.Stderr

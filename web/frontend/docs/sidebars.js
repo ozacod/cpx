@@ -61,6 +61,15 @@ export default {
         'examples/cross-compilation',
       ],
     },
+    {
+      type: 'category',
+      label: 'Help',
+      items: [
+        'troubleshooting',
+        'best-practices',
+        'faq',
+      ],
+    },
   ],
 };
 

@@ -14,8 +14,16 @@ func NewBuildCmd(setupVcpkgEnv func() error) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "build",
 		Short: "Compile the project with CMake",
-		Long:  "Compile the project with CMake. Supports optimization levels (-O0/1/2/3/s/fast) and clean builds.",
-		RunE:  runBuild,
+		Long: `Compile the project with CMake. Supports optimization levels (-O0/1/2/3/s/fast) and clean builds.
+
+Examples:
+  cpx build              # Debug build
+  cpx build --release    # Release build with O2
+  cpx build -O3          # Maximum optimization
+  cpx build -j 8         # Use 8 parallel jobs
+  cpx build --clean      # Clean rebuild
+  cpx build --watch      # Watch for changes and rebuild`,
+		RunE: runBuild,
 	}
 
 	cmd.Flags().BoolP("release", "r", false, "Build in release mode (O2)")
@@ -24,6 +32,7 @@ func NewBuildCmd(setupVcpkgEnv func() error) *cobra.Command {
 	cmd.Flags().String("target", "", "Specific target to build")
 	cmd.Flags().BoolP("clean", "c", false, "Clean build directory before building")
 	cmd.Flags().StringP("opt", "O", "", "Optimization level: 0, 1, 2, 3, s, fast")
+	cmd.Flags().BoolP("watch", "w", false, "Watch for file changes and rebuild automatically")
 
 	return cmd
 }
@@ -34,6 +43,11 @@ func runBuild(cmd *cobra.Command, args []string) error {
 	target, _ := cmd.Flags().GetString("target")
 	clean, _ := cmd.Flags().GetBool("clean")
 	optLevel, _ := cmd.Flags().GetString("opt")
+	watch, _ := cmd.Flags().GetBool("watch")
+
+	if watch {
+		return build.WatchAndBuild(release, jobs, target, optLevel, setupVcpkgEnvFunc)
+	}
 
 	return build.BuildProject(release, jobs, target, clean, optLevel, setupVcpkgEnvFunc)
 }
