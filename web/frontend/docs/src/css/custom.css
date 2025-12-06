@@ -1,6 +1,32 @@
-/* Hide the navbar completely - search will be handled differently */
+/* Hide the navbar but keep search accessible */
 .navbar {
+  position: fixed !important;
+  top: 0;
+  right: 0;
+  left: auto !important;
+  width: auto !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  border: none !important;
+  padding: 1rem !important;
+  z-index: 100;
+}
+
+/* Hide navbar items except search */
+.navbar__items,
+.navbar__brand,
+.navbar__logo,
+.navbar__toggle {
   display: none !important;
+}
+
+/* Show and style the search button */
+.navbar__items--right {
+  display: flex !important;
+}
+
+.navbar__search {
+  display: block !important;
 }
 
 /* Adjust main content to start at top - no navbar space needed */
