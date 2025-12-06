@@ -1,0 +1,28 @@
+FROM --platform=linux/amd64 alpine:3.20
+
+ENV VCPKG_ROOT=/opt/vcpkg
+ENV PATH="${VCPKG_ROOT}:${PATH}"
+ENV DEBIAN_FRONTEND=noninteractive
+
+# Base tools for musl builds
+RUN apk add --no-cache \
+    bash \
+    build-base \
+    cmake \
+    ninja \
+    git \
+    curl \
+    tar \
+    zip \
+    unzip \
+    linux-headers
+
+# Install vcpkg (forces source build on musl)
+RUN git clone https://github.com/Microsoft/vcpkg.git /opt/vcpkg && \
+    /bin/bash /opt/vcpkg/bootstrap-vcpkg.sh -disableMetrics -useSystemBinaries && \
+    rm -rf /opt/vcpkg/.git
+
+WORKDIR /workspace
+
+# Default command
+CMD ["/bin/bash"]

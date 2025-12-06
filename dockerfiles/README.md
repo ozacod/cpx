@@ -5,7 +5,9 @@ This directory contains Dockerfiles for cross-compiling C++ projects to differen
 ## Available Dockerfiles
 
 - **Dockerfile.linux-amd64** - Linux x86_64 compilation
+- **Dockerfile.linux-amd64-musl** - Linux x86_64 (Alpine musl) compilation
 - **Dockerfile.linux-arm64** - Linux ARM64 compilation (cross-compilation from x86_64)
+- **Dockerfile.linux-arm64-musl** - Linux ARM64 (Alpine musl) compilation
 - **Dockerfile.windows-amd64** - Windows x86_64 compilation (using MinGW-w64)
 - **Dockerfile.macos-amd64** - macOS x86_64 compilation (placeholder - requires osxcross setup)
 - **Dockerfile.macos-arm64** - macOS ARM64 (Apple Silicon) compilation (placeholder - requires osxcross setup)
