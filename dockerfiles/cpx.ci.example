@@ -14,6 +14,18 @@ targets:
     image: cpx-linux-arm64
     triplet: arm64-linux
     platform: linux/arm64
+
+  - name: linux-amd64-musl
+    dockerfile: Dockerfile.linux-amd64-musl
+    image: cpx-linux-amd64-musl
+    triplet: x64-linux
+    platform: linux/amd64
+    
+  - name: linux-arm64-musl
+    dockerfile: Dockerfile.linux-arm64-musl
+    image: cpx-linux-arm64-musl
+    triplet: arm64-linux
+    platform: linux/arm64
     
   # macOS targets require osxcross setup (placeholder)
   # - name: macos-amd64

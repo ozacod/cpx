@@ -217,7 +217,7 @@ get_latest_version() {
     fi
     
     if [ -z "$VERSION" ]; then
-        VERSION="v1.0.4"
+        VERSION="v1.1.5"
     fi
     echo "$VERSION"
 }
@@ -380,7 +380,9 @@ install_dockerfiles() {
     # List of dockerfiles to download
     DOCKERFILES=(
         "Dockerfile.linux-amd64"
+        "Dockerfile.linux-amd64-musl"
         "Dockerfile.linux-arm64"
+        "Dockerfile.linux-arm64-musl"
         "Dockerfile.windows-amd64"
         "Dockerfile.macos-amd64"
         "Dockerfile.macos-arm64"
