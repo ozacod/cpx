@@ -157,10 +157,10 @@ function App() {
                 </div>
               </div>
 
-              {/* Feature section with text + GIF */}
+              {/* Feature 1: TUI Demo */}
               <div className="mt-20 grid md:grid-cols-2 gap-10 md:gap-16 items-center text-left">
                 {/* Left side - description */}
-                <div className="space-y-6">
+                <div className="space-y-4">
                   <h2 className={`text-3xl sm:text-4xl font-bold ${
                     theme === 'dark' ? 'text-white' : 'text-gray-900'
                   }`}>
@@ -169,17 +169,7 @@ function App() {
                   <p className={`text-lg leading-relaxed ${
                     theme === 'dark' ? 'text-gray-400' : 'text-gray-600'
                   }`}>
-                    We made cpx to do one thing: Streamline the setup of modern C++ projects WITHOUT compromising flexibility.
-                  </p>
-                  <p className={`text-lg leading-relaxed ${
-                    theme === 'dark' ? 'text-gray-400' : 'text-gray-600'
-                  }`}>
-                    After countless projects, we've encoded our best practices into this CLI. Get CMake, vcpkg, testing, linting, and CI scaffolding—all configured and ready to build.
-                  </p>
-                  <p className={`text-base ${
-                    theme === 'dark' ? 'text-gray-500' : 'text-gray-500'
-                  }`}>
-                    This is NOT an all-inclusive template. We expect you to bring your own libraries and customize as needed.
+                    cpx brings the Go and Rust CLI tool experience to C++. Starting a new C++ project shouldn't mean wrestling with CMake configuration, chasing down dependencies, or debugging build systems. Opinionated templates embrace modern C++ best practices, static compilation is handled via vcpkg package management, and the workflow just works—from day one.
                   </p>
                 </div>
 
@@ -193,6 +183,58 @@ function App() {
                     src="/demo.gif"
                     alt="cpx new demo"
                     className="w-full h-full object-cover"
+                  />
+                </div>
+              </div>
+
+              {/* Feature 2: CMake */}
+              <div className="mt-16 grid md:grid-cols-2 gap-10 md:gap-16 items-center text-left">
+                {/* Left side - CMake icon */}
+                <div className="flex justify-center">
+                  <img 
+                    src="/cmake.svg" 
+                    alt="CMake" 
+                    className={`w-32 h-32 ${theme === 'dark' ? 'opacity-80' : 'opacity-90'}`}
+                  />
+                </div>
+
+                {/* Right side - description */}
+                <div className="space-y-4">
+                  <h3 className={`text-2xl sm:text-3xl font-bold ${
+                    theme === 'dark' ? 'text-white' : 'text-gray-900'
+                  }`}>
+                    Static Linking with vcpkg
+                  </h3>
+                  <p className={`text-lg leading-relaxed ${
+                    theme === 'dark' ? 'text-gray-400' : 'text-gray-600'
+                  }`}>
+                    Every project comes pre-configured with CMake, vcpkg integration, unit testing frameworks, code linting, formatting tools, and CI scaffolding for GitHub Actions. Everything is set up to produce statically-linked binaries out of the box, so you can distribute your applications without worrying about shared library dependencies on target systems.
+                  </p>
+                </div>
+              </div>
+
+              {/* Feature 3: Docker Cross-compilation */}
+              <div className="mt-16 grid md:grid-cols-2 gap-10 md:gap-16 items-center text-left">
+                {/* Left side - description */}
+                <div className="space-y-4">
+                  <h3 className={`text-2xl sm:text-3xl font-bold ${
+                    theme === 'dark' ? 'text-white' : 'text-gray-900'
+                  }`}>
+                    Cross-Compile Anywhere
+                  </h3>
+                  <p className={`text-lg leading-relaxed ${
+                    theme === 'dark' ? 'text-gray-400' : 'text-gray-600'
+                  }`}>
+                    Need to cross-compile? Docker images are provided with complete cross-compilation toolchains for Linux (glibc and musl). Binaries can be built for any target platform from any development machine—no need to set up native toolchains or maintain multiple build environments. One command, ship everywhere.
+                  </p>
+                </div>
+
+                {/* Right side - Docker icon */}
+                <div className="flex justify-center">
+                  <img 
+                    src="/docker.svg" 
+                    alt="Docker" 
+                    className={`w-48 h-48 ${theme === 'dark' ? 'opacity-80' : 'opacity-90'}`}
                   />
                 </div>
               </div>

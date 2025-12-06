@@ -15,11 +15,14 @@ func NewTestCmd(setupVcpkgEnv func() error) *cobra.Command {
 		Use:   "test",
 		Short: "Build and run tests",
 		Long:  "Build and run tests for the project.",
-		RunE:  runTest,
+		Example: `  cpx test
+  cpx test --verbose
+  cpx test --filter MySuite.*`,
+		RunE: runTest,
 	}
 
 	cmd.Flags().BoolP("verbose", "v", false, "Show verbose output")
-	cmd.Flags().String("filter", "", "Filter tests by name")
+	cmd.Flags().String("filter", "", "Filter tests by name (regexp supported by ctest)")
 
 	return cmd
 }

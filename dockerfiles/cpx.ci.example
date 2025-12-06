@@ -1,5 +1,6 @@
 # cpx.ci - Cross-compilation configuration
 # This file defines which Docker images to use for building your project
+# Note: All triplets use static library linkage by default
 
 # List of targets to build
 targets:
@@ -18,14 +19,21 @@ targets:
   - name: linux-amd64-musl
     dockerfile: Dockerfile.linux-amd64-musl
     image: cpx-linux-amd64-musl
-    triplet: x64-linux
+    triplet: x64-linux-musl
     platform: linux/amd64
     
   - name: linux-arm64-musl
     dockerfile: Dockerfile.linux-arm64-musl
     image: cpx-linux-arm64-musl
-    triplet: arm64-linux
+    triplet: arm64-linux-musl
     platform: linux/arm64
+
+  # Windows cross-compilation using MinGW (builds from Linux)
+  - name: windows-amd64
+    dockerfile: Dockerfile.windows-amd64-mingw
+    image: cpx-windows-amd64
+    triplet: x64-mingw-static
+    platform: linux/amd64
     
   # macOS targets require osxcross setup (placeholder)
   # - name: macos-amd64

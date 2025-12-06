@@ -26,8 +26,10 @@ func NewNewCmd(getVcpkgPath func() (string, error), setupVcpkgProject func(strin
 		Use:   "new",
 		Short: "Create a new C++ project (interactive)",
 		Long:  "Create a new C++ project using an interactive TUI. This will guide you through the project configuration.",
-		RunE:  runNew,
-		Args:  cobra.NoArgs,
+		Example: `  cpx new            # launch the interactive creator
+  cpx new --help    # view options`,
+		RunE: runNew,
+		Args: cobra.NoArgs,
 	}
 
 	return cmd

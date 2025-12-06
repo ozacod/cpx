@@ -8,6 +8,11 @@
 [![GitHub release](https://img.shields.io/github/release/ozacod/cpx.svg)](https://github.com/ozacod/cpx/releases)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
+
+<p align="center">
+  <img src="web/frontend/public/demo.gif" alt="cpx TUI demo" width="720" />
+</p>
+
 ## Overview
 
 cpx is a batteries-included CLI for C++ that pairs an interactive TUI with sensible defaults: CMake presets, vcpkg dependencies, testing, formatting, linting, sanitizers, git hooks, and Docker-based CI targets (including Alpine/musl). Releases embed the tag version directly into the binary so `cpx --version` always matches the downloaded release.
@@ -20,6 +25,7 @@ cpx is a batteries-included CLI for C++ that pairs an interactive TUI with sensi
 - Git hooks: pre-commit/pre-push with configurable checks
 - CI and cross-compilation: Docker targets for linux-amd64/arm64, macOS (placeholder), windows-amd64, plus Alpine musl images
 - Self-updating installer and `cpx upgrade`
+
 
 ## Install
 

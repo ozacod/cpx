@@ -14,12 +14,15 @@ func NewRunCmd(setupVcpkgEnv func() error) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "run",
 		Short: "Build and run the project",
-		Long:  "Build and run the project. Additional arguments are passed to the executable.",
-		RunE:  runRun,
+		Long:  "Build and run the project. Additional arguments after -- are passed to the executable.",
+		Example: `  cpx run
+  cpx run --release
+  cpx run --target app -- --flag value`,
+		RunE: runRun,
 	}
 
-	cmd.Flags().Bool("release", false, "Build in release mode")
-	cmd.Flags().String("target", "", "Specific target to run")
+	cmd.Flags().Bool("release", false, "Build in release mode (default is debug)")
+	cmd.Flags().String("target", "", "Specific target to run (if multiple executables exist)")
 
 	return cmd
 }
