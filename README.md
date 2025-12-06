@@ -57,12 +57,11 @@ The installer will:
 ## 🎯 Quick Start
 
 ```bash
-# Create a new project from default template (googletest)
-cpx create my_app
-cd my_app
+# Launch the interactive creator (TUI)
+cpx new
 
-# Or create with Catch2 template
-cpx create my_app --template catch
+# After the TUI finishes
+cd <project_name>
 
 # Build the project
 cpx build
@@ -89,9 +88,7 @@ cpx lint
 ### Project Management
 
 ```bash
-cpx create <name>                    # Create new project (uses default template)
-cpx create <name> --template <name>  # Create from template (default, catch, or path)
-cpx create <name> --lib              # Create library project
+cpx new                              # Launch interactive TUI to create a project
 ```
 
 ### Build & Run
@@ -184,51 +181,22 @@ cpx ci init --gitlab        # Generate GitLab CI configuration
 
 ## 📄 Project Templates
 
-cpx provides project templates that are automatically downloaded from GitHub. Templates define project structure, build configuration, testing framework, and git hooks.
+cpx still uses templates behind the scenes, but you no longer pass template files or flags. Run `cpx new`, pick your options in the TUI, and the CLI downloads and applies the correct template automatically.
 
 ### Available Templates
 
-- **default**: Uses Google Test framework (googletest)
-- **catch**: Uses Catch2 test framework
+- **default**: GoogleTest
+- **catch**: Catch2
+- **no tests**: if you decline a test framework in the TUI
 
-### Using Templates
+### How it works
 
-```bash
-# Use default template (googletest)
-cpx create my_project --template default
+1. Run `cpx new`
+2. Choose executable or library layout
+3. Select a test framework (or none)
+4. Choose git hook checks and formatting style
 
-# Use Catch2 template
-cpx create my_project --template catch
-
-# Use custom template file
-cpx create my_project --template ./my-template.yaml
-```
-
-If no template is specified, the `default` template is automatically downloaded and used.
-
-### Template Structure
-
-Templates are YAML files with the following structure:
-
-```yaml
-package:
-  version: 0.1.0
-  cpp_standard: 17
-
-build:
-  shared_libs: false
-  clang_format: Google
-
-testing:
-  framework: googletest  # or catch2
-
-hooks:
-  precommit:
-    - fmt
-    - lint
-  prepush:
-    - test
-```
+The template is fetched and filled in with your choices—no `cpx.yaml` required.
 
 
 ## ⚙️ Configuration
@@ -245,7 +213,7 @@ vcpkg_root: "/path/to/vcpkg"
 
 ### Project Configuration
 
-Dependencies are managed in `vcpkg.json` (not `cpx.yaml`). The `cpx.yaml` file is only used as a template for project creation.
+Project settings are captured through the interactive TUI (`cpx new`). There is no `cpx.yaml` to edit—your answers drive the generated files.
 
 **vcpkg.json** (auto-generated):
 ```json
@@ -264,20 +232,11 @@ cpx can automatically install git hooks for code quality checks:
 
 ### Configuration
 
-Add hooks configuration to `cpx.yaml`:
-
-```yaml
-hooks:
-  precommit:
-    - fmt      # Format code before commit
-    - lint     # Run linter before commit
-  prepush:
-    - test     # Run tests before push
-```
+Pick the checks you want when you run `cpx new` (fmt, lint, test, flawfinder, cppcheck, check).
 
 ### Installation
 
-Hooks are automatically installed when creating a project from a template. You can also install them manually:
+Install the hooks into `.git/hooks`:
 
 ```bash
 cpx hooks install
@@ -294,9 +253,8 @@ cpx hooks install
 
 ### Behavior
 
-- **Hooks configured in cpx.yaml** → Creates actual hook files (e.g., `pre-commit`)
-- **Hooks NOT configured** → Creates `.sample` files (e.g., `pre-commit.sample`)
-- **No cpx.yaml** → Uses defaults (fmt, lint for pre-commit; test for pre-push)
+- If you selected checks in the TUI, those hooks are installed (e.g., `pre-commit`, `pre-push`)
+- If you skipped hook selection, cpx installs defaults: fmt + lint on pre-commit, test on pre-push
 
 ## 🐳 Cross-Compilation
 
@@ -330,7 +288,7 @@ my_project/
 ├── CMakeLists.txt          # Main CMake configuration
 ├── CMakePresets.json        # CMake presets for IDE integration
 ├── vcpkg.json              # vcpkg dependencies
-├── cpx.yaml              # Project template (optional)
+├── cpx.ci                 # Cross-compilation targets (optional)
 ├── include/                # Header files
 │   └── my_project/
 │       └── my_project.hpp

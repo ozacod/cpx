@@ -15,7 +15,7 @@ my_project/
 ├── CMakeLists.txt          # Main CMake configuration
 ├── CMakePresets.json       # CMake presets (auto-generated)
 ├── vcpkg.json              # Dependencies
-├── cpx.yaml                # Project configuration
+├── cpx.ci                  # Cross-compilation targets (optional)
 ├── .clang-format           # Code style (optional)
 ├── .clang-tidy             # Linting rules (optional)
 ├── include/                # Public headers
@@ -140,15 +140,10 @@ cpx build --clean
 
 ### Use Git Hooks
 
-Configure hooks in `cpx.yaml`:
+Pick the checks you want when you run `cpx new`, then install them with:
 
-```yaml
-hooks:
-  precommit:
-    - fmt      # Format before commit
-    - lint     # Lint before commit
-  prepush:
-    - test     # Test before push
+```bash
+cpx hooks install
 ```
 
 ### Create a .clang-format File

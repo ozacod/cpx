@@ -1,22 +1,10 @@
 # Git Hooks Configuration
 
-Configure git hooks in `cpx.yaml` to automatically run code quality checks.
+Git hooks are configured through the interactive TUI (`cpx new`). There is no `cpx.yaml` to edit—pick the checks you want when creating the project.
 
-## Configuration
+## Choose hooks in the TUI
 
-Add hooks configuration to your `cpx.yaml`:
-
-```yaml
-hooks:
-  precommit:
-    - fmt      # Format code before commit
-    - lint     # Run linter before commit
-  prepush:
-    - test     # Run tests before push
-```
-
-## Supported Hook Checks
-
+During `cpx new`, select which checks to enforce:
 - `fmt` - Format code with clang-format
 - `lint` - Run clang-tidy static analysis
 - `test` - Run tests (blocking for pre-push)
@@ -26,7 +14,7 @@ hooks:
 
 ## Installation
 
-Hooks are automatically installed when creating a project from a template with hooks configured. You can also install them manually:
+After generation, install the hooks into `.git/hooks`:
 
 ```bash
 cpx hooks install
@@ -34,7 +22,6 @@ cpx hooks install
 
 ## Behavior
 
-- **Hooks configured in cpx.yaml** → Creates actual hook files (e.g., `pre-commit`)
-- **Hooks NOT configured** → Creates `.sample` files (e.g., `pre-commit.sample`)
-- **No cpx.yaml** → Uses defaults (fmt, lint for pre-commit; test for pre-push)
+- If you picked checks in the TUI, those hooks are installed (e.g., `pre-commit`, `pre-push`)
+- If you skipped hook selection, cpx installs sensible defaults: fmt + lint on pre-commit, test on pre-push
 

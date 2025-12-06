@@ -1,6 +1,6 @@
 # Cross-Compilation with Docker
 
-Cpx supports cross-compilation using Docker containers. The `cpx.ci` file is automatically created when you run `cpx create`.
+Cpx supports cross-compilation using Docker containers. The `cpx.ci` file is automatically created when you run `cpx new`.
 
 ## cpx.ci Configuration
 

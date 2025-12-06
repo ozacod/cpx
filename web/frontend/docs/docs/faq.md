@@ -157,18 +157,7 @@ IndentWidth: 4
 
 ### Are there git hooks?
 
-Yes! Configure in `cpx.yaml`:
-
-```yaml
-hooks:
-  precommit:
-    - fmt
-    - lint
-  prepush:
-    - test
-```
-
-Install with:
+Yes! Pick the checks you want when running `cpx new`, then install them:
 ```bash
 cpx hooks install
 ```

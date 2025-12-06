@@ -4,18 +4,7 @@ Examples of using code quality and security tools.
 
 ## Configure Git Hooks
 
-Add to `cpx.yaml`:
-
-```yaml
-hooks:
-  precommit:
-    - fmt
-    - lint
-  prepush:
-    - test
-```
-
-Install hooks (auto-installed on project creation):
+Choose the checks (fmt, lint, test, etc.) when you run `cpx new`, then install them:
 
 ```bash
 cpx hooks install

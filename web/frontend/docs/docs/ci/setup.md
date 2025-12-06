@@ -23,7 +23,7 @@ targets:
     platform: linux/amd64
 ```
 
-The `cpx.ci` file is created automatically with empty targets when you run `cpx create`.
+The `cpx.ci` file is created automatically with empty targets when you run `cpx new`.
 
 ## 3. Generate CI Workflows (Optional)
 

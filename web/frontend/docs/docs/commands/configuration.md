@@ -20,14 +20,13 @@ cpx config get-vcpkg-root
 
 ## cpx hooks install
 
-Install git hooks based on cpx.yaml configuration.
+Install git hooks using the choices captured during `cpx new`.
 
 ```bash
 cpx hooks install
 ```
 
 This command:
-- Creates hooks for precommit/prepush if configured in cpx.yaml
-- Creates .sample files if hooks are not configured
-- Uses defaults if no cpx.yaml exists
+- Installs pre-commit / pre-push hooks with the checks you selected in the TUI
+- Falls back to defaults (fmt + lint on pre-commit, test on pre-push) if no checks were chosen
 

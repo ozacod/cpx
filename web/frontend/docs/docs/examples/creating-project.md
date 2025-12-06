@@ -5,8 +5,15 @@ Examples of creating different types of projects.
 ## Basic Executable
 
 ```bash
-# Create a simple executable project
-cpx create my_app
+# Launch the TUI and pick "Executable"
+cpx new
+
+# When prompted:
+# - Name: my_app
+# - Project type: Executable
+# - Test framework: your choice
+
+# After generation
 cd my_app
 cpx build
 cpx run
@@ -15,22 +22,28 @@ cpx run
 ## Library Project
 
 ```bash
-# Create a library project
-cpx create my_lib --lib
+# Launch the TUI and pick "Library"
+cpx new
+
+# When prompted:
+# - Name: my_lib
+# - Project type: Library
+# - Enable tests if you need them
+
+# After generation
 cd my_lib
 cpx build
 ```
 
-## From Template
+## Choose a Test Framework
 
 ```bash
-# Create from default template (googletest)
-cpx create my_project --template default
+# Start the TUI and select the framework you prefer
+cpx new
 
-# Create with Catch2 template
-cpx create my_project --template catch
-
-cd my_project
-cpx build
+# Options available in the TUI:
+# - GoogleTest (default)
+# - Catch2
+# - doctest
 ```
 

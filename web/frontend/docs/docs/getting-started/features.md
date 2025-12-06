@@ -55,7 +55,7 @@ All vcpkg commands work directly through Cpx:
 
 ## 📝 Configurable Git Hooks
 
-Automatically install git hooks based on cpx.yaml configuration:
+Select git hooks during `cpx new` and install them with a single command:
 - Pre-commit hooks
 - Pre-push hooks
 - Customizable check commands

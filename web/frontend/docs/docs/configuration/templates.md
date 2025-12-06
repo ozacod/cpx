@@ -1,76 +1,33 @@
 # Project Templates
 
-Cpx provides project templates that define the project structure, build configuration, testing framework, and git hooks.
+Cpx still relies on templates internally, but you no longer pass template files or flags. Run the TUI with `cpx new`, choose your options, and the CLI applies the right template automatically.
 
-## Using Templates
+## How it works
 
-Templates are automatically downloaded from the GitHub repository when needed.
+1. Run `cpx new`
+2. Pick executable or library
+3. Select a test framework (or none)
+4. Choose git hook checks and formatting style
 
-```bash
-# Use default template
-cpx create my_project --template default
-
-# Use Catch2 template
-cpx create my_project --template catch
-```
+The CLI downloads the matching template and fills in your answers—no `cpx.yaml` required.
 
 ## Available Templates
 
-### default
+### Default (GoogleTest)
 
-The default template uses Google Test framework and includes standard git hooks configuration.
+Uses GoogleTest with standard git hook options and vcpkg manifest defaults. clang-format style is set from your TUI choice.
 
-**Configuration:**
-```yaml
-package:
-  version: 0.1.0
-  cpp_standard: 17
+### Catch2
 
-build:
-  shared_libs: false
-  clang_format: Google
+Uses Catch2 with the same build and hook scaffolding. Catch2 is pulled in via FetchContent automatically.
 
-testing:
-  framework: googletest
+### No-test option
 
-hooks:
-  precommit:
-    - fmt
-    - lint
-  prepush:
-    - test
-```
-
-### catch
-
-The catch template uses Catch2 test framework. Catch2 is automatically downloaded via FetchContent.
-
-**Configuration:**
-```yaml
-package:
-  version: 0.1.0
-  cpp_standard: 17
-
-build:
-  shared_libs: false
-  clang_format: Google
-
-testing:
-  framework: catch2
-
-hooks:
-  precommit:
-    - fmt
-    - lint
-  prepush:
-    - test
-```
+If you choose "no tests" in the TUI, the project is generated without testing targets while keeping the rest of the layout intact.
 
 ## Template Features
 
-- **Automatic Download**: Templates are downloaded from GitHub when needed
-- **No Local Storage**: Templates are not stored locally, always fetched from the repository
-- **Testing Framework**: Choose between googletest (default) or catch2
-- **Git Hooks**: Templates can include pre-configured git hooks
-- **Build Configuration**: C++ standard, clang-format style, and library settings
-
+- Automatic download and application based on TUI choices
+- Test framework selection in the TUI (GoogleTest, Catch2, or none)
+- Git hook options captured in the TUI
+- Build configuration driven by your answers (C++ standard, shared/static, clang-format style)
