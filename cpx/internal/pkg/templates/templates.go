@@ -403,7 +403,7 @@ FetchContent_MakeAvailable(Catch2)
 `)
 		sb.WriteString(fmt.Sprintf("target_link_libraries(%s_bench PRIVATE Catch2::Catch2WithMain)\n", projectName))
 	} else if hasNanoBench {
-		sb.WriteString(`# Fetch nanobench (header-only)
+		sb.WriteString(`# Fetch nanobench
 include(FetchContent)
 FetchContent_Declare(
     nanobench
@@ -413,7 +413,7 @@ FetchContent_Declare(
 FetchContent_MakeAvailable(nanobench)
 
 `)
-		sb.WriteString(fmt.Sprintf("target_include_directories(%s_bench PRIVATE ${nanobench_SOURCE_DIR}/src/include)\n", projectName))
+		sb.WriteString(fmt.Sprintf("target_link_libraries(%s_bench PRIVATE nanobench)\n", projectName))
 	}
 
 	return sb.String()
