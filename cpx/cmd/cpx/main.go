@@ -12,7 +12,6 @@ import (
 	"github.com/ozacod/cpx/internal/app/cli/root"
 	"github.com/ozacod/cpx/internal/pkg/templates"
 	"github.com/ozacod/cpx/internal/pkg/vcpkg"
-	"github.com/ozacod/cpx/pkg/config"
 )
 
 var vcpkgClient *vcpkg.Client
@@ -56,8 +55,6 @@ const (
 	Cyan   = cli.Cyan
 )
 
-type CpxConfig = config.ProjectConfig
-
 func getVcpkgPath() (string, error) {
 	client, err := getVcpkgClient()
 	if err != nil {
@@ -86,23 +83,7 @@ func main() {
 		getVcpkgPath,
 		setupVcpkgProject,
 		func(targetDir string, cfg *cli.CpxConfig, projectName string, isLib bool) error {
-			// Convert cli.CpxConfig to main.CpxConfig
-			mainCfg := &CpxConfig{}
-			mainCfg.Package.Name = cfg.Package.Name
-			mainCfg.Package.Version = cfg.Package.Version
-			mainCfg.Package.CppStandard = cfg.Package.CppStandard
-			mainCfg.Package.Authors = cfg.Package.Authors
-			mainCfg.Package.Description = cfg.Package.Description
-			mainCfg.Build.SharedLibs = cfg.Build.SharedLibs
-			mainCfg.Build.ClangFormat = cfg.Build.ClangFormat
-			mainCfg.Build.BuildType = cfg.Build.BuildType
-			mainCfg.Build.CxxFlags = cfg.Build.CxxFlags
-			mainCfg.VCS.Type = cfg.VCS.Type
-			mainCfg.PackageManager.Type = cfg.PackageManager.Type
-			mainCfg.Testing.Framework = cfg.Testing.Framework
-			mainCfg.Hooks.PreCommit = cfg.Hooks.PreCommit
-			mainCfg.Hooks.PrePush = cfg.Hooks.PrePush
-			return generateVcpkgProjectFilesFromConfig(targetDir, mainCfg, projectName, isLib)
+			return generateVcpkgProjectFilesFromConfig(targetDir, cfg, projectName, isLib)
 		}))
 	rootCmd.AddCommand(cli.AddCmd(runVcpkgCommand))
 	rootCmd.AddCommand(cli.RemoveCmd(runVcpkgCommand))
@@ -219,7 +200,7 @@ func setupVcpkgProject(targetDir, _ string, _ bool, dependencies []string) error
 }
 
 // generateVcpkgProjectFilesFromConfig generates CMake files with vcpkg integration from config struct
-func generateVcpkgProjectFilesFromConfig(targetDir string, cfg *CpxConfig, projectName string, isLib bool) error {
+func generateVcpkgProjectFilesFromConfig(targetDir string, cfg *cli.CpxConfig, projectName string, isLib bool) error {
 	if cfg == nil {
 		return fmt.Errorf("config is nil")
 	}
