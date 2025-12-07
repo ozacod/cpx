@@ -37,13 +37,13 @@ func CICmd() *cobra.Command {
 	return cmd
 }
 
-func runCI(cmd *cobra.Command, args []string) error {
+func runCI(cmd *cobra.Command, _ []string) error {
 	target, _ := cmd.Flags().GetString("target")
 	rebuild, _ := cmd.Flags().GetBool("rebuild")
 	return runCICommand(target, rebuild)
 }
 
-func runCIInit(cmd *cobra.Command, args []string) error {
+func runCIInit(cmd *cobra.Command, _ []string) error {
 	githubActions, _ := cmd.Flags().GetBool("github-actions")
 	gitlab, _ := cmd.Flags().GetBool("gitlab")
 
@@ -486,9 +486,7 @@ func runDockerBuild(target config.CITarget, projectRoot, outputDir string, build
 	// This is the recommended way to configure vcpkg cache location
 
 	// Add optimization flags
-	if optLevel != "" {
-		cmakeArgs = append(cmakeArgs, "-DCMAKE_CXX_FLAGS=-O"+optLevel)
-	}
+	cmakeArgs = append(cmakeArgs, "-DCMAKE_CXX_FLAGS=-O"+optLevel)
 
 	if triplet != "" {
 		cmakeArgs = append(cmakeArgs, "-DVCPKG_TARGET_TRIPLET="+triplet)

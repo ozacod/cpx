@@ -22,7 +22,7 @@ func CleanCmd() *cobra.Command {
 	return cmd
 }
 
-func runClean(cmd *cobra.Command, args []string) error {
+func runClean(cmd *cobra.Command, _ []string) error {
 	all, _ := cmd.Flags().GetBool("all")
 
 	buildDir := "build"

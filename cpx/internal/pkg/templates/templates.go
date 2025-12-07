@@ -80,92 +80,28 @@ func GenerateVersionHpp(projectName, projectVersion string) string {
 }
 
 func GenerateMainCpp(projectName string, libraryIDs []string) string {
+	// libraryIDs currently unused in the minimal template
+	_ = libraryIDs
+
 	safeName := safeIdent(projectName)
 	safeNameUpper := safeIdentUpper(projectName)
-	var includes []string
-	hasSpdlog := false
-	hasCLI11 := false
-	hasArgparse := false
-
-	for _, libID := range libraryIDs {
-		switch libID {
-		case "nlohmann_json":
-			includes = append(includes, "#include <nlohmann/json.hpp>")
-		case "spdlog":
-			includes = append(includes, "#include <spdlog/spdlog.h>")
-			hasSpdlog = true
-		case "fmt":
-			includes = append(includes, "#include <fmt/format.h>")
-		case "cli11":
-			includes = append(includes, "#include <CLI/CLI.hpp>")
-			hasCLI11 = true
-		case "argparse":
-			includes = append(includes, "#include <argparse/argparse.hpp>")
-			hasArgparse = true
-		}
-	}
-
-	includesStr := strings.Join(includes, "\n")
-	if includesStr != "" {
-		includesStr = "\n" + includesStr
-	}
 
 	var sb strings.Builder
 	versionMacro := safeNameUpper + "_VERSION"
 	sb.WriteString(fmt.Sprintf(`#include <%s/%s.hpp>
 #include <%s/version.hpp>
-#include <iostream>%s
+#include <iostream>
 
 int main(int argc, char* argv[]) {
-`, projectName, projectName, projectName, includesStr))
-
-	if hasSpdlog {
-		sb.WriteString(fmt.Sprintf(`    spdlog::info("Starting %s {}", %s);
-`, projectName, versionMacro))
-	} else {
-		sb.WriteString(fmt.Sprintf(`    std::cout << "Starting %s " << %s << std::endl;
-`, projectName, versionMacro))
-	}
-
-	if hasCLI11 {
-		sb.WriteString(fmt.Sprintf(`
-    CLI::App app{"%s application"};
-    
-    std::string name = "World";
-    app.add_option("-n,--name", name, "Name to greet");
-    
-    CLI11_PARSE(app, argc, argv);
-`, projectName))
-	} else if hasArgparse {
-		sb.WriteString(fmt.Sprintf(`
-    argparse::ArgumentParser program("%s");
-    
-    program.add_argument("-n", "--name")
-        .default_value(std::string("World"))
-        .help("Name to greet");
-    
-    try {
-        program.parse_args(argc, argv);
-    } catch (const std::exception& err) {
-        std::cerr << err.what() << std::endl;
-        std::cerr << program;
-        return 1;
-    }
-    
-    auto name = program.get<std::string>("--name");
-`, projectName))
-	} else {
-		sb.WriteString(`    (void)argc;
+    (void)argc;
     (void)argv;
-`)
-	}
 
-	sb.WriteString(fmt.Sprintf(`
+    std::cout << "Starting %s " << %s << std::endl;
     %s::greet();
     
     return 0;
 }
-`, safeName))
+`, projectName, projectName, projectName, projectName, versionMacro, safeName))
 
 	return sb.String()
 }
@@ -198,51 +134,25 @@ std::string version();
 }
 
 func GenerateLibSource(projectName string, libraryIDs []string) string {
+	// libraryIDs currently unused in the minimal template
+	_ = libraryIDs
+
 	safeName := safeIdent(projectName)
-	hasSpdlog := false
-	hasFmt := false
-
-	for _, libID := range libraryIDs {
-		switch libID {
-		case "spdlog":
-			hasSpdlog = true
-		case "fmt":
-			hasFmt = true
-		}
-	}
-
-	var includes []string
-	includes = append(includes, fmt.Sprintf("#include <%s/%s.hpp>", projectName, projectName))
-
-	if hasSpdlog {
-		includes = append(includes, "#include <spdlog/spdlog.h>")
-	}
-	if hasFmt {
-		includes = append(includes, "#include <fmt/format.h>")
-	}
-	includes = append(includes, "#include <iostream>")
 
 	var sb strings.Builder
-	sb.WriteString(strings.Join(includes, "\n"))
-	sb.WriteString("\n\n")
+	sb.WriteString(fmt.Sprintf("#include <%s/%s.hpp>\n", projectName, projectName))
+	sb.WriteString("#include <iostream>\n\n")
 	sb.WriteString(fmt.Sprintf("namespace %s {\n\n", safeName))
-	sb.WriteString("void greet() {\n")
-
-	if hasSpdlog {
-		sb.WriteString(fmt.Sprintf(`    spdlog::info("Hello from %s!");
-`, projectName))
-	} else {
-		sb.WriteString(fmt.Sprintf(`    std::cout << "Hello from %s!" << std::endl;
-`, projectName))
-	}
-
-	sb.WriteString(`}
+	sb.WriteString(fmt.Sprintf(`void greet() {
+    std::cout << "Hello from %s!" << std::endl;
+}
 
 std::string version() {
     return "1.0.0";
 }
 
-}  // namespace ` + safeName + "\n")
+}  // namespace `+safeName+`
+`, projectName))
 
 	return sb.String()
 }

@@ -15,12 +15,6 @@ import (
 	"github.com/ozacod/cpx/pkg/config"
 )
 
-const (
-	Version       = cli.Version
-	DefaultServer = cli.DefaultServer
-	LockFile      = cli.LockFile
-)
-
 var vcpkgClient *vcpkg.Client
 
 func getVcpkgClient() (*vcpkg.Client, error) {
@@ -56,14 +50,10 @@ func setupVcpkgEnv() error {
 }
 
 const (
-	Reset   = cli.Reset
-	Red     = cli.Red
-	Green   = cli.Green
-	Yellow  = cli.Yellow
-	Blue    = cli.Blue
-	Magenta = cli.Magenta
-	Cyan    = cli.Cyan
-	Bold    = cli.Bold
+	Reset  = cli.Reset
+	Red    = cli.Red
+	Yellow = cli.Yellow
+	Cyan   = cli.Cyan
 )
 
 type CpxConfig = config.ProjectConfig

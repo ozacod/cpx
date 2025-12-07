@@ -30,7 +30,7 @@ func CheckCmd(setupVcpkgEnv func() error) *cobra.Command {
 	return cmd
 }
 
-func runCheck(cmd *cobra.Command, args []string) error {
+func runCheck(cmd *cobra.Command, _ []string) error {
 	asan, _ := cmd.Flags().GetBool("asan")
 	tsan, _ := cmd.Flags().GetBool("tsan")
 	msan, _ := cmd.Flags().GetBool("msan")

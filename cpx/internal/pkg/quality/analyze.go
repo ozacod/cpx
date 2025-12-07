@@ -411,13 +411,6 @@ func parseCppcheckErrorTag(tag string) []AnalysisResult {
 	return results
 }
 
-func min(a, b int) int {
-	if a < b {
-		return a
-	}
-	return b
-}
-
 func extractXMLAttr(line, attr string) string {
 	prefix := attr + "=\""
 	start := strings.Index(line, prefix)

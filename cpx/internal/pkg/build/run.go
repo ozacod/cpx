@@ -175,8 +175,8 @@ func RunProject(release bool, target string, execArgs []string, verbose bool, se
 			} else {
 				// Multiple executables found, list them
 				fmt.Printf("%s Multiple executables found:%s\n", colorGray, colorReset)
-				for i, exec := range executables {
-					fmt.Printf("  [%d] %s\n", i+1, filepath.Base(exec))
+				for i, executable := range executables {
+					fmt.Printf("  [%d] %s\n", i+1, filepath.Base(executable))
 				}
 				fmt.Printf("\nUse --target <name> to specify which one to run\n")
 				// Run the first one by default
