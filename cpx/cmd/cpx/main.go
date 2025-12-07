@@ -1,17 +1,13 @@
 package main
 
 import (
-	"encoding/json"
 	"fmt"
 	"os"
 	"os/exec"
-	"path/filepath"
 	"strings"
 
 	"github.com/ozacod/cpx/internal/app/cli"
 	"github.com/ozacod/cpx/internal/app/cli/root"
-	"github.com/ozacod/cpx/internal/app/cli/tui"
-	"github.com/ozacod/cpx/internal/pkg/templates"
 	"github.com/ozacod/cpx/internal/pkg/vcpkg"
 )
 
@@ -193,162 +189,4 @@ func setupVcpkgProject(targetDir, _ string, _ bool, dependencies []string) error
 	}
 
 	return nil
-}
-
-// generateVcpkgProjectFilesFromConfig generates CMake files with vcpkg integration from config struct
-func generateVcpkgProjectFilesFromConfig(targetDir string, cfg *tui.ProjectConfig, projectName string, isLib bool) error {
-	if cfg == nil {
-		return fmt.Errorf("config is nil")
-	}
-
-	cppStandard := cfg.CppStandard
-	if cppStandard == 0 {
-		cppStandard = 17
-	}
-
-	projectVersion := "0.1.0"
-
-	// Get dependencies from vcpkg.json, not cpx.yaml
-	dependencies, err := getDependenciesFromVcpkgJsonLocal(targetDir)
-	if err != nil {
-		// If vcpkg.json doesn't exist or can't be read, use empty list
-		dependencies = []string{}
-	}
-
-	// Create directories
-	dirs := []string{
-		"include/" + projectName,
-		"src",
-		"tests",
-	}
-	for _, dir := range dirs {
-		if err := os.MkdirAll(filepath.Join(targetDir, dir), 0755); err != nil {
-			return fmt.Errorf("failed to create directory %s: %w", dir, err)
-		}
-	}
-
-	// Generate CMakeLists.txt with vcpkg integration
-	cmakeLists := templates.GenerateVcpkgCMakeLists(projectName, cppStandard, dependencies, !isLib, cfg.TestFramework != "" && cfg.TestFramework != "none", cfg.TestFramework, projectVersion)
-	if err := os.WriteFile(filepath.Join(targetDir, "CMakeLists.txt"), []byte(cmakeLists), 0644); err != nil {
-		return fmt.Errorf("failed to write CMakeLists.txt: %w", err)
-	}
-
-	// Generate CMakePresets.json only if using vcpkg
-	// (contains vcpkg toolchain reference)
-	if cfg.PackageManager == "" || cfg.PackageManager == "vcpkg" {
-		cmakePresets := templates.GenerateCMakePresets()
-		if err := os.WriteFile(filepath.Join(targetDir, "CMakePresets.json"), []byte(cmakePresets), 0644); err != nil {
-			return fmt.Errorf("failed to write CMakePresets.json: %w", err)
-		}
-	}
-
-	// Generate version.hpp
-	versionHpp := templates.GenerateVersionHpp(projectName, projectVersion)
-	if err := os.WriteFile(filepath.Join(targetDir, "include/"+projectName+"/version.hpp"), []byte(versionHpp), 0644); err != nil {
-		return fmt.Errorf("failed to write version.hpp: %w", err)
-	}
-
-	// Generate header file
-	libHeader := templates.GenerateLibHeader(projectName)
-	if err := os.WriteFile(filepath.Join(targetDir, "include/"+projectName+"/"+projectName+".hpp"), []byte(libHeader), 0644); err != nil {
-		return fmt.Errorf("failed to write header: %w", err)
-	}
-
-	// Generate source files
-	if !isLib {
-		mainCpp := templates.GenerateMainCpp(projectName, dependencies)
-		if err := os.WriteFile(filepath.Join(targetDir, "src/main.cpp"), []byte(mainCpp), 0644); err != nil {
-			return fmt.Errorf("failed to write main.cpp: %w", err)
-		}
-	}
-
-	libSource := templates.GenerateLibSource(projectName, dependencies)
-	if err := os.WriteFile(filepath.Join(targetDir, "src/"+projectName+".cpp"), []byte(libSource), 0644); err != nil {
-		return fmt.Errorf("failed to write source: %w", err)
-	}
-
-	// Generate README
-	readme := templates.GenerateVcpkgReadme(projectName, dependencies, cppStandard, isLib)
-	if err := os.WriteFile(filepath.Join(targetDir, "README.md"), []byte(readme), 0644); err != nil {
-		return fmt.Errorf("failed to write README: %w", err)
-	}
-
-	// Generate .gitignore only if VCS is git or not specified (default to git)
-	if cfg.VCS == "" || cfg.VCS == "git" {
-		gitignore := templates.GenerateGitignore()
-		if err := os.WriteFile(filepath.Join(targetDir, ".gitignore"), []byte(gitignore), 0644); err != nil {
-			return fmt.Errorf("failed to write .gitignore: %w", err)
-		}
-	}
-
-	// Generate .clang-format
-	clangFormatStyle := cfg.ClangFormat
-	if clangFormatStyle == "" {
-		clangFormatStyle = "Google"
-	}
-	clangFormat := templates.GenerateClangFormat(clangFormatStyle)
-	if err := os.WriteFile(filepath.Join(targetDir, ".clang-format"), []byte(clangFormat), 0644); err != nil {
-		return fmt.Errorf("failed to write .clang-format: %w", err)
-	}
-
-	// Generate test files if testing framework is enabled
-	if cfg.TestFramework != "" && cfg.TestFramework != "none" {
-		// Generate tests/CMakeLists.txt
-		testCMake := templates.GenerateTestCMake(projectName, dependencies, cfg.TestFramework)
-		if err := os.WriteFile(filepath.Join(targetDir, "tests/CMakeLists.txt"), []byte(testCMake), 0644); err != nil {
-			return fmt.Errorf("failed to write tests/CMakeLists.txt: %w", err)
-		}
-
-		// Generate tests/test_main.cpp
-		testMain := templates.GenerateTestMain(projectName, dependencies, cfg.TestFramework)
-		if err := os.WriteFile(filepath.Join(targetDir, "tests/test_main.cpp"), []byte(testMain), 0644); err != nil {
-			return fmt.Errorf("failed to write tests/test_main.cpp: %w", err)
-		}
-	}
-
-	// Generate cpx.ci with empty targets
-	cpxCI := templates.GenerateCpxCI()
-	if err := os.WriteFile(filepath.Join(targetDir, "cpx.ci"), []byte(cpxCI), 0644); err != nil {
-		return fmt.Errorf("failed to write cpx.ci: %w", err)
-	}
-
-	return nil
-}
-
-// removeDependenciesFromYaml removes the dependencies section from YAML content
-// getDependenciesFromVcpkgJson reads dependencies from vcpkg.json
-// getDependenciesFromVcpkgJsonLocal is a local helper for createProject
-func getDependenciesFromVcpkgJsonLocal(projectDir string) ([]string, error) {
-	vcpkgJsonPath := filepath.Join(projectDir, "vcpkg.json")
-
-	// Check if vcpkg.json exists
-	if _, err := os.Stat(vcpkgJsonPath); os.IsNotExist(err) {
-		return []string{}, nil
-	}
-
-	// Read vcpkg.json
-	data, err := os.ReadFile(vcpkgJsonPath)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read vcpkg.json: %w", err)
-	}
-
-	var vcpkgJson map[string]interface{}
-	if err := json.Unmarshal(data, &vcpkgJson); err != nil {
-		return nil, fmt.Errorf("failed to parse vcpkg.json: %w", err)
-	}
-
-	// Extract dependencies
-	deps, ok := vcpkgJson["dependencies"].([]interface{})
-	if !ok {
-		return []string{}, nil
-	}
-
-	dependencies := make([]string, 0, len(deps))
-	for _, dep := range deps {
-		if depStr, ok := dep.(string); ok {
-			dependencies = append(dependencies, depStr)
-		}
-	}
-
-	return dependencies, nil
 }
