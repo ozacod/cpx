@@ -1,8 +1,9 @@
 <div align="center">
-  <img src="cpx.svg" alt="cpx logo" width="200" />
 
-  # cpx
-  **Cpx Your Code!** Cargo-like DX for C++: scaffold, build, test, lint, package, and cross-compile with one CLI.
+# <img src="cpx.svg" alt="cpx logo" width="30" /> cpx
+
+**Cpx Your Code!** Cargo-like DX for C++: scaffold, build, test, bench, lint, package, and cross-compile with one CLI.
+
 </div>
 
 [![GitHub release](https://img.shields.io/github/release/ozacod/cpx.svg)](https://github.com/ozacod/cpx/releases)
@@ -15,14 +16,18 @@
 
 ## Overview
 
-cpx is a batteries-included CLI for C++ that pairs an interactive TUI with sensible defaults: CMake presets, vcpkg dependencies, testing, formatting, linting, sanitizers, git hooks, and Docker-based CI targets (including Alpine/musl). Releases embed the tag version directly into the binary so `cpx --version` always matches the downloaded release.
+cpx is a batteries-included CLI for C++ that pairs an interactive TUI with sensible defaults: CMake presets, vcpkg dependencies, testing, benchmarking, formatting, linting, sanitizers, git hooks, and Docker-based CI targets (including Alpine/musl). Releases embed the tag version directly into the binary so `cpx --version` always matches the downloaded release.
 
 ### Highlights
-- Interactive `cpx new` TUI (project type, test framework, hooks, style, standard, vcpkg)
+- Interactive `cpx new` TUI:
+  - Templates: App or Library
+  - Test Frameworks: GoogleTest, Catch2, Doctest
+  - Benchmarking: Google Benchmark, Nanobench, Catch2
+  - Git Hooks: Auto-configure pre-commit (fmt/lint) and pre-push (test)
+- **Smart Add**: `cpx add <pkg>` fetches usage info and auto-injects `find_package` and `target_link_libraries` into `CMakeLists.txt`.
 - vcpkg-first workflow with generated `CMakePresets.json`
 - Code quality: clang-format, clang-tidy, Cppcheck, Flawfinder
 - Sanitizers: ASan, TSan, MSan, UBSan
-- Git hooks: pre-commit/pre-push with configurable checks
 - CI and cross-compilation: Docker targets for linux-amd64/arm64, macOS (placeholder), windows-amd64, plus Alpine musl images
 - Self-updating installer and `cpx upgrade`
 
@@ -60,16 +65,17 @@ cd <project>
 cpx build          # or: cpx build --release
 cpx run            # run the app
 cpx test           # run tests
+cpx bench          # run benchmarks
 cpx fmt            # format
 cpx lint           # clang-tidy
-cpx add port fmt   # add a vcpkg port
+cpx add fmt   # adds dependency and updates CMakeLists.txt
 ```
 
 ## Command sampler
-- Project: `cpx new`, `cpx add port <pkg>`, `cpx remove <pkg>`, `cpx search <term>`, `cpx list`, `cpx info <pkg>`
-- Build/run/test: `cpx build [--release|-j 8|--asan|--tsan|--msan|--ubsan]`, `cpx run [--release]`, `cpx test [--filter <name>]`, `cpx check`
+- Project: `cpx new`, `cpx add <pkg>` (Smart Add), `cpx remove <pkg>`, `cpx search <term>`, `cpx list`, `cpx info <pkg>`
+- Build/run/test: `cpx build [--release|-j 8|--asan|--tsan|--msan|--ubsan]`, `cpx run [--release]`, `cpx test [--filter <name>]`, `cpx bench [--verbose]`, `cpx check`
 - Quality: `cpx fmt [--check]`, `cpx lint [--fix]`, `cpx flawfinder [--html|--csv|--dataflow]`, `cpx cppcheck [--xml|--enable <checks>]`
-- Hooks: `cpx hooks install`
+- Hooks: `cpx hooks install` (manual refit)
 - Versioning: `cpx release <major|minor|patch>` (updates `CMakeLists.txt` and `version.hpp` if present)
 - CI: `cpx ci [--target <name>] [--rebuild]`
 - Utilities: `cpx config set-vcpkg-root <path>`, `cpx upgrade`, `cpx doc`
@@ -93,6 +99,7 @@ my_project/
 │   └── version.hpp      # generated with version macros
 ├── src/
 ├── tests/
+├── bench/               # optional benchmarks
 └── build/               # gitignored
 ```
 
