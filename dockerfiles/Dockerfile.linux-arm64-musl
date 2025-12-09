@@ -3,20 +3,29 @@ FROM --platform=linux/arm64 alpine:3.20
 
 ENV VCPKG_ROOT=/opt/vcpkg
 ENV PATH="${VCPKG_ROOT}:${PATH}"
-ENV DEBIAN_FRONTEND=noninteractive
+# Force vcpkg to use system binaries instead of downloading its own
+ENV VCPKG_FORCE_SYSTEM_BINARIES=1
 
-# Base tools for musl builds
+# Add edge repository for newer cmake
+RUN echo "https://dl-cdn.alpinelinux.org/alpine/edge/main" >> /etc/apk/repositories && \
+    echo "https://dl-cdn.alpinelinux.org/alpine/edge/community" >> /etc/apk/repositories
+
+# Base tools for musl builds - cmake from edge repo
 RUN apk add --no-cache \
     bash \
     build-base \
-    cmake \
     ninja \
     git \
     curl \
     tar \
+    openssl \
+    openssl-dev \
     zip \
     unzip \
-    linux-headers
+    linux-headers \
+    perl \
+    pkgconf && \
+    apk add --no-cache cmake --repository=https://dl-cdn.alpinelinux.org/alpine/edge/main
 
 # Install vcpkg (forces source build on musl)
 RUN git clone https://github.com/Microsoft/vcpkg.git /opt/vcpkg && \

@@ -19,13 +19,13 @@ targets:
   - name: linux-amd64-musl
     dockerfile: Dockerfile.linux-amd64-musl
     image: cpx-linux-amd64-musl
-    triplet: x64-linux-musl
+    triplet: x64-linux
     platform: linux/amd64
     
   - name: linux-arm64-musl
     dockerfile: Dockerfile.linux-arm64-musl
     image: cpx-linux-arm64-musl
-    triplet: arm64-linux-musl
+    triplet: arm64-linux
     platform: linux/arm64
 
   # Windows cross-compilation using MinGW (builds from Linux)
