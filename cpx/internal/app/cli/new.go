@@ -127,7 +127,7 @@ func createProjectFromTUI(config tui.ProjectConfig, getVcpkgPath func() (string,
 	projectVersion := "0.1.0"
 
 	// Generate benchmark artifacts if enabled
-	benchSources, _ := generateBenchmarkArtifacts(projectName, cfg.Benchmark)
+	benchSources, _ := templates.GenerateBenchmarkSources(projectName, cfg.Benchmark)
 
 	// Create directory structure
 	dirs := []string{
@@ -150,21 +150,39 @@ func createProjectFromTUI(config tui.ProjectConfig, getVcpkgPath func() (string,
 	// Generate build system files based on package manager choice
 	if cfg.PackageManager == "bazel" {
 		// Generate MODULE.bazel
-		moduleBazel := templates.GenerateModuleBazel(projectName, projectVersion)
+		moduleBazel := templates.GenerateModuleBazel(projectName, projectVersion, cfg.TestFramework, cfg.Benchmark)
 		if err := os.WriteFile(filepath.Join(projectName, "MODULE.bazel"), []byte(moduleBazel), 0644); err != nil {
 			return fmt.Errorf("failed to write MODULE.bazel: %w", err)
 		}
 
-		// Generate BUILD.bazel
+		// Generate root BUILD.bazel (aliases)
 		buildBazel := templates.GenerateBuildBazelRoot(projectName, !cfg.IsLibrary)
 		if err := os.WriteFile(filepath.Join(projectName, "BUILD.bazel"), []byte(buildBazel), 0644); err != nil {
 			return fmt.Errorf("failed to write BUILD.bazel: %w", err)
+		}
+
+		// Generate src/BUILD.bazel
+		srcBuild := templates.GenerateBuildBazelSrc(projectName, !cfg.IsLibrary)
+		if err := os.WriteFile(filepath.Join(projectName, "src/BUILD.bazel"), []byte(srcBuild), 0644); err != nil {
+			return fmt.Errorf("failed to write src/BUILD.bazel: %w", err)
+		}
+
+		// Generate include/BUILD.bazel
+		includeBuild := templates.GenerateBuildBazelInclude(projectName)
+		if err := os.WriteFile(filepath.Join(projectName, "include/BUILD.bazel"), []byte(includeBuild), 0644); err != nil {
+			return fmt.Errorf("failed to write include/BUILD.bazel: %w", err)
 		}
 
 		// Generate .bazelrc
 		bazelrc := templates.GenerateBazelrc(cppStandard)
 		if err := os.WriteFile(filepath.Join(projectName, ".bazelrc"), []byte(bazelrc), 0644); err != nil {
 			return fmt.Errorf("failed to write .bazelrc: %w", err)
+		}
+
+		// Generate .bazelignore
+		bazelignore := templates.GenerateBazelignore()
+		if err := os.WriteFile(filepath.Join(projectName, ".bazelignore"), []byte(bazelignore), 0644); err != nil {
+			return fmt.Errorf("failed to write .bazelignore: %w", err)
 		}
 	} else {
 		// Generate CMakeLists.txt (vcpkg or none)
@@ -215,10 +233,18 @@ func createProjectFromTUI(config tui.ProjectConfig, getVcpkgPath func() (string,
 			return fmt.Errorf("failed to write bench_main.cpp: %w", err)
 		}
 
-		// Generate bench/CMakeLists.txt
-		benchCMake := templates.GenerateBenchCMake(projectName, cfg.Benchmark)
-		if err := os.WriteFile(filepath.Join(projectName, "bench/CMakeLists.txt"), []byte(benchCMake), 0644); err != nil {
-			return fmt.Errorf("failed to write bench/CMakeLists.txt: %w", err)
+		if cfg.PackageManager == "bazel" {
+			// Generate bench/BUILD.bazel for Bazel projects
+			benchBuild := templates.GenerateBuildBazelBench(projectName, cfg.Benchmark)
+			if err := os.WriteFile(filepath.Join(projectName, "bench/BUILD.bazel"), []byte(benchBuild), 0644); err != nil {
+				return fmt.Errorf("failed to write bench/BUILD.bazel: %w", err)
+			}
+		} else {
+			// Generate bench/CMakeLists.txt for CMake projects
+			benchCMake := templates.GenerateBenchCMake(projectName, cfg.Benchmark)
+			if err := os.WriteFile(filepath.Join(projectName, "bench/CMakeLists.txt"), []byte(benchCMake), 0644); err != nil {
+				return fmt.Errorf("failed to write bench/CMakeLists.txt: %w", err)
+			}
 		}
 	}
 
@@ -258,9 +284,18 @@ func createProjectFromTUI(config tui.ProjectConfig, getVcpkgPath func() (string,
 
 	// Generate test files if test framework is selected
 	if cfg.TestFramework != "" && cfg.TestFramework != "none" {
-		testCMake := templates.GenerateTestCMake(projectName, cfg.TestFramework)
-		if err := os.WriteFile(filepath.Join(projectName, "tests/CMakeLists.txt"), []byte(testCMake), 0644); err != nil {
-			return fmt.Errorf("failed to write tests/CMakeLists.txt: %w", err)
+		if cfg.PackageManager == "bazel" {
+			// Generate tests/BUILD.bazel for Bazel projects
+			testsBuild := templates.GenerateBuildBazelTests(projectName, cfg.TestFramework)
+			if err := os.WriteFile(filepath.Join(projectName, "tests/BUILD.bazel"), []byte(testsBuild), 0644); err != nil {
+				return fmt.Errorf("failed to write tests/BUILD.bazel: %w", err)
+			}
+		} else {
+			// Generate tests/CMakeLists.txt for CMake projects
+			testCMake := templates.GenerateTestCMake(projectName, cfg.TestFramework)
+			if err := os.WriteFile(filepath.Join(projectName, "tests/CMakeLists.txt"), []byte(testCMake), 0644); err != nil {
+				return fmt.Errorf("failed to write tests/CMakeLists.txt: %w", err)
+			}
 		}
 
 		testMain := templates.GenerateTestMain(projectName, cfg.TestFramework)

@@ -706,26 +706,29 @@ func runDockerBazelBuild(target config.CITarget, projectRoot, outputDir string, 
 
 	// Create Bazel build script
 	// Use --output_base to keep Bazel's output completely separate from the workspace
+	// Use HOME=/root to reuse Bazel downloaded during Docker image build
+	// Use --symlink_prefix=/dev/null to suppress symlinks (workspace is read-only)
+	// Use --spawn_strategy=local to disable sandbox (causes issues in Docker)
 	buildScript := fmt.Sprintf(`#!/bin/bash
 set -e
 echo "  Building with Bazel..."
-# Set up Bazel with output_base outside workspace to avoid conflicts
-export HOME=/tmp
+# Use HOME=/root to reuse Bazel pre-downloaded during Docker image build
+export HOME=/root
 BAZEL_OUTPUT_BASE=/bazel-cache
 mkdir -p "$BAZEL_OUTPUT_BASE"
-# Build with config - use output_base to keep bazel output outside workspace
-bazel --output_base="$BAZEL_OUTPUT_BASE" build --config=%s //...
+# Build with config
+# --output_base: keep bazel output outside workspace
+# --symlink_prefix=/dev/null: suppress symlinks (workspace is read-only)
+# --spawn_strategy=local: disable sandbox (causes issues in Docker)
+bazel --output_base="$BAZEL_OUTPUT_BASE" build --config=%s --symlink_prefix=/dev/null --spawn_strategy=local //...
 echo "  Copying artifacts..."
 mkdir -p /output/%s
-# Copy binaries from bazel-bin (which is now under output_base)
+# Copy binaries from bazel-bin (under output_base)
 find "$BAZEL_OUTPUT_BASE" -path "*/bin/*" -type f -executable ! -name "*.runfiles*" ! -name "*.params" ! -name "*.sh" ! -name "*.py" -exec cp {} /output/%s/ \; 2>/dev/null || true
-# Also check symlinked bazel-bin in workspace
-find bazel-bin -type f -executable ! -name "*.runfiles*" ! -name "*.params" ! -name "*.sh" ! -name "*.py" -exec cp {} /output/%s/ \; 2>/dev/null || true
-# Copy libraries
+# Copy libraries  
 find "$BAZEL_OUTPUT_BASE" -path "*/bin/*" -type f \( -name "*.a" -o -name "*.so" \) -exec cp {} /output/%s/ \; 2>/dev/null || true
-find bazel-bin -type f \( -name "*.a" -o -name "*.so" \) -exec cp {} /output/%s/ \; 2>/dev/null || true
 echo "  Build complete!"
-`, bazelConfig, target.Name, target.Name, target.Name, target.Name, target.Name)
+`, bazelConfig, target.Name, target.Name, target.Name)
 
 	// Run Docker container
 	fmt.Printf("  %s Running Bazel build in Docker container...%s\n", Cyan, Reset)

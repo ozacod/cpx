@@ -608,89 +608,252 @@ MIT
 // ============================================================================
 
 // GenerateModuleBazel generates MODULE.bazel content for a Bazel project
-func GenerateModuleBazel(projectName, version string) string {
+func GenerateModuleBazel(projectName, version, testFramework, benchmarkFramework string) string {
 	if version == "" {
 		version = "0.1.0"
 	}
-	return fmt.Sprintf(`module(
+
+	// Base module definition
+	content := fmt.Sprintf(`module(
     name = "%s",
     version = "%s",
 )
 
-bazel_dep(name = "rules_cc", version = "0.1.0")
+bazel_dep(name = "rules_cc", version = "0.1.1")
 `, projectName, version)
+
+	// Add test framework dependency
+	switch testFramework {
+	case "googletest":
+		content += `bazel_dep(name = "googletest", version = "1.15.2")
+`
+	case "catch2":
+		content += `bazel_dep(name = "catch2", version = "3.7.1")
+`
+	case "doctest":
+		content += `bazel_dep(name = "doctest", version = "2.4.11")
+`
+	}
+
+	// Add benchmark framework dependency
+	switch benchmarkFramework {
+	case "google-benchmark", "googlebenchmark":
+		content += `bazel_dep(name = "google_benchmark", version = "1.9.1")
+`
+	case "nanobench":
+		content += `bazel_dep(name = "nanobench", version = "4.3.11")
+`
+	case "catch2-benchmark":
+		// Catch2 already includes benchmark support
+		if testFramework != "catch2" {
+			content += `bazel_dep(name = "catch2", version = "3.7.1")
+`
+		}
+	}
+
+	return content
 }
 
-// GenerateBuildBazelRoot generates root BUILD.bazel
+// GenerateBuildBazelRoot generates root BUILD.bazel (empty or just aliases)
 func GenerateBuildBazelRoot(projectName string, isExe bool) string {
+	if isExe {
+		return fmt.Sprintf(`# Root BUILD.bazel - aliases for convenience
+# Main targets are in //src:
+
+# Alias to main binary
+alias(
+    name = "%s",
+    actual = "//src:%s",
+)
+
+# Alias to library
+alias(
+    name = "%s_lib",
+    actual = "//src:%s_lib",
+    visibility = ["//visibility:public"],
+)
+`, projectName, projectName, projectName, projectName)
+	}
+	return fmt.Sprintf(`# Root BUILD.bazel - aliases for convenience
+
+# Alias to main library
+alias(
+    name = "%s",
+    actual = "//src:%s",
+    visibility = ["//visibility:public"],
+)
+`, projectName, projectName)
+}
+
+// GenerateBuildBazelSrc generates src/BUILD.bazel
+func GenerateBuildBazelSrc(projectName string, isExe bool) string {
 	if isExe {
 		return fmt.Sprintf(`load("@rules_cc//cc:defs.bzl", "cc_binary", "cc_library")
 
-# Main library
+# Core library
 cc_library(
     name = "%s_lib",
-    srcs = ["src/%s.cpp"],
-    hdrs = glob(["include/%s/*.hpp"]),
-    includes = ["include"],
+    srcs = ["%s.cpp"],
+    deps = ["//include:%s_headers"],
     visibility = ["//visibility:public"],
 )
 
 # Main executable
 cc_binary(
     name = "%s",
-    srcs = ["src/main.cpp"],
+    srcs = ["main.cpp"],
     deps = [":%s_lib"],
+    visibility = ["//visibility:public"],
 )
 `, projectName, projectName, projectName, projectName, projectName)
 	}
 	return fmt.Sprintf(`load("@rules_cc//cc:defs.bzl", "cc_library")
 
-# Main library
+# Core library
 cc_library(
     name = "%s",
-    srcs = ["src/%s.cpp"],
-    hdrs = glob(["include/%s/*.hpp"]),
-    includes = ["include"],
+    srcs = ["%s.cpp"],
+    deps = ["//include:%s_headers"],
     visibility = ["//visibility:public"],
 )
 `, projectName, projectName, projectName)
 }
 
+// GenerateBuildBazelInclude generates include/BUILD.bazel
+func GenerateBuildBazelInclude(projectName string) string {
+	return fmt.Sprintf(`load("@rules_cc//cc:defs.bzl", "cc_library")
+
+# Header-only library (public headers)
+cc_library(
+    name = "%s_headers",
+    hdrs = glob(["%s/*.hpp"]),
+    includes = ["."],
+    visibility = ["//visibility:public"],
+)
+`, projectName, projectName)
+}
+
 // GenerateBuildBazelTests generates tests/BUILD.bazel
 func GenerateBuildBazelTests(projectName string, testFramework string) string {
-	hasGtest := testFramework == "googletest"
-
-	if hasGtest {
+	switch testFramework {
+	case "googletest":
 		return fmt.Sprintf(`load("@rules_cc//cc:defs.bzl", "cc_test")
 
 cc_test(
     name = "%s_test",
     srcs = ["test_main.cpp"],
     deps = [
-        "//:% s_lib",
+        "//src:%s_lib",
         "@googletest//:gtest_main",
     ],
 )
 `, projectName, projectName)
-	}
 
-	// Default: basic test without framework
-	return fmt.Sprintf(`load("@rules_cc//cc:defs.bzl", "cc_test")
+	case "catch2":
+		return fmt.Sprintf(`load("@rules_cc//cc:defs.bzl", "cc_test")
 
 cc_test(
     name = "%s_test",
     srcs = ["test_main.cpp"],
     deps = [
-        "//:%s_lib",
+        "//src:%s_lib",
+        "@catch2//:catch2_main",
     ],
 )
 `, projectName, projectName)
+
+	case "doctest":
+		return fmt.Sprintf(`load("@rules_cc//cc:defs.bzl", "cc_test")
+
+cc_test(
+    name = "%s_test",
+    srcs = ["test_main.cpp"],
+    deps = [
+        "//src:%s_lib",
+        "@doctest//:doctest",
+    ],
+)
+`, projectName, projectName)
+
+	default:
+		// Basic test without framework
+		return fmt.Sprintf(`load("@rules_cc//cc:defs.bzl", "cc_test")
+
+cc_test(
+    name = "%s_test",
+    srcs = ["test_main.cpp"],
+    deps = [
+        "//src:%s_lib",
+    ],
+)
+`, projectName, projectName)
+	}
+}
+
+// GenerateBuildBazelBench generates bench/BUILD.bazel
+func GenerateBuildBazelBench(projectName, benchmarkFramework string) string {
+	switch benchmarkFramework {
+	case "google-benchmark", "googlebenchmark":
+		return fmt.Sprintf(`load("@rules_cc//cc:defs.bzl", "cc_binary")
+
+cc_binary(
+    name = "%s_bench",
+    srcs = ["bench_main.cpp"],
+    deps = [
+        "//src:%s_lib",
+        "@google_benchmark//:benchmark_main",
+    ],
+)
+`, projectName, projectName)
+
+	case "nanobench":
+		return fmt.Sprintf(`load("@rules_cc//cc:defs.bzl", "cc_binary")
+
+cc_binary(
+    name = "%s_bench",
+    srcs = ["bench_main.cpp"],
+    deps = [
+        "//src:%s_lib",
+        "@nanobench//:nanobench",
+    ],
+)
+`, projectName, projectName)
+
+	case "catch2-benchmark":
+		return fmt.Sprintf(`load("@rules_cc//cc:defs.bzl", "cc_binary")
+
+cc_binary(
+    name = "%s_bench",
+    srcs = ["bench_main.cpp"],
+    deps = [
+        "//src:%s_lib",
+        "@catch2//:catch2_main",
+    ],
+)
+`, projectName, projectName)
+
+	default:
+		// Default to google benchmark
+		return fmt.Sprintf(`load("@rules_cc//cc:defs.bzl", "cc_binary")
+
+cc_binary(
+    name = "%s_bench",
+    srcs = ["bench_main.cpp"],
+    deps = [
+        "//src:%s_lib",
+    ],
+)
+`, projectName, projectName)
+	}
 }
 
 // GenerateBazelrc generates .bazelrc with common settings
 func GenerateBazelrc(cppStandard int) string {
 	return fmt.Sprintf(`# C++ standard
 build --cxxopt=-std=c++%d
+
+# Hide bazel symlinks (creates .bazel-bin, .bazel-out, etc.)
+build --symlink_prefix=.
 
 # Enable optimizations for release builds
 build:release --compilation_mode=opt
@@ -707,10 +870,28 @@ test --test_output=errors
 `, cppStandard)
 }
 
+// GenerateBazelignore generates .bazelignore file
+func GenerateBazelignore() string {
+	return `# Ignore build output directory
+build
+
+# Ignore git
+.git
+
+# Ignore IDE directories
+.idea
+.vscode
+`
+}
+
 // GenerateBazelGitignore generates .gitignore for Bazel projects
 func GenerateBazelGitignore() string {
 	return `# Bazel
 bazel-*
+.bazel-*
+
+# Build output
+build/
 
 # IDE
 .idea/
@@ -740,13 +921,14 @@ A C++ library using Bazel for builds and dependency management.
 
 ## Requirements
 
-- Bazel 7.0 or higher (Bzlmod support)
+- Bazel 7.0+ (Bzlmod support)
 - C++%d compatible compiler
 
 ## Building
 
 %sbash
-bazel build //...
+cpx build
+# or: bazel build //...
 %s
 
 ## Usage
@@ -763,20 +945,21 @@ Then in your BUILD.bazel:
 cc_binary(
     name = "your_app",
     srcs = ["main.cpp"],
-    deps = ["@%s//:%s"],
+    deps = ["@%s"],
 )
 %s
 
 ## Testing
 
 %sbash
-bazel test //...
+cpx test
+# or: bazel test //...
 %s
 
 ## License
 
 MIT
-`, projectName, cppStandard, codeBlock, codeBlock, codeBlock, projectName, codeBlock, codeBlock, projectName, projectName, codeBlock, codeBlock, codeBlock)
+`, projectName, cppStandard, codeBlock, codeBlock, codeBlock, projectName, codeBlock, codeBlock, projectName, codeBlock, codeBlock, codeBlock)
 	}
 	return fmt.Sprintf(`# %s
 
@@ -784,30 +967,31 @@ A C++ project using Bazel for builds and dependency management.
 
 ## Requirements
 
-- Bazel 7.0 or higher (Bzlmod support)
+- Bazel 7.0+ (Bzlmod support)
 - C++%d compatible compiler
 
 ## Building
 
 %sbash
-bazel build //:% s
+cpx build
+# or: bazel build //...
 %s
 
 ## Running
 
 %sbash
-bazel run //:%s
+cpx run
+# or: bazel run //:%s
 %s
 
 ## Testing
 
 %sbash
-bazel test //...
+cpx test
+# or: bazel test //...
 %s
 
 ## Adding Dependencies
-
-Use cpx to add dependencies from the Bazel Central Registry:
 
 %sbash
 cpx add abseil-cpp
@@ -816,5 +1000,98 @@ cpx add abseil-cpp
 ## License
 
 MIT
-`, projectName, cppStandard, codeBlock, projectName, codeBlock, codeBlock, projectName, codeBlock, codeBlock, codeBlock, codeBlock, codeBlock)
+`, projectName, cppStandard, codeBlock, codeBlock, codeBlock, projectName, codeBlock, codeBlock, codeBlock, codeBlock, codeBlock)
+}
+
+// ============================================================================
+// Benchmark Source Templates
+// ============================================================================
+
+// BenchSources holds generated benchmark source files
+type BenchSources struct {
+	Main string
+}
+
+// GenerateBenchmarkSources generates benchmark source files based on framework
+func GenerateBenchmarkSources(projectName, benchmarkFramework string) (*BenchSources, []string) {
+	safeName := SafeIdent(projectName)
+
+	switch benchmarkFramework {
+	case "google-benchmark":
+		return &BenchSources{Main: generateGoogleBenchMain(projectName, safeName)}, []string{"benchmark"}
+	case "nanobench":
+		return &BenchSources{Main: generateNanoBenchMain(projectName, safeName)}, []string{"nanobench"}
+	case "catch2-benchmark":
+		return &BenchSources{Main: generateCatch2BenchMain(projectName, safeName)}, []string{"catch2"}
+	default:
+		return nil, nil
+	}
+}
+
+func generateGoogleBenchMain(projectName, safeName string) string {
+	return fmt.Sprintf(`#include <benchmark/benchmark.h>
+#include <%s/%s.hpp>
+
+static void BM_version(benchmark::State& state) {
+    for (auto _ : state) {
+        benchmark::DoNotOptimize(%s::version());
+    }
+}
+
+BENCHMARK(BM_version);
+
+int main(int argc, char** argv) {
+    benchmark::Initialize(&argc, argv);
+    if (benchmark::ReportUnrecognizedArguments(argc, argv)) return 1;
+    benchmark::RunSpecifiedBenchmarks();
+}
+`, projectName, projectName, safeName)
+}
+
+func generateNanoBenchMain(projectName, safeName string) string {
+	return fmt.Sprintf(`#include <nanobench.h>
+#include <%s/%s.hpp>
+#include <iostream>
+
+int main() {
+    ankerl::nanobench::Bench bench;
+    bench.run("version", [] {
+        ankerl::nanobench::doNotOptimizeAway(%s::version());
+    });
+    return 0;
+}
+`, projectName, projectName, safeName)
+}
+
+func generateCatch2BenchMain(projectName, safeName string) string {
+	return fmt.Sprintf(`#include <catch2/catch_all.hpp>
+#include <%s/%s.hpp>
+
+TEST_CASE("Benchmark version", "[benchmark]") {
+    BENCHMARK("version") {
+        return %s::version();
+    };
+}
+`, projectName, projectName, safeName)
+}
+
+// SafeIdent converts a project name to a valid C++ identifier
+func SafeIdent(name string) string {
+	result := ""
+	for i, c := range name {
+		if (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || c == '_' {
+			result += string(c)
+		} else if c >= '0' && c <= '9' {
+			if i == 0 {
+				result += "_"
+			}
+			result += string(c)
+		} else if c == '-' || c == ' ' {
+			result += "_"
+		}
+	}
+	if result == "" {
+		result = "project"
+	}
+	return result
 }

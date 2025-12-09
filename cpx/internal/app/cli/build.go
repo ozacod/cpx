@@ -84,6 +84,8 @@ func runBazelBuild(release bool, target string, clean bool, verbose bool) error 
 		if err := cleanCmd.Run(); err != nil {
 			return fmt.Errorf("bazel clean failed: %w", err)
 		}
+		// Also remove build directory
+		os.RemoveAll("build")
 	}
 
 	// Build args
@@ -116,6 +118,27 @@ func runBazelBuild(release bool, target string, clean bool, verbose bool) error 
 		return fmt.Errorf("bazel build failed: %w", err)
 	}
 
+	// Copy artifacts to build/ directory for consistency with CMake projects
+	if err := os.MkdirAll("build", 0755); err != nil {
+		return fmt.Errorf("failed to create build directory: %w", err)
+	}
+
+	// Copy executables and libraries from .bazel-bin to build/
+	// (symlink created by --symlink_prefix=. in .bazelrc)
+	fmt.Printf("%sCopying artifacts to build/...%s\n", Cyan, Reset)
+	// Use -L to follow symlinks (.bazel-bin is a symlink)
+	// Filter out Bazel metadata files (.cppmap, .repo_mapping, etc.)
+	copyCmd := exec.Command("bash", "-c", `
+		# Copy executables (files with execute permission, not scripts or metadata)
+		find -L .bazel-bin -maxdepth 1 -type f -perm +111 ! -name "*.params" ! -name "*.sh" ! -name "*.cppmap" ! -name "*.repo_mapping" ! -name "*runfiles*" -exec cp {} build/ \; 2>/dev/null || true
+		# Copy libraries
+		find -L .bazel-bin -maxdepth 1 -type f \( -name "*.a" -o -name "*.so" -o -name "*.dylib" \) -exec cp {} build/ \; 2>/dev/null || true
+	`)
+	copyCmd.Stdout = os.Stdout
+	copyCmd.Stderr = os.Stderr
+	copyCmd.Run() // Ignore errors - may have no artifacts
+
 	fmt.Printf("%s✓ Build successful%s\n", Green, Reset)
+	fmt.Printf("  Artifacts in: build/\n")
 	return nil
 }
