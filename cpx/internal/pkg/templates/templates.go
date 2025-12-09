@@ -602,3 +602,219 @@ MIT
 `, projectName, cppStandard, codeBlock, codeBlock, codeBlock, projectName, codeBlock, codeBlock, codeBlock)
 	}
 }
+
+// ============================================================================
+// BAZEL TEMPLATES
+// ============================================================================
+
+// GenerateModuleBazel generates MODULE.bazel content for a Bazel project
+func GenerateModuleBazel(projectName, version string) string {
+	if version == "" {
+		version = "0.1.0"
+	}
+	return fmt.Sprintf(`module(
+    name = "%s",
+    version = "%s",
+)
+
+bazel_dep(name = "rules_cc", version = "0.0.9")
+`, projectName, version)
+}
+
+// GenerateBuildBazelRoot generates root BUILD.bazel
+func GenerateBuildBazelRoot(projectName string, isExe bool) string {
+	if isExe {
+		return fmt.Sprintf(`load("@rules_cc//cc:defs.bzl", "cc_binary", "cc_library")
+
+# Main library
+cc_library(
+    name = "%s_lib",
+    srcs = ["src/%s.cpp"],
+    hdrs = glob(["include/%s/*.hpp"]),
+    includes = ["include"],
+    visibility = ["//visibility:public"],
+)
+
+# Main executable
+cc_binary(
+    name = "%s",
+    srcs = ["src/main.cpp"],
+    deps = [":%s_lib"],
+)
+`, projectName, projectName, projectName, projectName, projectName)
+	}
+	return fmt.Sprintf(`load("@rules_cc//cc:defs.bzl", "cc_library")
+
+# Main library
+cc_library(
+    name = "%s",
+    srcs = ["src/%s.cpp"],
+    hdrs = glob(["include/%s/*.hpp"]),
+    includes = ["include"],
+    visibility = ["//visibility:public"],
+)
+`, projectName, projectName, projectName)
+}
+
+// GenerateBuildBazelTests generates tests/BUILD.bazel
+func GenerateBuildBazelTests(projectName string, testFramework string) string {
+	hasGtest := testFramework == "googletest"
+
+	if hasGtest {
+		return fmt.Sprintf(`load("@rules_cc//cc:defs.bzl", "cc_test")
+
+cc_test(
+    name = "%s_test",
+    srcs = ["test_main.cpp"],
+    deps = [
+        "//:% s_lib",
+        "@googletest//:gtest_main",
+    ],
+)
+`, projectName, projectName)
+	}
+
+	// Default: basic test without framework
+	return fmt.Sprintf(`load("@rules_cc//cc:defs.bzl", "cc_test")
+
+cc_test(
+    name = "%s_test",
+    srcs = ["test_main.cpp"],
+    deps = [
+        "//:%s_lib",
+    ],
+)
+`, projectName, projectName)
+}
+
+// GenerateBazelrc generates .bazelrc with common settings
+func GenerateBazelrc(cppStandard int) string {
+	return fmt.Sprintf(`# C++ standard
+build --cxxopt=-std=c++%d
+
+# Enable optimizations for release builds
+build:release --compilation_mode=opt
+
+# Debug build configuration
+build:debug --compilation_mode=dbg
+build:debug --cxxopt=-g
+
+# Enable colored output
+build --color=yes
+
+# Show test output
+test --test_output=errors
+`, cppStandard)
+}
+
+// GenerateBazelGitignore generates .gitignore for Bazel projects
+func GenerateBazelGitignore() string {
+	return `# Bazel
+bazel-*
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# Compiled files
+*.o
+*.obj
+*.a
+*.lib
+*.so
+*.dylib
+*.dll
+`
+}
+
+// GenerateBazelReadme generates README with Bazel instructions
+func GenerateBazelReadme(projectName string, cppStandard int, isLib bool) string {
+	codeBlock := "```"
+	if isLib {
+		return fmt.Sprintf(`# %s
+
+A C++ library using Bazel for builds and dependency management.
+
+## Requirements
+
+- Bazel 7.0 or higher (Bzlmod support)
+- C++%d compatible compiler
+
+## Building
+
+%sbash
+bazel build //...
+%s
+
+## Usage
+
+Add to your MODULE.bazel:
+
+%sstarlark
+bazel_dep(name = "%s", version = "0.1.0")
+%s
+
+Then in your BUILD.bazel:
+
+%sstarlark
+cc_binary(
+    name = "your_app",
+    srcs = ["main.cpp"],
+    deps = ["@%s//:%s"],
+)
+%s
+
+## Testing
+
+%sbash
+bazel test //...
+%s
+
+## License
+
+MIT
+`, projectName, cppStandard, codeBlock, codeBlock, codeBlock, projectName, codeBlock, codeBlock, projectName, projectName, codeBlock, codeBlock, codeBlock)
+	}
+	return fmt.Sprintf(`# %s
+
+A C++ project using Bazel for builds and dependency management.
+
+## Requirements
+
+- Bazel 7.0 or higher (Bzlmod support)
+- C++%d compatible compiler
+
+## Building
+
+%sbash
+bazel build //:% s
+%s
+
+## Running
+
+%sbash
+bazel run //:%s
+%s
+
+## Testing
+
+%sbash
+bazel test //...
+%s
+
+## Adding Dependencies
+
+Use cpx to add dependencies from the Bazel Central Registry:
+
+%sbash
+cpx add abseil-cpp
+%s
+
+## License
+
+MIT
+`, projectName, cppStandard, codeBlock, projectName, codeBlock, codeBlock, projectName, codeBlock, codeBlock, codeBlock, codeBlock, codeBlock)
+}

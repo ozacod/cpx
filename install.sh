@@ -222,6 +222,93 @@ get_latest_version() {
     echo "$VERSION"
 }
 
+# Check if BCR is already cloned
+check_bcr() {
+    # Check common installation locations
+    BCR_LOCATIONS="$HOME/.local/bazel-central-registry $HOME/.cache/cpx/bazel-central-registry"
+    for loc in $BCR_LOCATIONS; do
+        if [ -d "$loc/modules" ]; then
+            echo "$loc"
+            return 0
+        fi
+    done
+    
+    return 1
+}
+
+# Clone Bazel Central Registry
+install_bcr() {
+    printf "\n%bChecking for Bazel Central Registry...%b\n" "$CYAN" "$NC" >&2
+    
+    # Check if BCR is already cloned
+    BCR_PATH=$(check_bcr)
+    if [ -n "$BCR_PATH" ]; then
+        printf "%bBCR found at: %s%b\n" "$GREEN" "$BCR_PATH" "$NC" >&2
+        configure_bcr "$BCR_PATH" >&2
+        echo "$BCR_PATH"
+        return 0
+    fi
+    
+    # Check if git is available
+    if ! command -v git > /dev/null 2>&1; then
+        printf "%bWarning: git is not installed. Skipping BCR installation.%b\n" "$YELLOW" "$NC" >&2
+        printf "You can install BCR manually and configure it with: %bcpx config set-bcr-root <path>%b\n" "$CYAN" "$NC" >&2
+        return 1
+    fi
+    
+    # Clone BCR
+    BCR_INSTALL_DIR="$HOME/.local/bazel-central-registry"
+    printf "%bCloning Bazel Central Registry to %s...%b\n" "$CYAN" "$BCR_INSTALL_DIR" "$NC" >&2
+    printf "%b(This may take a while - the registry is large)%b\n" "$YELLOW" "$NC" >&2
+    
+    # Remove existing directory if incomplete
+    if [ -d "$BCR_INSTALL_DIR" ] && [ ! -d "$BCR_INSTALL_DIR/modules" ]; then
+        rm -rf "$BCR_INSTALL_DIR"
+    fi
+    
+    # Clone with depth 1 (shallow clone)
+    if ! git clone --depth 1 https://github.com/bazelbuild/bazel-central-registry.git "$BCR_INSTALL_DIR" >&2; then
+        printf "%bWarning: Failed to clone BCR. You can clone it manually later.%b\n" "$YELLOW" "$NC" >&2
+        printf "  Run: git clone https://github.com/bazelbuild/bazel-central-registry.git ~/.local/bazel-central-registry\n" >&2
+        printf "  Then: cpx config set-bcr-root ~/.local/bazel-central-registry\n" >&2
+        return 1
+    fi
+    
+    printf "%bSuccessfully cloned BCR to %s%b\n" "$GREEN" "$BCR_INSTALL_DIR" "$NC" >&2
+    configure_bcr "$BCR_INSTALL_DIR" >&2
+    echo "$BCR_INSTALL_DIR"
+    return 0
+}
+
+# Configure cpx to use BCR
+configure_bcr() {
+    BCR_PATH=$1
+    
+    # Check if cpx is in PATH
+    if ! command -v "$BINARY_NAME" > /dev/null 2>&1; then
+        INSTALL_DIR=$(get_install_dir)
+        CPX_BINARY="$INSTALL_DIR/$BINARY_NAME"
+    else
+        CPX_BINARY=$(command -v "$BINARY_NAME")
+    fi
+    
+    # Check if cpx binary exists
+    if [ ! -f "$CPX_BINARY" ]; then
+        printf "%bWarning: cpx binary not found. Cannot configure BCR automatically.%b\n" "$YELLOW" "$NC"
+        printf "Run this after cpx is in your PATH: %bcpx config set-bcr-root %s%b\n" "$CYAN" "$BCR_PATH" "$NC"
+        return 1
+    fi
+    
+    # Configure BCR root
+    printf "%bConfiguring cpx to use BCR...%b\n" "$CYAN" "$NC"
+    if "$CPX_BINARY" config set-bcr-root "$BCR_PATH" 2>/dev/null; then
+        printf "%bSuccessfully configured cpx to use BCR%b\n" "$GREEN" "$NC"
+    else
+        printf "%bWarning: Failed to configure BCR automatically.%b\n" "$YELLOW" "$NC"
+        printf "Run this manually: %bcpx config set-bcr-root %s%b\n" "$CYAN" "$BCR_PATH" "$NC"
+    fi
+}
+
 download_binary() {
     OS=$1
     ARCH=$2
@@ -481,6 +568,19 @@ main() {
     else
         printf "\n%bNote: vcpkg installation on Windows requires manual setup.%b\n" "$YELLOW" "$NC"
         printf "After installing vcpkg, run: %bcpx config set-vcpkg-root <path>%b\n" "$CYAN" "$NC"
+    fi
+    
+    # Install BCR for Bazel support (non-fatal if it fails)
+    if [ "$OS" != "windows" ] || [ -n "$MSYSTEM" ]; then
+        # Check if BCR already exists
+        EXISTING_BCR=$(check_bcr 2>/dev/null || echo "")
+        if [ -n "$EXISTING_BCR" ]; then
+            printf "%bFound existing BCR at: %s%b\n" "$GREEN" "$EXISTING_BCR" "$NC"
+            configure_bcr "$EXISTING_BCR" || true
+        else
+            # Install BCR
+            install_bcr 2>&1 | sed '$d' || true
+        fi
     fi
 }
 

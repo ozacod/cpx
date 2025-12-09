@@ -147,17 +147,38 @@ func createProjectFromTUI(config tui.ProjectConfig, getVcpkgPath func() (string,
 		}
 	}
 
-	// Generate CMakeLists.txt
-	cmakeLists := templates.GenerateVcpkgCMakeLists(projectName, cppStandard, !cfg.IsLibrary, cfg.TestFramework != "" && cfg.TestFramework != "none", cfg.Benchmark, benchSources != nil, projectVersion)
-	if err := os.WriteFile(filepath.Join(projectName, "CMakeLists.txt"), []byte(cmakeLists), 0644); err != nil {
-		return fmt.Errorf("failed to write CMakeLists.txt: %w", err)
-	}
+	// Generate build system files based on package manager choice
+	if cfg.PackageManager == "bazel" {
+		// Generate MODULE.bazel
+		moduleBazel := templates.GenerateModuleBazel(projectName, projectVersion)
+		if err := os.WriteFile(filepath.Join(projectName, "MODULE.bazel"), []byte(moduleBazel), 0644); err != nil {
+			return fmt.Errorf("failed to write MODULE.bazel: %w", err)
+		}
 
-	// Generate CMakePresets.json for vcpkg
-	if cfg.PackageManager == "" || cfg.PackageManager == "vcpkg" {
-		cmakePresets := templates.GenerateCMakePresets()
-		if err := os.WriteFile(filepath.Join(projectName, "CMakePresets.json"), []byte(cmakePresets), 0644); err != nil {
-			return fmt.Errorf("failed to write CMakePresets.json: %w", err)
+		// Generate BUILD.bazel
+		buildBazel := templates.GenerateBuildBazelRoot(projectName, !cfg.IsLibrary)
+		if err := os.WriteFile(filepath.Join(projectName, "BUILD.bazel"), []byte(buildBazel), 0644); err != nil {
+			return fmt.Errorf("failed to write BUILD.bazel: %w", err)
+		}
+
+		// Generate .bazelrc
+		bazelrc := templates.GenerateBazelrc(cppStandard)
+		if err := os.WriteFile(filepath.Join(projectName, ".bazelrc"), []byte(bazelrc), 0644); err != nil {
+			return fmt.Errorf("failed to write .bazelrc: %w", err)
+		}
+	} else {
+		// Generate CMakeLists.txt (vcpkg or none)
+		cmakeLists := templates.GenerateVcpkgCMakeLists(projectName, cppStandard, !cfg.IsLibrary, cfg.TestFramework != "" && cfg.TestFramework != "none", cfg.Benchmark, benchSources != nil, projectVersion)
+		if err := os.WriteFile(filepath.Join(projectName, "CMakeLists.txt"), []byte(cmakeLists), 0644); err != nil {
+			return fmt.Errorf("failed to write CMakeLists.txt: %w", err)
+		}
+
+		// Generate CMakePresets.json for vcpkg
+		if cfg.PackageManager == "" || cfg.PackageManager == "vcpkg" {
+			cmakePresets := templates.GenerateCMakePresets()
+			if err := os.WriteFile(filepath.Join(projectName, "CMakePresets.json"), []byte(cmakePresets), 0644); err != nil {
+				return fmt.Errorf("failed to write CMakePresets.json: %w", err)
+			}
 		}
 	}
 
@@ -201,15 +222,25 @@ func createProjectFromTUI(config tui.ProjectConfig, getVcpkgPath func() (string,
 		}
 	}
 
-	// Generate README
-	readme := templates.GenerateVcpkgReadme(projectName, cppStandard, cfg.IsLibrary)
+	// Generate README based on package manager
+	var readme string
+	if cfg.PackageManager == "bazel" {
+		readme = templates.GenerateBazelReadme(projectName, cppStandard, cfg.IsLibrary)
+	} else {
+		readme = templates.GenerateVcpkgReadme(projectName, cppStandard, cfg.IsLibrary)
+	}
 	if err := os.WriteFile(filepath.Join(projectName, "README.md"), []byte(readme), 0644); err != nil {
 		return fmt.Errorf("failed to write README: %w", err)
 	}
 
 	// Generate .gitignore only if VCS is git
 	if cfg.VCS == "" || cfg.VCS == "git" {
-		gitignore := templates.GenerateGitignore()
+		var gitignore string
+		if cfg.PackageManager == "bazel" {
+			gitignore = templates.GenerateBazelGitignore()
+		} else {
+			gitignore = templates.GenerateGitignore()
+		}
 		if err := os.WriteFile(filepath.Join(projectName, ".gitignore"), []byte(gitignore), 0644); err != nil {
 			return fmt.Errorf("failed to write .gitignore: %w", err)
 		}
@@ -244,13 +275,16 @@ func createProjectFromTUI(config tui.ProjectConfig, getVcpkgPath func() (string,
 		return fmt.Errorf("failed to write cpx.ci: %w", err)
 	}
 
-	// Setup vcpkg if enabled
+	// Setup vcpkg if enabled (skip for bazel)
 	if cfg.PackageManager == "vcpkg" {
 		vcpkgPath, err := getVcpkgPath()
 		if err == nil && vcpkgPath != "" {
 			_ = setupVcpkgProject(projectName, projectName, cfg.IsLibrary, []string{})
 		}
 	}
+
+	// Skip CMake-based test/bench generation for Bazel projects
+	// Bazel uses BUILD.bazel files in each directory instead
 
 	// Initialize git and install hooks if configured
 	if cfg.VCS == "git" || cfg.VCS == "" {

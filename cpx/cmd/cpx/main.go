@@ -9,6 +9,7 @@ import (
 	"github.com/ozacod/cpx/internal/app/cli"
 	"github.com/ozacod/cpx/internal/app/cli/root"
 	"github.com/ozacod/cpx/internal/pkg/vcpkg"
+	"github.com/ozacod/cpx/pkg/config"
 )
 
 var vcpkgClient *vcpkg.Client
@@ -68,6 +69,14 @@ func runVcpkgCommand(args []string) error {
 	return client.RunCommand(args)
 }
 
+func getBcrPath() string {
+	cfg, err := config.LoadGlobal()
+	if err != nil {
+		return ""
+	}
+	return cfg.BcrRoot
+}
+
 func main() {
 	rootCmd := root.GetRootCmd()
 
@@ -78,7 +87,7 @@ func main() {
 	rootCmd.AddCommand(cli.BenchCmd(setupVcpkgEnv))
 	rootCmd.AddCommand(cli.CleanCmd())
 	rootCmd.AddCommand(cli.NewCmd(getVcpkgPath, setupVcpkgProject))
-	rootCmd.AddCommand(cli.AddCmd(runVcpkgCommand))
+	rootCmd.AddCommand(cli.AddCmd(runVcpkgCommand, getBcrPath))
 	rootCmd.AddCommand(cli.RemoveCmd(runVcpkgCommand))
 	rootCmd.AddCommand(cli.ListCmd(runVcpkgCommand))
 	rootCmd.AddCommand(cli.SearchCmd(runVcpkgCommand, getVcpkgPath))

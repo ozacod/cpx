@@ -122,7 +122,7 @@ func InitialModel() Model {
 		testFrameworkOptions:  []string{"GoogleTest", "Catch2", "doctest", "None"},
 		benchmarkOptions:      []string{"Google Benchmark", "nanobench", "Catch2 benchmark", "None"},
 		clangFormatOptions:    []string{"Google", "LLVM", "Chromium", "Mozilla", "WebKit"},
-		packageManagerOptions: []string{"vcpkg", "None"},
+		packageManagerOptions: []string{"vcpkg", "Bazel", "None"},
 		preCommitOptions:      []string{"format", "lint", "cppcheck", "test"},
 		prePushOptions:        []string{"test", "cppcheck"},
 		selectedPreCommit:     map[int]bool{0: true, 1: true},
@@ -316,9 +316,12 @@ func (m Model) handleEnter() (tea.Model, tea.Cmd) {
 		m.cursor = 0
 
 	case StepPackageManager:
-		if m.cursor == 0 {
+		switch m.cursor {
+		case 0:
 			m.config.PackageManager = "vcpkg"
-		} else {
+		case 1:
+			m.config.PackageManager = "bazel"
+		default:
 			m.config.PackageManager = "none"
 		}
 		answer := m.packageManagerOptions[m.cursor]

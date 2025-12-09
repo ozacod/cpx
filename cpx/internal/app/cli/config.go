@@ -37,6 +37,15 @@ func ConfigCmd() *cobra.Command {
 	}
 	cmd.AddCommand(setVcpkgRootCmd)
 
+	setBcrRootCmd := &cobra.Command{
+		Use:   "set-bcr-root",
+		Short: "Set Bazel Central Registry root directory",
+		Long:  "Set the path to the cloned Bazel Central Registry repository.",
+		RunE:  runConfigSetBcrRoot,
+		Args:  cobra.ExactArgs(1),
+	}
+	cmd.AddCommand(setBcrRootCmd)
+
 	return cmd
 }
 
@@ -50,6 +59,10 @@ func runConfigGet(cmd *cobra.Command, args []string) error {
 
 func runConfigSetVcpkgRoot(cmd *cobra.Command, args []string) error {
 	return setVcpkgRoot(args[0])
+}
+
+func runConfigSetBcrRoot(cmd *cobra.Command, args []string) error {
+	return setBcrRoot(args[0])
 }
 
 func showConfig() error {
@@ -69,6 +82,7 @@ func showConfig() error {
 	fmt.Printf("%sCpx Configuration%s\n", Bold, Reset)
 	fmt.Printf("  Config file: %s\n", configPath)
 	fmt.Printf("  vcpkg_root: %s\n", cfg.VcpkgRoot)
+	fmt.Printf("  bcr_root:   %s\n", cfg.BcrRoot)
 	return nil
 }
 
@@ -81,6 +95,9 @@ func getConfig(key string) error {
 	switch key {
 	case "vcpkg_root", "vcpkg-root":
 		fmt.Println(cfg.VcpkgRoot)
+		return nil
+	case "bcr_root", "bcr-root":
+		fmt.Println(cfg.BcrRoot)
 		return nil
 	default:
 		return fmt.Errorf("unknown config key: %s", key)
@@ -121,5 +138,39 @@ func setVcpkgRoot(path string) error {
 	}
 
 	fmt.Printf("%s Set vcpkg_root to %s%s\n", Green, absPath, Reset)
+	return nil
+}
+
+func setBcrRoot(path string) error {
+	// Validate path exists
+	if _, err := os.Stat(path); os.IsNotExist(err) {
+		return fmt.Errorf("path does not exist: %s", path)
+	}
+
+	// Check if it looks like a BCR directory
+	modulesDir := filepath.Join(path, "modules")
+	if _, err := os.Stat(modulesDir); os.IsNotExist(err) {
+		fmt.Printf("%s Warning: %s does not appear to be a BCR directory%s\n", Yellow, path, Reset)
+		fmt.Printf("  (modules directory not found at %s)\n", modulesDir)
+	}
+
+	cfg, err := config.LoadGlobal()
+	if err != nil {
+		cfg = &config.GlobalConfig{}
+	}
+
+	// Convert to absolute path
+	absPath, err := filepath.Abs(path)
+	if err != nil {
+		return fmt.Errorf("failed to get absolute path: %w", err)
+	}
+
+	cfg.BcrRoot = absPath
+
+	if err := config.SaveGlobal(cfg); err != nil {
+		return fmt.Errorf("failed to save config: %w", err)
+	}
+
+	fmt.Printf("%s✓ Set bcr_root to %s%s\n", Green, absPath, Reset)
 	return nil
 }

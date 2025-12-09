@@ -53,3 +53,4 @@ temp/
 setup_env.sh
 .sql
 .db
+cpx/cpx-bin

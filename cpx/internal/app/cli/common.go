@@ -21,7 +21,7 @@ const (
 )
 
 // Version is the cpx version
-const Version = "1.1.7"
+const Version = "1.0.1"
 
 // DefaultServer is the default server URL
 const DefaultServer = "https://cpx-dev.vercel.app"
@@ -41,6 +41,35 @@ func requireVcpkgProject(cmdName string) error {
 		return fmt.Errorf("failed to check vcpkg manifest: %w", err)
 	}
 	return nil
+}
+
+// ProjectType represents the type of C++ project
+type ProjectType string
+
+const (
+	ProjectTypeVcpkg   ProjectType = "vcpkg"
+	ProjectTypeBazel   ProjectType = "bazel"
+	ProjectTypeUnknown ProjectType = "unknown"
+)
+
+// DetectProjectType determines if current directory is vcpkg, bazel, or unknown
+func DetectProjectType() ProjectType {
+	if _, err := os.Stat("vcpkg.json"); err == nil {
+		return ProjectTypeVcpkg
+	}
+	if _, err := os.Stat("MODULE.bazel"); err == nil {
+		return ProjectTypeBazel
+	}
+	return ProjectTypeUnknown
+}
+
+// RequireProject ensures the current directory is a cpx project (vcpkg or bazel)
+func RequireProject(cmdName string) (ProjectType, error) {
+	pt := DetectProjectType()
+	if pt == ProjectTypeUnknown {
+		return pt, fmt.Errorf("%s requires a cpx project (vcpkg.json or MODULE.bazel not found)\n  hint: create one with cpx new", cmdName)
+	}
+	return pt, nil
 }
 
 // Spinner represents a simple progress spinner
