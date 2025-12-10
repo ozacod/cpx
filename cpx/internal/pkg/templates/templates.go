@@ -1080,14 +1080,14 @@ src_files = files(
 `, projectName, safeName, safeName, projectName, safeName, projectName)
 	}
 
-	// Library only
+	// Library only (static by default)
 	return fmt.Sprintf(`# Source files
 src_files = files(
   '%s.cpp'
 )
 
-# Library
-%s_lib = library('%s',
+# Library (static by default)
+%s_lib = static_library('%s',
   src_files,
   include_directories : inc_dirs,
   install : true
