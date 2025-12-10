@@ -202,8 +202,8 @@ target_include_directories(%s
 
 `, projectName, projectName, projectName))
 	} else {
-		sb.WriteString(fmt.Sprintf(`# Library
-add_library(%s
+		sb.WriteString(fmt.Sprintf(`# Library (static by default)
+add_library(%s STATIC
     src/%s.cpp
 )
 
