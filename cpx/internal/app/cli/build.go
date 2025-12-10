@@ -113,6 +113,9 @@ func runBazelBuild(release bool, target string, clean bool, verbose bool) error 
 	fmt.Printf("%sBuilding with Bazel...%s\n", Cyan, Reset)
 	if verbose {
 		fmt.Printf("  Running: bazel %v\n", bazelArgs)
+	} else {
+		// Suppress progress bars for cleaner output (like vcpkg)
+		bazelArgs = append(bazelArgs, "--noshow_progress")
 	}
 
 	buildCmd := execCommand("bazel", bazelArgs...)
@@ -188,6 +191,9 @@ func runMesonBuild(release bool, target string, clean bool, verbose bool) error 
 			setupArgs = append(setupArgs, "--buildtype=release")
 		} else {
 			setupArgs = append(setupArgs, "--buildtype=debug")
+		}
+		if !verbose {
+			setupArgs = append(setupArgs, "--quiet")
 		}
 		setupCmd := execCommand("meson", setupArgs...)
 		setupCmd.Stdout = os.Stdout

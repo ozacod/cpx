@@ -65,6 +65,7 @@ func runBazelTest(verbose bool, filter string) error {
 		bazelArgs = append(bazelArgs, "--test_output=all")
 	} else {
 		bazelArgs = append(bazelArgs, "--test_output=errors")
+		bazelArgs = append(bazelArgs, "--noshow_progress")
 	}
 
 	testCmd := execCommand("bazel", bazelArgs...)
@@ -101,6 +102,8 @@ func runMesonTest(verbose bool, filter string) error {
 
 	if verbose {
 		mesonArgs = append(mesonArgs, "-v")
+	} else {
+		mesonArgs = append(mesonArgs, "--quiet")
 	}
 
 	if filter != "" {

@@ -30,6 +30,7 @@ type CIBuild struct {
 	Jobs         int      `yaml:"jobs"`
 	CMakeArgs    []string `yaml:"cmake_args"`
 	BuildArgs    []string `yaml:"build_args"`
+	MesonArgs    []string `yaml:"meson_args"`
 }
 
 // LoadCI loads the CI configuration from cpx.ci

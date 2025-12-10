@@ -81,6 +81,8 @@ func runBazelBench(verbose bool, target string) error {
 
 	if verbose {
 		bazelArgs = append(bazelArgs, "--verbose_failures")
+	} else {
+		bazelArgs = append(bazelArgs, "--noshow_progress")
 	}
 
 	benchCmd := execCommand("bazel", bazelArgs...)

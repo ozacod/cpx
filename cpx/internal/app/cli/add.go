@@ -180,6 +180,8 @@ func printMesonUsageInfo(pkgName string) {
 	fmt.Printf("\n%sUSAGE INFO FOR %s:%s\n", Cyan, pkgName, Reset)
 	fmt.Printf("Add this to your meson.build:\n\n")
 	fmt.Printf("  %s_dep = dependency('%s')\n\n", pkgName, pkgName)
+	fmt.Printf("Then link it to your target:\n\n")
+	fmt.Printf("  executable(..., dependencies : %s_dep)\n\n", pkgName)
 	fmt.Printf("%s📦 Find more info at:%s\n", Cyan, Reset)
 	fmt.Printf("   https://wrapdb.mesonbuild.com/\n\n")
 }

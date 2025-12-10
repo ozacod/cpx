@@ -92,6 +92,8 @@ func runBazelRun(release bool, target string, args []string, verbose bool) error
 	fmt.Printf("%sRunning with Bazel...%s\n", Cyan, Reset)
 	if verbose {
 		fmt.Printf("  Running: bazel %v\n", bazelArgs)
+	} else {
+		bazelArgs = append(bazelArgs, "--noshow_progress")
 	}
 
 	runCmd := execCommand("bazel", bazelArgs...)

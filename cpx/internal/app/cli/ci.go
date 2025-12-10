@@ -128,10 +128,17 @@ func runCICommand(targetName string, rebuild bool) error {
 
 	fmt.Printf("%s Building for %d target(s) using Docker...%s\n", Cyan, len(targets), Reset)
 
-	// Get current working directory (project root)
-	projectRoot, err := os.Getwd()
+	// Get project root
+	projectRoot, err := findProjectRoot()
 	if err != nil {
-		return fmt.Errorf("failed to get current directory: %w", err)
+		return fmt.Errorf("failed to get project root: %w", err)
+	}
+
+	// Debug print for detection
+	if _, err := os.Stat(filepath.Join(projectRoot, "meson.build")); err == nil {
+		fmt.Printf("DEBUG: Found meson.build in %s\n", projectRoot)
+	} else {
+		fmt.Printf("DEBUG: Did NOT find meson.build in %s\n", projectRoot)
 	}
 
 	// Build and run for each target
@@ -177,6 +184,9 @@ func findProjectRoot() (string, error) {
 			return dir, nil
 		}
 		if _, err := os.Stat(filepath.Join(dir, "MODULE.bazel")); err == nil {
+			return dir, nil
+		}
+		if _, err := os.Stat(filepath.Join(dir, "meson.build")); err == nil {
 			return dir, nil
 		}
 
@@ -444,6 +454,11 @@ func runDockerBuild(target config.CITarget, projectRoot, outputDir string, build
 
 	if isBazel {
 		return runDockerBazelBuild(target, projectRoot, outputDir, buildConfig)
+	}
+
+	// Check if this is a Meson project
+	if _, err := os.Stat(filepath.Join(projectRoot, "meson.build")); err == nil {
+		return runDockerMesonBuild(target, projectRoot, outputDir, buildConfig)
 	}
 
 	// Detect project type (executable or library) for CMake projects
@@ -752,6 +767,122 @@ echo "  Build complete!"
 
 	if err := cmd.Run(); err != nil {
 		return fmt.Errorf("docker bazel build failed: %w", err)
+	}
+
+	return nil
+}
+
+// runDockerMesonBuild runs a Meson build inside Docker
+func runDockerMesonBuild(target config.CITarget, projectRoot, outputDir string, buildConfig config.CIBuild) error {
+	// Get absolute paths
+	absProjectRoot, err := filepath.Abs(projectRoot)
+	if err != nil {
+		return fmt.Errorf("failed to get absolute path for project root: %w", err)
+	}
+
+	absOutputDir, err := filepath.Abs(filepath.Join(projectRoot, outputDir))
+	if err != nil {
+		return fmt.Errorf("failed to get absolute path for output directory: %w", err)
+	}
+
+	// Create persistent build directory for caching
+	hostBuildDir := filepath.Join(projectRoot, "build-"+target.Name)
+	if err := os.MkdirAll(hostBuildDir, 0755); err != nil {
+		return fmt.Errorf("failed to create build directory: %w", err)
+	}
+	absBuildDir, err := filepath.Abs(hostBuildDir)
+	if err != nil {
+		return fmt.Errorf("failed to get absolute path for build directory: %w", err)
+	}
+
+	// Determine build type
+	buildType := "release"
+	if buildConfig.Type == "Debug" || buildConfig.Type == "debug" {
+		buildType = "debug"
+	}
+
+	// Build Meson arguments
+	setupArgs := []string{"setup", "builddir", "--buildtype=" + buildType}
+
+	// Add cross-file if triplet specified
+	// Note: In cpx ci, the Docker image usually has the environment setup.
+	// For Meson, we might need a cross-file if we are strictly cross-compiling not just running in a different arch container.
+	// But usually 'cpx ci' uses an image that *is* the target environment (or emulated via QEMU).
+	// So we typically don't need a cross file unless the image is a cross-compilation toolchain image.
+	// For now, we assume the environment is correct or the image handles it.
+
+	// Add custom Meson args
+	setupArgs = append(setupArgs, buildConfig.MesonArgs...)
+
+	// Build script
+	// Mount host build dir to /workspace/builddir to persist subprojects and build artifacts
+	// But /workspace is read-only. So we mount to /tmp/builddir and symlink or just build there.
+	// Best approach: Mount host build dir to /tmp/builddir.
+	// Meson needs source at /workspace.
+	// We run meson setup from /workspace but point output to /tmp/builddir.
+
+	// setupCmd := fmt.Sprintf("meson %s", strings.Join(setupArgs, " "))
+	// compileCmd := "meson compile -C builddir"
+	// if buildConfig.Verbose {
+	// 	compileCmd += " -v"
+	// }
+
+	buildScript := fmt.Sprintf(`#!/bin/bash
+set -e
+# Ensure build directory exists (mounted from host)
+mkdir -p /tmp/builddir
+
+# Symlink /tmp/builddir to /workspace/builddir so Meson finds it where we expect, 
+# OR just tell meson to build in /tmp/builddir.
+# Let's use /tmp/builddir directly.
+
+echo "  Configuring Meson..."
+# Run setup if build.ninja doesn't exist
+if [ ! -f /tmp/builddir/build.ninja ]; then
+    meson setup /tmp/builddir %s
+else
+    echo "  Build directory already configured, skipping setup."
+fi
+
+echo "  Building..."
+meson compile -C /tmp/builddir
+
+echo "  Copying artifacts..."
+mkdir -p /workspace/out/%s
+# Copy executables (exclude tests if possible, but hard to distinguish in general without introspection)
+# We'll copy everything executable that isn't a shared lib from builddir
+find /tmp/builddir -maxdepth 1 -type f -perm +111 ! -name "*.so" ! -name "*.dylib" ! -name "*.a" ! -name "*.p" ! -name "build.ninja" ! -name "*.json" -exec cp {} /workspace/out/%s/ \; 2>/dev/null || true
+
+# Copy libraries
+find /tmp/builddir -maxdepth 1 -type f \( -name "*.a" -o -name "*.so" -o -name "*.dylib" \) -exec cp {} /workspace/out/%s/ \; 2>/dev/null || true
+
+echo "  Build complete!"
+`, strings.Join(setupArgs[2:], " "), target.Name, target.Name, target.Name)
+
+	// Run Docker container
+	fmt.Printf("  %s Running Meson build in Docker container...%s\n", Cyan, Reset)
+
+	platform := target.Platform
+	dockerArgs := []string{"run", "--rm"}
+	if platform != "" {
+		dockerArgs = append(dockerArgs, "--platform", platform)
+	}
+
+	// Mounts
+	dockerArgs = append(dockerArgs,
+		"-v", absProjectRoot+":/workspace:ro", // Source read-only
+		"-v", absBuildDir+":/tmp/builddir", // Persistent build dir
+		"-v", absOutputDir+":/workspace/out", // Output dir
+		"-w", "/workspace",
+		target.Image,
+		"bash", "-c", buildScript)
+
+	cmd := exec.Command("docker", dockerArgs...)
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("docker meson build failed: %w", err)
 	}
 
 	return nil
