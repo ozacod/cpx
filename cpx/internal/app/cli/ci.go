@@ -72,7 +72,16 @@ func runCIInit(cmd *cobra.Command, _ []string) error {
 	return nil
 }
 
+var ciCommandExecuted = false
+
 func runCICommand(targetName string, rebuild bool) error {
+	if ciCommandExecuted {
+		fmt.Printf("%s[DEBUG] CI command already executed in this process (PID: %d), skipping second invocation.%s\n", Yellow, os.Getpid(), Reset)
+		return nil
+	}
+	ciCommandExecuted = true
+	// fmt.Printf("%s[DEBUG] Starting CI build (PID: %d)%s\n", Yellow, os.Getpid(), Reset)
+
 	// Load cpx.ci configuration
 	ciConfig, err := config.LoadCI("cpx.ci")
 	if err != nil {
@@ -498,6 +507,7 @@ func runDockerBuild(target config.CITarget, projectRoot, outputDir string, build
 
 	// Build CMake arguments
 	cmakeArgs := []string{
+		"-GNinja", // Use Ninja for faster, correct incremental builds
 		"-B", containerBuildDir,
 		"-S", "/workspace",
 		"-DCMAKE_BUILD_TYPE=" + buildType,
@@ -625,15 +635,24 @@ mkdir -p /tmp/.vcpkg_cache
 mkdir -p "$VCPKG_INSTALLED_DIR" "$VCPKG_DOWNLOADS" "$VCPKG_BUILDTREES_ROOT" "%s" "$X_VCPKG_REGISTRIES_CACHE"
 # Ensure build directory exists (mounted from host)
 mkdir -p %s
-echo "  Configuring CMake..."
-cmake %s
+
+# Check if already configured (incremental build)
+if [ -f "%s/build.ninja" ]; then
+    echo "  Build directory already configured, skipping setup."
+else
+    echo "  Configuring CMake (Ninja)..."
+    cmake %s
+fi
+
 echo " Building..."
+# Use cmake --build which will re-configure if Build system files changed
 cmake %s
+
 echo " Copying artifacts..."
 mkdir -p /output/%s
 %s
 echo " Build complete!"
-`, vcpkgInstalledPath, vcpkgDownloadsPath, vcpkgBuildtreesPath, binaryCachePath, binaryCachePath, containerBuildDir, strings.Join(cmakeArgs, " "), strings.Join(buildArgs, " "), target.Name, copyCommand)
+`, vcpkgInstalledPath, vcpkgDownloadsPath, vcpkgBuildtreesPath, binaryCachePath, binaryCachePath, containerBuildDir, containerBuildDir, strings.Join(cmakeArgs, " "), strings.Join(buildArgs, " "), target.Name, copyCommand)
 
 	// Run Docker container
 	fmt.Printf("  %s Running build in Docker container...%s\n", Cyan, Reset)
@@ -665,6 +684,7 @@ echo " Build complete!"
 		return fmt.Errorf("failed to get absolute path for project root: %w", err)
 	}
 
+	// Mounts
 	dockerArgs = append(dockerArgs,
 		"-v", absProjectRoot+":"+workspacePath+":ro", // Mount source as read-only
 		"-v", absBuildDir+":"+buildPath, // Mount build directory for caching build artifacts
