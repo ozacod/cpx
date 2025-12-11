@@ -82,7 +82,7 @@ func runCIInit(cmd *cobra.Command, _ []string) error {
 }
 
 // runAddTarget scans available Dockerfiles and adds selected targets to cpx.ci
-func runAddTarget(_ *cobra.Command, _ []string) error {
+func runAddTarget(_ *cobra.Command, args []string) error {
 	// Get dockerfiles directory
 	homeDir, err := os.UserHomeDir()
 	if err != nil {
@@ -101,6 +101,7 @@ func runAddTarget(_ *cobra.Command, _ []string) error {
 		return fmt.Errorf("failed to read dockerfiles directory: %w", err)
 	}
 
+	availableTargetsMap := make(map[string]bool)
 	var availableTargets []string
 	for _, entry := range entries {
 		if entry.IsDir() {
@@ -110,6 +111,7 @@ func runAddTarget(_ *cobra.Command, _ []string) error {
 		if strings.HasPrefix(name, "Dockerfile.") && !strings.HasSuffix(name, ".example") {
 			targetName := strings.TrimPrefix(name, "Dockerfile.")
 			availableTargets = append(availableTargets, targetName)
+			availableTargetsMap[targetName] = true
 		}
 	}
 
@@ -138,42 +140,59 @@ func runAddTarget(_ *cobra.Command, _ []string) error {
 		existingTargets[t.Name] = true
 	}
 
-	// Filter out already added targets
-	var newTargets []string
-	for _, t := range availableTargets {
-		if !existingTargets[t] {
-			newTargets = append(newTargets, t)
-		}
-	}
-
-	if len(newTargets) == 0 {
-		fmt.Printf("%sAll available targets are already in cpx.ci%s\n", Yellow, Reset)
-		return nil
-	}
-
-	// Print available targets for selection
-	fmt.Printf("%sAvailable targets:%s\n", Cyan, Reset)
-	for i, t := range newTargets {
-		fmt.Printf("  %d. %s\n", i+1, t)
-	}
-
-	// Simple selection - add all for now (TUI can be added later)
-	fmt.Printf("\n%sEnter target numbers to add (comma-separated, or 'all'):%s ", Cyan, Reset)
-	var input string
-	fmt.Scanln(&input)
-
 	var selectedTargets []string
-	if strings.ToLower(strings.TrimSpace(input)) == "all" {
-		selectedTargets = newTargets
+
+	// If args provided, use them directly
+	if len(args) > 0 {
+		for _, arg := range args {
+			// Validate target exists
+			if !availableTargetsMap[arg] {
+				return fmt.Errorf("unknown target: %s\n  Available targets: %s", arg, strings.Join(availableTargets, ", "))
+			}
+			// Skip if already exists
+			if existingTargets[arg] {
+				fmt.Printf("%sTarget %s already in cpx.ci, skipping%s\n", Yellow, arg, Reset)
+				continue
+			}
+			selectedTargets = append(selectedTargets, arg)
+		}
 	} else {
-		// Parse comma-separated numbers
-		parts := strings.Split(input, ",")
-		for _, part := range parts {
-			part = strings.TrimSpace(part)
-			var idx int
-			if _, err := fmt.Sscanf(part, "%d", &idx); err == nil {
-				if idx >= 1 && idx <= len(newTargets) {
-					selectedTargets = append(selectedTargets, newTargets[idx-1])
+		// Interactive mode: filter out already added targets
+		var newTargets []string
+		for _, t := range availableTargets {
+			if !existingTargets[t] {
+				newTargets = append(newTargets, t)
+			}
+		}
+
+		if len(newTargets) == 0 {
+			fmt.Printf("%sAll available targets are already in cpx.ci%s\n", Yellow, Reset)
+			return nil
+		}
+
+		// Print available targets for selection
+		fmt.Printf("%sAvailable targets:%s\n", Cyan, Reset)
+		for i, t := range newTargets {
+			fmt.Printf("  %d. %s\n", i+1, t)
+		}
+
+		// Simple selection
+		fmt.Printf("\n%sEnter target numbers to add (comma-separated, or 'all'):%s ", Cyan, Reset)
+		var input string
+		fmt.Scanln(&input)
+
+		if strings.ToLower(strings.TrimSpace(input)) == "all" {
+			selectedTargets = newTargets
+		} else {
+			// Parse comma-separated numbers
+			parts := strings.Split(input, ",")
+			for _, part := range parts {
+				part = strings.TrimSpace(part)
+				var idx int
+				if _, err := fmt.Sscanf(part, "%d", &idx); err == nil {
+					if idx >= 1 && idx <= len(newTargets) {
+						selectedTargets = append(selectedTargets, newTargets[idx-1])
+					}
 				}
 			}
 		}
