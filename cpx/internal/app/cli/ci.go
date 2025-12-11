@@ -842,7 +842,7 @@ set -e
 # Ensure build directory exists (mounted from host)
 mkdir -p /tmp/builddir
 
-# Symlink /tmp/builddir to /workspace/builddir so Meson finds it where we expect, 
+# Symlink /tmp/builddir to /workspace/builddir so Meson finds it where we expect,
 # OR just tell meson to build in /tmp/builddir.
 # Let's use /tmp/builddir directly.
 
