@@ -10,9 +10,8 @@ import (
 
 // Target represents a build target
 type Target struct {
-	Name        string
-	Platform    string // Human-readable platform description
-	AlreadyUsed bool   // Whether this target is already in cpx.ci
+	Name     string
+	Platform string // Human-readable platform description
 }
 
 // TargetState represents the current state of the target selection UI
@@ -32,6 +31,7 @@ type TargetModel struct {
 	quitting bool
 	viewport int
 	viewSize int
+	Title    string // Custom title for the selection screen
 }
 
 // TargetResultMsg is returned when selection is complete
@@ -40,12 +40,29 @@ type TargetResultMsg struct {
 }
 
 // NewTargetModel creates a new target selection model
-func NewTargetModel(targets []Target) TargetModel {
+func NewTargetModel(targets []Target, initialSelection []string, title string) TargetModel {
+	if title == "" {
+		title = "Select Build Targets"
+	}
+
+	selected := make(map[int]bool)
+	targetMap := make(map[string]int)
+	for i, t := range targets {
+		targetMap[t.Name] = i
+	}
+
+	for _, name := range initialSelection {
+		if idx, ok := targetMap[name]; ok {
+			selected[idx] = true
+		}
+	}
+
 	return TargetModel{
 		state:    TargetStateSelecting,
 		targets:  targets,
-		selected: make(map[int]bool),
+		selected: selected,
 		viewSize: 15,
+		Title:    title,
 	}
 }
 
@@ -64,8 +81,8 @@ func (m TargetModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, tea.Quit
 
 		case "enter":
-			// If nothing selected, select current item (if not already used)
-			if len(m.selected) == 0 && !m.targets[m.cursor].AlreadyUsed {
+			// If nothing selected, select current item
+			if len(m.selected) == 0 {
 				m.selected[m.cursor] = true
 			}
 			m.state = TargetStateDone
@@ -88,34 +105,28 @@ func (m TargetModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 
 		case " ":
-			// Space to toggle selection (skip already used)
-			if !m.targets[m.cursor].AlreadyUsed {
-				m.selected[m.cursor] = !m.selected[m.cursor]
-				if !m.selected[m.cursor] {
-					delete(m.selected, m.cursor)
-				}
+			// Space to toggle selection
+			m.selected[m.cursor] = !m.selected[m.cursor]
+			if !m.selected[m.cursor] {
+				delete(m.selected, m.cursor)
 			}
 
 		case "tab":
 			// Tab to select and move down
-			if !m.targets[m.cursor].AlreadyUsed {
-				m.selected[m.cursor] = true
-				if m.cursor < len(m.targets)-1 {
-					m.cursor++
-					if m.cursor >= m.viewport+m.viewSize {
-						m.viewport = m.cursor - m.viewSize + 1
-					}
+			m.selected[m.cursor] = true
+			if m.cursor < len(m.targets)-1 {
+				m.cursor++
+				if m.cursor >= m.viewport+m.viewSize {
+					m.viewport = m.cursor - m.viewSize + 1
 				}
 			} else if m.cursor < len(m.targets)-1 {
 				m.cursor++
 			}
 
 		case "a":
-			// 'a' to select all available (not already used)
-			for i, t := range m.targets {
-				if !t.AlreadyUsed {
-					m.selected[i] = true
-				}
+			// 'a' to select all
+			for i := range m.targets {
+				m.selected[i] = true
 			}
 
 		case "n":
@@ -136,7 +147,7 @@ func (m TargetModel) View() string {
 	var s strings.Builder
 
 	// Header
-	s.WriteString(cyanBold.Render("Select Build Targets") + "\n\n")
+	s.WriteString(cyanBold.Render(m.Title) + "\n\n")
 
 	if len(m.targets) == 0 {
 		s.WriteString(dimStyle.Render("No targets available.\n"))
@@ -166,9 +177,7 @@ func (m TargetModel) View() string {
 
 		// Checkbox
 		checkbox := "[ ]"
-		if target.AlreadyUsed {
-			checkbox = greenCheck.Render("[✓]") + dimStyle.Render(" (added)")
-		} else if m.selected[i] {
+		if m.selected[i] {
 			checkbox = greenCheck.Render("[✓]")
 		}
 
@@ -184,11 +193,7 @@ func (m TargetModel) View() string {
 
 		line := fmt.Sprintf("%s%s %-20s %s", prefix, checkbox, name, dimStyle.Render(platform))
 		if i == m.cursor {
-			if target.AlreadyUsed {
-				line = style.Render(fmt.Sprintf("%s%s %-20s", prefix, checkbox, name)) + " " + dimStyle.Render(platform)
-			} else {
-				line = style.Render(fmt.Sprintf("%s%s %-20s", prefix, checkbox, name)) + " " + dimStyle.Render(platform)
-			}
+			line = style.Render(fmt.Sprintf("%s%s %-20s", prefix, checkbox, name)) + " " + dimStyle.Render(platform)
 		}
 		s.WriteString(line + "\n")
 	}
@@ -201,7 +206,7 @@ func (m TargetModel) View() string {
 	// Footer
 	s.WriteString("\n")
 
-	// Count selected (excluding already used)
+	// Count selected
 	selectedCount := len(m.selected)
 	if selectedCount > 0 {
 		s.WriteString(greenStyle.Render(fmt.Sprintf("%d selected", selectedCount)) + " • ")
@@ -216,16 +221,14 @@ func (m TargetModel) View() string {
 func (m TargetModel) GetSelected() []string {
 	var selected []string
 	for i := range m.selected {
-		if !m.targets[i].AlreadyUsed {
-			selected = append(selected, m.targets[i].Name)
-		}
+		selected = append(selected, m.targets[i].Name)
 	}
 	return selected
 }
 
 // RunTargetSelection runs the target selection TUI and returns selected targets
-func RunTargetSelection(targets []Target) ([]string, error) {
-	m := NewTargetModel(targets)
+func RunTargetSelection(targets []Target, initialSelection []string, title string) ([]string, error) {
+	m := NewTargetModel(targets, initialSelection, title)
 	p := tea.NewProgram(m)
 	finalModel, err := p.Run()
 	if err != nil {

@@ -47,19 +47,37 @@ func CICmd() *cobra.Command {
 	addTargetCmd := &cobra.Command{
 		Use:   "add-target [target...]",
 		Short: "Add a build target to cpx.ci",
-		Long:  "Scan available Dockerfiles and add a build target to cpx.ci configuration.",
+		Long:  "Scan available targets and add a build target to cpx.ci configuration.",
 		RunE:  runAddTarget,
 	}
+	cmd.AddCommand(addTargetCmd)
 
-	// Add list subcommand to add-target
-	listTargetsCmd := &cobra.Command{
+	// Add list subcommand (formerly add-target list)
+	listCmd := &cobra.Command{
 		Use:   "list",
-		Short: "List all available build targets and select interactively",
-		Long:  "List all available Dockerfiles and let you choose which to add to cpx.ci.",
+		Short: "Manage build targets (list/add/remove)",
+		Long:  "List all available build targets and manage them interactively (check to add, uncheck to remove).",
 		RunE:  runListTargets,
 	}
-	addTargetCmd.AddCommand(listTargetsCmd)
-	cmd.AddCommand(addTargetCmd)
+	cmd.AddCommand(listCmd)
+
+	// Add rm-target subcommand
+	rmTargetCmd := &cobra.Command{
+		Use:   "rm-target [target...]",
+		Short: "Remove a build target from cpx.ci",
+		Long:  "Remove one or more build targets from cpx.ci configuration.",
+		RunE:  runRemoveTarget,
+	}
+
+	// Add list subcommand to rm-target
+	listRemoveTargetsCmd := &cobra.Command{
+		Use:   "list",
+		Short: "List all targets in cpx.ci and select to remove",
+		Long:  "List all targets defined in cpx.ci and lets you choose which to remove.",
+		RunE:  runListRemoveTargets,
+	}
+	rmTargetCmd.AddCommand(listRemoveTargetsCmd)
+	cmd.AddCommand(rmTargetCmd)
 
 	return cmd
 }
@@ -215,6 +233,98 @@ func runAddTarget(_ *cobra.Command, args []string) error {
 	return nil
 }
 
+// runRemoveTarget removes targets from cpx.ci
+func runRemoveTarget(_ *cobra.Command, args []string) error {
+	// Load existing cpx.ci
+	ciConfig, err := config.LoadCI("cpx.ci")
+	if err != nil {
+		return fmt.Errorf("failed to load cpx.ci: %w\n  No cpx.ci file found in current directory", err)
+	}
+
+	if len(ciConfig.Targets) == 0 {
+		fmt.Printf("%sNo targets in cpx.ci to remove%s\n", Yellow, Reset)
+		return nil
+	}
+
+	// If no args, use interactive mode
+	if len(args) == 0 {
+		// simple interactive mode
+		fmt.Printf("%sTargets in cpx.ci:%s\n", Cyan, Reset)
+		for i, t := range ciConfig.Targets {
+			fmt.Printf("  %d. %s\n", i+1, t.Name)
+		}
+
+		fmt.Printf("\n%sEnter target numbers to remove (comma-separated, or 'all'):%s ", Cyan, Reset)
+		var input string
+		fmt.Scanln(&input)
+
+		var selectedToRemove []string
+
+		if strings.ToLower(strings.TrimSpace(input)) == "all" {
+			for _, t := range ciConfig.Targets {
+				selectedToRemove = append(selectedToRemove, t.Name)
+			}
+		} else {
+			parts := strings.Split(input, ",")
+			for _, part := range parts {
+				part = strings.TrimSpace(part)
+				var idx int
+				if _, err := fmt.Sscanf(part, "%d", &idx); err == nil {
+					if idx >= 1 && idx <= len(ciConfig.Targets) {
+						selectedToRemove = append(selectedToRemove, ciConfig.Targets[idx-1].Name)
+					}
+				}
+			}
+		}
+
+		if len(selectedToRemove) == 0 {
+			fmt.Printf("%sNo targets selected for removal%s\n", Yellow, Reset)
+			return nil
+		}
+
+		// Proceed with removal using selectedToRemove
+		args = selectedToRemove
+	}
+
+	// Build set of targets to remove
+	toRemove := make(map[string]bool)
+	for _, arg := range args {
+		toRemove[arg] = true
+	}
+
+	// Filter out removed targets
+	var newTargets []config.CITarget
+	var removed []string
+	for _, t := range ciConfig.Targets {
+		if toRemove[t.Name] {
+			removed = append(removed, t.Name)
+		} else {
+			newTargets = append(newTargets, t)
+		}
+	}
+
+	if len(removed) == 0 {
+		fmt.Printf("%sNo matching targets found to remove%s\n\n", Yellow, Reset)
+		fmt.Printf("Available targets in cpx.ci:\n")
+		for _, t := range ciConfig.Targets {
+			fmt.Printf("  - %s\n", t.Name)
+		}
+		return nil
+	}
+
+	// Update and save config
+	ciConfig.Targets = newTargets
+	if err := config.SaveCI(ciConfig, "cpx.ci"); err != nil {
+		return err
+	}
+
+	for _, name := range removed {
+		fmt.Printf("%s- Removed target: %s%s\n", Red, name, Reset)
+	}
+	fmt.Printf("\n%sSaved cpx.ci with %d target(s)%s\n", Green, len(ciConfig.Targets), Reset)
+	return nil
+}
+
 // runListTargets shows all available targets and lets user select interactively
 func runListTargets(_ *cobra.Command, _ []string) error {
 	// Get dockerfiles directory
@@ -267,43 +377,157 @@ func runListTargets(_ *cobra.Command, _ []string) error {
 	}
 
 	existingTargets := make(map[string]bool)
+	var existingTargetNames []string
 	for _, t := range ciConfig.Targets {
 		existingTargets[t.Name] = true
+		existingTargetNames = append(existingTargetNames, t.Name)
 	}
 
 	// Build targets list for TUI
 	var targets []tui.Target
 	for _, name := range availableTargets {
 		targets = append(targets, tui.Target{
-			Name:        name,
-			Platform:    describePlatform(name),
-			AlreadyUsed: existingTargets[name],
+			Name:     name,
+			Platform: describePlatform(name),
 		})
 	}
 
 	// Run interactive TUI
-	selectedTargets, err := tui.RunTargetSelection(targets)
+	selectedTargets, err := tui.RunTargetSelection(targets, existingTargetNames, "Manage Build Targets")
 	if err != nil {
 		return fmt.Errorf("TUI error: %w", err)
 	}
 
 	if len(selectedTargets) == 0 {
-		fmt.Printf("%sNo targets selected%s\n", Yellow, Reset)
+		fmt.Printf("%sNo targets selected - clearing all targets%s\n", Yellow, Reset)
+	}
+
+	// Calculate changes
+	selectedMap := make(map[string]bool)
+	for _, t := range selectedTargets {
+		selectedMap[t] = true
+	}
+
+	var added, removed []string
+
+	// Find added
+	for _, t := range selectedTargets {
+		if !existingTargets[t] {
+			added = append(added, t)
+		}
+	}
+
+	// Find removed
+	for t := range existingTargets {
+		if !selectedMap[t] {
+			removed = append(removed, t)
+		}
+	}
+
+	if len(added) == 0 && len(removed) == 0 {
+		fmt.Printf("No changes made.\n")
 		return nil
 	}
 
-	// Add selected targets
-	for _, targetName := range selectedTargets {
-		target := deriveTargetConfig(targetName)
-		ciConfig.Targets = append(ciConfig.Targets, target)
-		fmt.Printf("%s+ Added target: %s%s\n", Green, targetName, Reset)
+	// Construct new config targets list
+	// We preserve order of selected targets for new ones, but keep existing ones first?
+	// Actually simple rebuild is fine.
+	var newTargets []config.CITarget
+
+	// Rebuild list based on selection order
+	// Or maybe just filter existing list + append new ones?
+	// To preserve existing config (options maybe?), better to modify existing list.
+	// But CITarget only has basic fields now. Rebuilding is safer for order consistency if desired.
+	// Let's rebuild: existing targets (kept) + new targets
+
+	// Keep existing targets that are still selected
+	for _, t := range ciConfig.Targets {
+		if selectedMap[t.Name] {
+			newTargets = append(newTargets, t)
+		}
 	}
+
+	// Add new targets
+	for _, name := range added {
+		newTargets = append(newTargets, deriveTargetConfig(name))
+	}
+
+	ciConfig.Targets = newTargets
 
 	// Save cpx.ci
 	if err := config.SaveCI(ciConfig, "cpx.ci"); err != nil {
 		return err
 	}
 
+	// Print summary
+	for _, t := range added {
+		fmt.Printf("%s+ Added target: %s%s\n", Green, t, Reset)
+	}
+	for _, t := range removed {
+		fmt.Printf("%s- Removed target: %s%s\n", Red, t, Reset)
+	}
+
+	fmt.Printf("\n%sSaved cpx.ci with %d target(s)%s\n", Green, len(ciConfig.Targets), Reset)
+	return nil
+}
+
+// runListRemoveTargets shows all targets in cpx.ci and lets user select to remove
+func runListRemoveTargets(_ *cobra.Command, _ []string) error {
+	// Load existing cpx.ci
+	ciConfig, err := config.LoadCI("cpx.ci")
+	if err != nil {
+		return fmt.Errorf("failed to load cpx.ci: %w\n  No cpx.ci file found in current directory", err)
+	}
+
+	if len(ciConfig.Targets) == 0 {
+		fmt.Printf("%sNo targets in cpx.ci to remove%s\n", Yellow, Reset)
+		return nil
+	}
+
+	// Build targets list for TUI
+	var targets []tui.Target
+	for _, t := range ciConfig.Targets {
+		targets = append(targets, tui.Target{
+			Name:     t.Name,
+			Platform: describePlatform(t.Name),
+		})
+	}
+
+	// Run interactive TUI - initially empty selection for removal list?
+	// The command says "Select targets to remove".
+	// So we start with nothing selected. User selects items.
+	// We remove those items.
+	selectedToRemove, err := tui.RunTargetSelection(targets, nil, "Select Targets to Remove")
+	if err != nil {
+		return fmt.Errorf("TUI error: %w", err)
+	}
+
+	if len(selectedToRemove) == 0 {
+		fmt.Printf("%sNo targets selected for removal%s\n", Yellow, Reset)
+		return nil
+	}
+
+	// Remove selected targets
+	toRemove := make(map[string]bool)
+	for _, name := range selectedToRemove {
+		toRemove[name] = true
+	}
+
+	var newTargets []config.CITarget
+	for _, t := range ciConfig.Targets {
+		if !toRemove[t.Name] {
+			newTargets = append(newTargets, t)
+		}
+	}
+
+	ciConfig.Targets = newTargets
+	if err := config.SaveCI(ciConfig, "cpx.ci"); err != nil {
+		return err
+	}
+
+	for name := range toRemove {
+		fmt.Printf("%s- Removed target: %s%s\n", Red, name, Reset)
+	}
 	fmt.Printf("\n%sSaved cpx.ci with %d target(s)%s\n", Green, len(ciConfig.Targets), Reset)
 	return nil
 }
@@ -337,34 +561,27 @@ func describePlatform(name string) string {
 	return osName + " " + archName
 }
 
-// dimStyle applies dim styling to text
-func dimStyle(s string) string {
-	return Dim + s + Reset
-}
-
 // deriveTargetConfig derives a CITarget from a target name
 func deriveTargetConfig(name string) config.CITarget {
 	target := config.CITarget{
-		Name:       name,
-		Dockerfile: "Dockerfile." + name,
-		Image:      "cpx-" + name,
+		Source: name,
 	}
 
 	// Derive platform from name
-	parts := strings.Split(name, "-")
-	if len(parts) >= 2 {
-		os := parts[0]   // linux
-		arch := parts[1] // amd64, arm64
-
-		switch os {
-		case "linux":
-			if arch == "amd64" {
-				target.Platform = "linux/amd64"
-			} else if arch == "arm64" {
-				target.Platform = "linux/arm64"
-			}
-		}
-	}
+	// parts := strings.Split(name, "-")
+	// if len(parts) >= 2 {
+	// 	os := parts[0]   // linux
+	// 	arch := parts[1] // amd64, arm64
+	//
+	// 	switch os {
+	// 	case "linux":
+	// 		if arch == "amd64" {
+	// 			// target.Platform = "linux/amd64"
+	// 		} else if arch == "arm64" {
+	// 			// target.Platform = "linux/arm64"
+	// 		}
+	// 	}
+	// }
 
 	return target
 }
@@ -462,13 +679,20 @@ func runCIBuild(targetName string, rebuild bool, executeAfterBuild bool) error {
 		}
 
 		// Build Docker image
-		dockerfilePath := filepath.Join(absDockerfilesDir, target.Dockerfile)
+		// Check if Dockerfile exists as specified, or try prepending Dockerfile.
+		dockerfilePath := filepath.Join(absDockerfilesDir, target.Source)
 		if _, err := os.Stat(dockerfilePath); os.IsNotExist(err) {
-			return fmt.Errorf("dockerfile not found: %s\n  Run 'cpx upgrade' to download Dockerfiles", dockerfilePath)
+			// Try prepending Dockerfile.
+			altPath := filepath.Join(absDockerfilesDir, "Dockerfile."+target.Source)
+			if _, err := os.Stat(altPath); err == nil {
+				dockerfilePath = altPath
+			} else {
+				return fmt.Errorf("dockerfile not found: %s (or Dockerfile.%s)\n  Run 'cpx upgrade' to download Dockerfiles", target.Source, target.Source)
+			}
 		}
 
-		if err := buildDockerImage(dockerfilePath, target.Image, target.Platform, rebuild); err != nil {
-			return fmt.Errorf("failed to build Docker image %s: %w", target.Image, err)
+		if err := buildDockerImage(dockerfilePath, target.Tag, rebuild); err != nil {
+			return fmt.Errorf("failed to build Docker image %s: %w", target.Tag, err)
 		}
 
 		// Run build in Docker container
@@ -522,7 +746,7 @@ func findProjectRoot() (string, error) {
 	}
 }
 
-func buildDockerImage(dockerfilePath, imageName, platform string, rebuild bool) error {
+func buildDockerImage(dockerfilePath, imageName string, rebuild bool) error {
 	// Check if image already exists
 	if !rebuild {
 		cmd := exec.Command("docker", "images", "-q", imageName)
@@ -555,9 +779,9 @@ func buildDockerImage(dockerfilePath, imageName, platform string, rebuild bool) 
 	// Build Docker image with platform flag if specified
 	// Use buildx for better multi-arch support
 	buildArgs := []string{"buildx", "build", "-f", absDockerfilePath, "-t", imageName}
-	if platform != "" {
-		buildArgs = append(buildArgs, "--platform", platform)
-	}
+	// if platform != "" {
+	// 	buildArgs = append(buildArgs, "--platform", platform)
+	// }
 	buildArgs = append(buildArgs, "--load") // Load into local Docker daemon
 	buildArgs = append(buildArgs, dockerfileDir)
 
@@ -570,9 +794,9 @@ func buildDockerImage(dockerfilePath, imageName, platform string, rebuild bool) 
 		fmt.Printf("  %s  docker buildx failed, trying regular docker build...%s\n", Yellow, Reset)
 		// Fallback to regular docker build
 		buildArgs = []string{"build", "-f", absDockerfilePath, "-t", imageName}
-		if platform != "" {
-			buildArgs = append(buildArgs, "--platform", platform)
-		}
+		// if platform != "" {
+		// 	buildArgs = append(buildArgs, "--platform", platform)
+		// }
 		buildArgs = append(buildArgs, dockerfileDir)
 
 		cmd = exec.Command("docker", buildArgs...)
@@ -881,7 +1105,7 @@ fi
 	fmt.Printf("  %s Running build in Docker container...%s\n", Cyan, Reset)
 
 	// Use platform from target config
-	platform := target.Platform
+	// platform := target.Platform
 
 	// Mount only necessary directories:
 	// - Source code (read-only to avoid modifying host files)
@@ -889,9 +1113,9 @@ fi
 	// - Output directory (for artifacts)
 	// - vcpkg cache directory (from build/.vcpkg_cache to /tmp/.vcpkg_cache)
 	dockerArgs := []string{"run", "--rm"}
-	if platform != "" {
-		dockerArgs = append(dockerArgs, "--platform", platform)
-	}
+	// if platform != "" {
+	// 	dockerArgs = append(dockerArgs, "--platform", platform)
+	// }
 	// Mount paths for Linux/macOS containers
 	// Build directory is mounted to /tmp/build to avoid read-only /workspace mount issues
 	// vcpkg cache is mounted to /tmp/.vcpkg_cache for the same reason
@@ -914,7 +1138,7 @@ fi
 		"-v", absOutputDir+":"+outputPath, // Mount output directory for artifacts
 		"-v", absVcpkgCacheDir+":"+cachePath, // Mount vcpkg cache
 		"-w", workspacePath,
-		target.Image,
+		target.Tag,
 		command, "-c", buildScript)
 
 	cmd := exec.Command("docker", dockerArgs...)
@@ -1001,11 +1225,11 @@ echo "  Build complete!"
 	// Run Docker container
 	fmt.Printf("  %s Running Bazel build in Docker container...%s\n", Cyan, Reset)
 
-	platform := target.Platform
+	// platform := target.Platform
 	dockerArgs := []string{"run", "--rm"}
-	if platform != "" {
-		dockerArgs = append(dockerArgs, "--platform", platform)
-	}
+	// if platform != "" {
+	// 	dockerArgs = append(dockerArgs, "--platform", platform)
+	// }
 
 	// Mount workspace as read-only to prevent Bazel from creating files in it
 	// Mount output directory separately
@@ -1017,7 +1241,7 @@ echo "  Build complete!"
 		"-v", bazelCacheDir+":/bazel-cache",
 		"-v", bazelRepoCacheDir+":/bazel-repo-cache",
 		"-w", "/workspace",
-		target.Image,
+		target.Tag,
 		"bash", "-c", buildScript)
 
 	cmd := exec.Command("docker", dockerArgs...)
@@ -1140,11 +1364,11 @@ echo "  Build complete!"
 	// Run Docker container
 	fmt.Printf("  %s Running Meson build in Docker container...%s\n", Cyan, Reset)
 
-	platform := target.Platform
+	// platform := target.Platform
 	dockerArgs := []string{"run", "--rm"}
-	if platform != "" {
-		dockerArgs = append(dockerArgs, "--platform", platform)
-	}
+	// if platform != "" {
+	// 	dockerArgs = append(dockerArgs, "--platform", platform)
+	// }
 
 	// Mounts
 	dockerArgs = append(dockerArgs,
@@ -1153,7 +1377,7 @@ echo "  Build complete!"
 		"-v", absSubprojectsDir+":/workspace/subprojects", // Subprojects read-write for downloading wraps
 		"-v", absOutputDir+":/workspace/out", // Output dir
 		"-w", "/workspace",
-		target.Image,
+		target.Tag,
 		"bash", "-c", buildScript)
 
 	cmd := exec.Command("docker", dockerArgs...)

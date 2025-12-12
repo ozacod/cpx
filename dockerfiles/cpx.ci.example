@@ -1,27 +1,16 @@
 # cpx.ci - Cross-compilation configuration
-# This file defines which Docker images to use for building your project
+# Docker image names are derived as cpx-<target-name>
+# Target names are derived from dockerfile (e.g., Dockerfile.linux-amd64 -> linux-amd64)
 
 # List of targets to build
 targets:
-  - name: linux-amd64
-    dockerfile: Dockerfile.linux-amd64
-    image: cpx-linux-amd64
-    platform: linux/amd64
+  - image: linux-amd64
 
-  - name: linux-arm64
-    dockerfile: Dockerfile.linux-arm64
-    image: cpx-linux-arm64
-    platform: linux/arm64
+  - image: linux-arm64
 
-  - name: linux-amd64-musl
-    dockerfile: Dockerfile.linux-amd64-musl
-    image: cpx-linux-amd64-musl
-    platform: linux/amd64
+  - image: linux-amd64-musl
 
-  - name: linux-arm64-musl
-    dockerfile: Dockerfile.linux-arm64-musl
-    image: cpx-linux-arm64-musl
-    platform: linux/arm64
+  - image: linux-arm64-musl
 
 # Build configuration
 build:
@@ -42,4 +31,3 @@ build:
 
 # Output directory for artifacts
 output: .bin/ci
-

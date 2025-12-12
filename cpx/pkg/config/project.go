@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"gopkg.in/yaml.v3"
 )
@@ -17,11 +18,10 @@ type CIConfig struct {
 
 // CITarget represents a cross-compilation target
 type CITarget struct {
-	Name       string `yaml:"name"`
-	Dockerfile string `yaml:"dockerfile"`
-	Image      string `yaml:"image"`
-	Triplet    string `yaml:"triplet,omitempty"`
-	Platform   string `yaml:"platform"`
+	Name    string `yaml:"name,omitempty"`
+	Source  string `yaml:"image"`
+	Tag     string `yaml:"tag,omitempty"`
+	Triplet string `yaml:"triplet,omitempty"`
 }
 
 // CIBuild represents CI build configuration
@@ -55,6 +55,22 @@ func LoadCI(path string) (*CIConfig, error) {
 	}
 	if config.Build.Optimization == "" {
 		config.Build.Optimization = "2"
+	}
+
+	// Derive name from image if not specified
+	for i := range config.Targets {
+		if config.Targets[i].Name == "" && config.Targets[i].Source != "" {
+			name := config.Targets[i].Source
+			name = strings.TrimPrefix(name, "Dockerfile.")
+			config.Targets[i].Name = name
+		}
+	}
+
+	// Derive tag from target name if not specified
+	for i := range config.Targets {
+		if config.Targets[i].Tag == "" {
+			config.Targets[i].Tag = "cpx-" + config.Targets[i].Name
+		}
 	}
 
 	return &config, nil
