@@ -24,6 +24,18 @@ func CICmd() *cobra.Command {
 	cmd.Flags().String("target", "", "Build only specific target (default: all)")
 	cmd.Flags().Bool("rebuild", false, "Rebuild Docker images even if they exist")
 
+	// Add run subcommand - builds a specific target (required)
+	runCmd := &cobra.Command{
+		Use:   "run",
+		Short: "Build a specific target using Docker",
+		Long:  "Build a specific target using Docker. Requires --target flag.",
+		RunE:  runCIRun,
+	}
+	runCmd.Flags().String("target", "", "Target to build (required)")
+	runCmd.Flags().Bool("rebuild", false, "Rebuild Docker image even if it exists")
+	runCmd.MarkFlagRequired("target")
+	cmd.AddCommand(runCmd)
+
 	// Add add-target subcommand
 	addTargetCmd := &cobra.Command{
 		Use:   "add-target [target...]",
@@ -46,6 +58,12 @@ func CICmd() *cobra.Command {
 }
 
 func runCI(cmd *cobra.Command, _ []string) error {
+	target, _ := cmd.Flags().GetString("target")
+	rebuild, _ := cmd.Flags().GetBool("rebuild")
+	return runCICommand(target, rebuild)
+}
+
+func runCIRun(cmd *cobra.Command, _ []string) error {
 	target, _ := cmd.Flags().GetString("target")
 	rebuild, _ := cmd.Flags().GetBool("rebuild")
 	return runCICommand(target, rebuild)
