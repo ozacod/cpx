@@ -496,17 +496,9 @@ func GenerateCpxCI() string {
 
 # List of targets to build
 targets:
-  # - name: linux-amd64
-  #   dockerfile: Dockerfile.linux-amd64
-  #   image: cpx-linux-amd64
-  #   triplet: x64-linux
-  #   platform: linux/amd64
+  # - image: linux-amd64
 
-  # - name: linux-arm64
-  #   dockerfile: Dockerfile.linux-arm64
-  #   image: cpx-linux-arm64
-  #   triplet: arm64-linux
-  #   platform: linux/arm64
+  # - image: linux-arm64
 
 # Build configuration
 build:

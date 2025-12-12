@@ -46,20 +46,11 @@ func CICmd() *cobra.Command {
 	// Add add-target subcommand
 	addTargetCmd := &cobra.Command{
 		Use:   "add-target [target...]",
-		Short: "Add a build target to cpx.ci",
-		Long:  "Scan available targets and add a build target to cpx.ci configuration.",
+		Short: "Add or manage build targets in cpx.ci",
+		Long:  "Scan available targets and add a build target to cpx.ci configuration. If no arguments are provided, opens an interactive target manager to add/remove targets.",
 		RunE:  runAddTarget,
 	}
 	cmd.AddCommand(addTargetCmd)
-
-	// Add list subcommand (formerly add-target list)
-	listCmd := &cobra.Command{
-		Use:   "list",
-		Short: "Manage build targets (list/add/remove)",
-		Long:  "List all available build targets and manage them interactively (check to add, uncheck to remove).",
-		RunE:  runListTargets,
-	}
-	cmd.AddCommand(listCmd)
 
 	// Add rm-target subcommand
 	rmTargetCmd := &cobra.Command{
@@ -79,6 +70,16 @@ func CICmd() *cobra.Command {
 	rmTargetCmd.AddCommand(listRemoveTargetsCmd)
 	cmd.AddCommand(rmTargetCmd)
 
+	// Add register subcommand
+	registerCmd := &cobra.Command{
+		Use:   "register [file]",
+		Short: "Register a new Dockerfile target",
+		Long:  "Register a new Dockerfile target to the local cpx configuration. The file must be named in the format 'Dockerfile.<name>'.",
+		Args:  cobra.ExactArgs(1),
+		RunE:  runRegisterTarget,
+	}
+	cmd.AddCommand(registerCmd)
+
 	return cmd
 }
 
@@ -95,7 +96,9 @@ func runCIRun(cmd *cobra.Command, _ []string) error {
 	return runCIBuild(target, rebuild, true)
 }
 
-// runAddTarget scans available Dockerfiles and adds selected targets to cpx.ci
+// runAddTarget adds a build target to cpx.ci
+// If args are provided, adds those specific targets.
+// If no args are provided, opens interactive target manager.
 func runAddTarget(_ *cobra.Command, args []string) error {
 	// Get dockerfiles directory
 	homeDir, err := os.UserHomeDir()
@@ -148,16 +151,17 @@ func runAddTarget(_ *cobra.Command, args []string) error {
 		}
 	}
 
-	// Get existing target names to avoid duplicates
+	// Get existing target names
 	existingTargets := make(map[string]bool)
+	var existingTargetNames []string
 	for _, t := range ciConfig.Targets {
 		existingTargets[t.Name] = true
+		existingTargetNames = append(existingTargetNames, t.Name)
 	}
 
-	var selectedTargets []string
-
-	// If args provided, use them directly
+	// Check if args provided
 	if len(args) > 0 {
+		var selectedTargets []string
 		for _, arg := range args {
 			// Validate target exists
 			if !availableTargetsMap[arg] {
@@ -170,63 +174,103 @@ func runAddTarget(_ *cobra.Command, args []string) error {
 			}
 			selectedTargets = append(selectedTargets, arg)
 		}
-	} else {
-		// Interactive mode: filter out already added targets
-		var newTargets []string
-		for _, t := range availableTargets {
-			if !existingTargets[t] {
-				newTargets = append(newTargets, t)
-			}
-		}
 
-		if len(newTargets) == 0 {
-			fmt.Printf("%sAll available targets are already in cpx.ci%s\n", Yellow, Reset)
+		if len(selectedTargets) == 0 {
+			fmt.Printf("%sNo new targets added%s\n", Yellow, Reset)
 			return nil
 		}
 
-		// Print available targets for selection
-		fmt.Printf("%sAvailable targets:%s\n", Cyan, Reset)
-		for i, t := range newTargets {
-			fmt.Printf("  %d. %s\n", i+1, t)
+		// Add selected targets
+		for _, targetName := range selectedTargets {
+			target := deriveTargetConfig(targetName)
+			ciConfig.Targets = append(ciConfig.Targets, target)
+			fmt.Printf("%s+ Added target: %s%s\n", Green, targetName, Reset)
 		}
 
-		// Simple selection
-		fmt.Printf("\n%sEnter target numbers to add (comma-separated, or 'all'):%s ", Cyan, Reset)
-		var input string
-		fmt.Scanln(&input)
-
-		if strings.ToLower(strings.TrimSpace(input)) == "all" {
-			selectedTargets = newTargets
-		} else {
-			// Parse comma-separated numbers
-			parts := strings.Split(input, ",")
-			for _, part := range parts {
-				part = strings.TrimSpace(part)
-				var idx int
-				if _, err := fmt.Sscanf(part, "%d", &idx); err == nil {
-					if idx >= 1 && idx <= len(newTargets) {
-						selectedTargets = append(selectedTargets, newTargets[idx-1])
-					}
-				}
-			}
+		// Save cpx.ci
+		if err := config.SaveCI(ciConfig, "cpx.ci"); err != nil {
+			return err
 		}
-	}
 
-	if len(selectedTargets) == 0 {
-		fmt.Printf("%sNo targets selected%s\n", Yellow, Reset)
+		fmt.Printf("\n%sSaved cpx.ci with %d target(s)%s\n", Green, len(ciConfig.Targets), Reset)
 		return nil
 	}
 
-	// Add selected targets
-	for _, targetName := range selectedTargets {
-		target := deriveTargetConfig(targetName)
-		ciConfig.Targets = append(ciConfig.Targets, target)
-		fmt.Printf("%s+ Added target: %s%s\n", Green, targetName, Reset)
+	// Interactive Mode (Target Manager)
+	// Build targets list for TUI
+	var targets []tui.Target
+	for _, name := range availableTargets {
+		targets = append(targets, tui.Target{
+			Name:     name,
+			Platform: describePlatform(name),
+		})
 	}
+
+	// Run interactive TUI
+	selectedTargets, err := tui.RunTargetSelection(targets, existingTargetNames, "Manage Build Targets")
+	if err != nil {
+		return fmt.Errorf("TUI error: %w", err)
+	}
+
+	if len(selectedTargets) == 0 {
+		fmt.Printf("%sNo targets selected - clearing all targets%s\n", Yellow, Reset)
+	}
+
+	// Calculate changes
+	selectedMap := make(map[string]bool)
+	for _, t := range selectedTargets {
+		selectedMap[t] = true
+	}
+
+	var added, removed []string
+
+	// Find added
+	for _, t := range selectedTargets {
+		if !existingTargets[t] {
+			added = append(added, t)
+		}
+	}
+
+	// Find removed
+	for t := range existingTargets {
+		if !selectedMap[t] {
+			removed = append(removed, t)
+		}
+	}
+
+	if len(added) == 0 && len(removed) == 0 {
+		fmt.Printf("No changes made.\n")
+		return nil
+	}
+
+	// Rebuild targets list: existing (kept) + new
+	var newTargets []config.CITarget
+
+	// Keep existing targets that are still selected
+	for _, t := range ciConfig.Targets {
+		if selectedMap[t.Name] {
+			newTargets = append(newTargets, t)
+		}
+	}
+
+	// Add new targets
+	for _, name := range added {
+		newTargets = append(newTargets, deriveTargetConfig(name))
+	}
+
+	ciConfig.Targets = newTargets
 
 	// Save cpx.ci
 	if err := config.SaveCI(ciConfig, "cpx.ci"); err != nil {
 		return err
+	}
+
+	// Print summary
+	for _, t := range added {
+		fmt.Printf("%s+ Added target: %s%s\n", Green, t, Reset)
+	}
+	for _, t := range removed {
+		fmt.Printf("%s- Removed target: %s%s\n", Red, t, Reset)
 	}
 
 	fmt.Printf("\n%sSaved cpx.ci with %d target(s)%s\n", Green, len(ciConfig.Targets), Reset)
@@ -325,152 +369,6 @@ func runRemoveTarget(_ *cobra.Command, args []string) error {
 	return nil
 }
 
-// runListTargets shows all available targets and lets user select interactively
-func runListTargets(_ *cobra.Command, _ []string) error {
-	// Get dockerfiles directory
-	homeDir, err := os.UserHomeDir()
-	if err != nil {
-		return fmt.Errorf("failed to get home directory: %w", err)
-	}
-	dockerfilesDir := filepath.Join(homeDir, ".config", "cpx", "dockerfiles")
-
-	// Check if directory exists
-	if _, err := os.Stat(dockerfilesDir); os.IsNotExist(err) {
-		return fmt.Errorf("dockerfiles directory not found: %s\n  Run 'cpx upgrade' to download Dockerfiles", dockerfilesDir)
-	}
-
-	// Scan for Dockerfile.* files
-	entries, err := os.ReadDir(dockerfilesDir)
-	if err != nil {
-		return fmt.Errorf("failed to read dockerfiles directory: %w", err)
-	}
-
-	var availableTargets []string
-	for _, entry := range entries {
-		if entry.IsDir() {
-			continue
-		}
-		name := entry.Name()
-		if strings.HasPrefix(name, "Dockerfile.") && !strings.HasSuffix(name, ".example") {
-			targetName := strings.TrimPrefix(name, "Dockerfile.")
-			availableTargets = append(availableTargets, targetName)
-		}
-	}
-
-	if len(availableTargets) == 0 {
-		return fmt.Errorf("no Dockerfiles found in %s", dockerfilesDir)
-	}
-
-	// Load existing cpx.ci to check which targets are already added
-	ciConfig, err := config.LoadCI("cpx.ci")
-	if err != nil {
-		// Create new config
-		ciConfig = &config.CIConfig{
-			Targets: []config.CITarget{},
-			Build: config.CIBuild{
-				Type:         "Release",
-				Optimization: "2",
-				Jobs:         0,
-			},
-			Output: ".bin/ci",
-		}
-	}
-
-	existingTargets := make(map[string]bool)
-	var existingTargetNames []string
-	for _, t := range ciConfig.Targets {
-		existingTargets[t.Name] = true
-		existingTargetNames = append(existingTargetNames, t.Name)
-	}
-
-	// Build targets list for TUI
-	var targets []tui.Target
-	for _, name := range availableTargets {
-		targets = append(targets, tui.Target{
-			Name:     name,
-			Platform: describePlatform(name),
-		})
-	}
-
-	// Run interactive TUI
-	selectedTargets, err := tui.RunTargetSelection(targets, existingTargetNames, "Manage Build Targets")
-	if err != nil {
-		return fmt.Errorf("TUI error: %w", err)
-	}
-
-	if len(selectedTargets) == 0 {
-		fmt.Printf("%sNo targets selected - clearing all targets%s\n", Yellow, Reset)
-	}
-
-	// Calculate changes
-	selectedMap := make(map[string]bool)
-	for _, t := range selectedTargets {
-		selectedMap[t] = true
-	}
-
-	var added, removed []string
-
-	// Find added
-	for _, t := range selectedTargets {
-		if !existingTargets[t] {
-			added = append(added, t)
-		}
-	}
-
-	// Find removed
-	for t := range existingTargets {
-		if !selectedMap[t] {
-			removed = append(removed, t)
-		}
-	}
-
-	if len(added) == 0 && len(removed) == 0 {
-		fmt.Printf("No changes made.\n")
-		return nil
-	}
-
-	// Construct new config targets list
-	// We preserve order of selected targets for new ones, but keep existing ones first?
-	// Actually simple rebuild is fine.
-	var newTargets []config.CITarget
-
-	// Rebuild list based on selection order
-	// Or maybe just filter existing list + append new ones?
-	// To preserve existing config (options maybe?), better to modify existing list.
-	// But CITarget only has basic fields now. Rebuilding is safer for order consistency if desired.
-	// Let's rebuild: existing targets (kept) + new targets
-
-	// Keep existing targets that are still selected
-	for _, t := range ciConfig.Targets {
-		if selectedMap[t.Name] {
-			newTargets = append(newTargets, t)
-		}
-	}
-
-	// Add new targets
-	for _, name := range added {
-		newTargets = append(newTargets, deriveTargetConfig(name))
-	}
-
-	ciConfig.Targets = newTargets
-
-	// Save cpx.ci
-	if err := config.SaveCI(ciConfig, "cpx.ci"); err != nil {
-		return err
-	}
-
-	// Print summary
-	for _, t := range added {
-		fmt.Printf("%s+ Added target: %s%s\n", Green, t, Reset)
-	}
-	for _, t := range removed {
-		fmt.Printf("%s- Removed target: %s%s\n", Red, t, Reset)
-	}
-
-	fmt.Printf("\n%sSaved cpx.ci with %d target(s)%s\n", Green, len(ciConfig.Targets), Reset)
-	return nil
-}
-
 // runListRemoveTargets shows all targets in cpx.ci and lets user select to remove
 func runListRemoveTargets(_ *cobra.Command, _ []string) error {
 	// Load existing cpx.ci
@@ -529,6 +427,57 @@ func runListRemoveTargets(_ *cobra.Command, _ []string) error {
 		fmt.Printf("%s- Removed target: %s%s\n", Red, name, Reset)
 	}
 	fmt.Printf("\n%sSaved cpx.ci with %d target(s)%s\n", Green, len(ciConfig.Targets), Reset)
+	return nil
+}
+
+// runRegisterTarget registers a new Dockerfile target
+func runRegisterTarget(_ *cobra.Command, args []string) error {
+	sourcePath := args[0]
+	baseName := filepath.Base(sourcePath)
+
+	// Validate filename format
+	if !strings.HasPrefix(baseName, "Dockerfile.") || len(baseName) <= len("Dockerfile.") {
+		return fmt.Errorf("filename must match format 'Dockerfile.<name>' (e.g., Dockerfile.custom-target)")
+	}
+
+	// Validate source file exists
+	if _, err := os.Stat(sourcePath); os.IsNotExist(err) {
+		return fmt.Errorf("file not found: %s", sourcePath)
+	}
+
+	// Get config directory
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		return fmt.Errorf("failed to get home directory: %w", err)
+	}
+	dockerfilesDir := filepath.Join(homeDir, ".config", "cpx", "dockerfiles")
+
+	// Ensure directory exists
+	if err := os.MkdirAll(dockerfilesDir, 0755); err != nil {
+		return fmt.Errorf("failed to create dockerfiles directory: %w", err)
+	}
+
+	destPath := filepath.Join(dockerfilesDir, baseName)
+
+	// Check if target already exists
+	if _, err := os.Stat(destPath); err == nil {
+		return fmt.Errorf("target already exists: %s\n  Remove it manually to overwrite: rm %s", baseName, destPath)
+	}
+
+	// Copy file
+	input, err := os.ReadFile(sourcePath)
+	if err != nil {
+		return fmt.Errorf("failed to read source file: %w", err)
+	}
+
+	if err := os.WriteFile(destPath, input, 0644); err != nil {
+		return fmt.Errorf("failed to write target file: %w", err)
+	}
+
+	targetName := strings.TrimPrefix(baseName, "Dockerfile.")
+	fmt.Printf("%sSuccessfully registered target: %s%s\n", Green, targetName, Reset)
+	fmt.Printf("You can now add it using: cpx ci add-target %s\n", targetName)
+
 	return nil
 }
 
@@ -907,10 +856,6 @@ func runDockerBuild(target config.CITarget, projectRoot, outputDir string, build
 		return fmt.Errorf("failed to get absolute path for build directory: %w", err)
 	}
 
-	// Add triplet if specified - this is critical for cross-compilation
-	triplet := target.Triplet
-	// The triplet should match the Docker image being used
-
 	// Use /tmp/build instead of /workspace/build to avoid read-only mount issues
 	containerBuildDir := "/tmp/build"
 
@@ -927,13 +872,6 @@ func runDockerBuild(target config.CITarget, projectRoot, outputDir string, build
 
 	// Add optimization flags
 	cmakeArgs = append(cmakeArgs, "-DCMAKE_CXX_FLAGS=-O"+optLevel)
-
-	if triplet != "" {
-		cmakeArgs = append(cmakeArgs, "-DVCPKG_TARGET_TRIPLET="+triplet)
-		// VCPKG_HOST_TRIPLET should match the container architecture
-		// It's automatically detected by vcpkg based on the container's architecture
-		// No need to set it explicitly - vcpkg will detect it correctly from the container
-	}
 
 	// Disable registry updates via CMake variable
 	// This is more reliable than environment variables

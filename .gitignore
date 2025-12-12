@@ -62,3 +62,4 @@ subprojects/*
 # gifts
 scripts/*.gif
 content/
+aim.md

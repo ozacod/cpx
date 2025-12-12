@@ -18,10 +18,9 @@ type CIConfig struct {
 
 // CITarget represents a cross-compilation target
 type CITarget struct {
-	Name    string `yaml:"name,omitempty"`
-	Source  string `yaml:"image"`
-	Tag     string `yaml:"tag,omitempty"`
-	Triplet string `yaml:"triplet,omitempty"`
+	Name   string `yaml:"name,omitempty"`
+	Source string `yaml:"image"`
+	Tag    string `yaml:"tag,omitempty"`
 }
 
 // CIBuild represents CI build configuration

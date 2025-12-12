@@ -58,10 +58,10 @@ func TestSaveCIConfig(t *testing.T) {
 	ciConfig := &config.CIConfig{
 		Targets: []config.CITarget{
 			{
-				Name:    "linux-amd64",
-				Source:  "linux-amd64",
-				Tag:     "cpx-linux-amd64",
-				Triplet: "x64-linux",
+				Name:   "linux-amd64",
+				Source: "linux-amd64",
+				Tag:    "cpx-linux-amd64",
+
 				// Platform:   "linux/amd64",
 			},
 		},
