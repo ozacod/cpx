@@ -52,6 +52,7 @@ func main() {
 	rootCmd.AddCommand(cli.UpgradeCmd())
 	rootCmd.AddCommand(cli.ConfigCmd())
 	rootCmd.AddCommand(cli.CICmd())
+	rootCmd.AddCommand(cli.WorkflowCmd())
 	rootCmd.AddCommand(cli.HooksCmd())
 	rootCmd.AddCommand(cli.UpdateCmd())
 
