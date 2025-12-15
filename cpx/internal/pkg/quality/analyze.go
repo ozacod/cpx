@@ -265,7 +265,7 @@ func runCppcheckAnalysis(targets []string) ToolResults {
 				if xmlEnd > 0 {
 					xmlContent = xmlContent[:xmlEnd+9]
 				}
-				os.WriteFile(tmpXML.Name(), []byte(xmlContent), 0644)
+				_ = os.WriteFile(tmpXML.Name(), []byte(xmlContent), 0644)
 			}
 		}
 	}
@@ -431,7 +431,7 @@ func extractXMLInt(line, attr string) int {
 		return 0
 	}
 	var num int
-	fmt.Sscanf(val, "%d", &num)
+	_, _ = fmt.Sscanf(val, "%d", &num)
 	return num
 }
 
@@ -480,7 +480,7 @@ func runLintAnalysis(vcpkg VcpkgSetup) ToolResults {
 			if _, err := os.Stat(dir); os.IsNotExist(err) {
 				continue
 			}
-			filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
+			_ = filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
 				if err != nil || info.IsDir() {
 					return nil
 				}
@@ -566,8 +566,8 @@ func parseClangTidyOutput(output string) []AnalysisResult {
 
 		file := parts[0]
 		var lineNum, colNum int
-		fmt.Sscanf(parts[1], "%d", &lineNum)
-		fmt.Sscanf(parts[2], "%d", &colNum)
+		_, _ = fmt.Sscanf(parts[1], "%d", &lineNum)
+		_, _ = fmt.Sscanf(parts[2], "%d", &colNum)
 
 		severity := strings.TrimSpace(parts[3])
 		message := ""
@@ -711,9 +711,9 @@ func parseFlawfinderCSV(output string) []AnalysisResult {
 
 		file := fields[0]
 		var lineNum, colNum, level int
-		fmt.Sscanf(fields[1], "%d", &lineNum)
-		fmt.Sscanf(fields[2], "%d", &colNum)
-		fmt.Sscanf(fields[4], "%d", &level) // Use Level (field 4), not DefaultLevel
+		_, _ = fmt.Sscanf(fields[1], "%d", &lineNum)
+		_, _ = fmt.Sscanf(fields[2], "%d", &colNum)
+		_, _ = fmt.Sscanf(fields[4], "%d", &level) // Use Level (field 4), not DefaultLevel
 
 		category := fields[5]
 		name := fields[6]

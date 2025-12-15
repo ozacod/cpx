@@ -50,7 +50,7 @@ func runCMakeBuild(buildArgs []string, verbose bool, currentStep, totalSteps int
 	defer signal.Stop(sigCh)
 	go func() {
 		<-sigCh
-		bar.Clear()
+		_ = bar.Clear()
 		fmt.Print("\033[?25h") // Show cursor
 		os.Exit(1)
 	}()
@@ -79,7 +79,7 @@ func runCMakeBuild(buildArgs []string, verbose bool, currentStep, totalSteps int
 		if match := progressRe.FindString(line); match != "" {
 			pct := extractPercent(match)
 			if pct >= 0 && pct != lastPercent {
-				bar.Set(pct)
+				_ = bar.Set(pct)
 				lastPercent = pct
 			}
 			continue
@@ -91,8 +91,8 @@ func runCMakeBuild(buildArgs []string, verbose bool, currentStep, totalSteps int
 	err := <-waitCh
 
 	// Complete the progress bar
-	bar.Set(100)
-	bar.Clear()
+	_ = bar.Set(100)
+	_ = bar.Clear()
 
 	if err != nil {
 		if nonProgress.Len() > 0 {

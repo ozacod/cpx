@@ -32,7 +32,7 @@ func TestRunBazelBench(t *testing.T) {
 	tmpDir := t.TempDir()
 	oldWd, err := os.Getwd()
 	require.NoError(t, err)
-	defer os.Chdir(oldWd)
+	defer func() { _ = os.Chdir(oldWd) }()
 	require.NoError(t, os.Chdir(tmpDir))
 
 	// Create bench/BUILD.bazel with a target
@@ -102,7 +102,7 @@ func TestRunMesonBench(t *testing.T) {
 	tmpDir := t.TempDir()
 	oldWd, err := os.Getwd()
 	require.NoError(t, err)
-	defer os.Chdir(oldWd)
+	defer func() { _ = os.Chdir(oldWd) }()
 	require.NoError(t, os.Chdir(tmpDir))
 
 	// Create meson.build and builddir
@@ -127,7 +127,7 @@ func TestFindBenchTarget(t *testing.T) {
 	tmpDir := t.TempDir()
 	oldWd, err := os.Getwd()
 	require.NoError(t, err)
-	defer os.Chdir(oldWd)
+	defer func() { _ = os.Chdir(oldWd) }()
 	require.NoError(t, os.Chdir(tmpDir))
 
 	tests := []struct {

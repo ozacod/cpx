@@ -32,7 +32,7 @@ func copyAndSign(src, dest string) error {
 		cmd := exec.Command("codesign", "-s", "-", "--force", dest)
 		// We ignore error here because codesign might not be available or needed
 		// but it fixes the ASan issue most of the time
-		cmd.Run()
+		_ = cmd.Run()
 	}
 	return nil
 }

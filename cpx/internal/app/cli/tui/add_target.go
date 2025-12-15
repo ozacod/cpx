@@ -326,8 +326,8 @@ func checkDockerImageHasCommand(image, command string) bool {
 	select {
 	case err := <-done:
 		return err == nil
-	case <-time.After(10 * time.Second):
-		cmd.Process.Kill()
+	case <-time.After(20 * time.Second):
+		_ = cmd.Process.Kill()
 		return false
 	}
 }
@@ -431,7 +431,7 @@ func checkImagePullCmd(image, dockerMode, platform string) tea.Cmd {
 			// Pull succeeded, now check tools
 			return ImageCheckProgress{Phase: "checking"}
 		case <-time.After(120 * time.Second):
-			cmd.Process.Kill()
+			_ = cmd.Process.Kill()
 			return ImageCheckResult{
 				Success: false,
 				Error:   fmt.Sprintf("Timeout pulling image: %s", image),

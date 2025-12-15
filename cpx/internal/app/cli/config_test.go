@@ -205,7 +205,7 @@ func TestSetVcpkgRoot(t *testing.T) {
 
 			// Read captured output
 			var buf bytes.Buffer
-			buf.ReadFrom(r)
+			_, _ = buf.ReadFrom(r)
 
 			if tt.expectsError {
 				assert.Error(t, err)
@@ -266,7 +266,7 @@ func TestSetBcrRoot(t *testing.T) {
 			r, w, _ := os.Pipe()
 			os.Stdout = w
 
-			err := setBcrRoot(tt.path)
+			runErr := setBcrRoot(tt.path)
 
 			// Restore stdout
 			w.Close()
@@ -274,12 +274,13 @@ func TestSetBcrRoot(t *testing.T) {
 
 			// Read captured output
 			var buf bytes.Buffer
-			buf.ReadFrom(r)
+			_, err := buf.ReadFrom(r)
+			require.NoError(t, err)
 
 			if tt.expectsError {
-				assert.Error(t, err)
+				assert.Error(t, runErr)
 			} else {
-				assert.NoError(t, err)
+				assert.NoError(t, runErr)
 
 				// Verify config was saved
 				cfg, err := config.LoadGlobal()

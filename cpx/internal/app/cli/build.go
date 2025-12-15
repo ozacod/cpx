@@ -64,7 +64,7 @@ func BuildCmd(client *vcpkg.Client) *cobra.Command {
 	return cmd
 }
 
-func runBuild(cmd *cobra.Command, args []string, client *vcpkg.Client) error {
+func runBuild(cmd *cobra.Command, _ []string, client *vcpkg.Client) error {
 	release, _ := cmd.Flags().GetBool("release")
 	jobs, _ := cmd.Flags().GetInt("jobs")
 	target, _ := cmd.Flags().GetString("target")
@@ -152,7 +152,7 @@ func runBazelBuild(release bool, target string, clean bool, verbose bool, optLev
 	bazelArgs := []string{"build"}
 
 	// Handle optimization level - optLevel takes precedence over release flag
-	optLabel := "debug"
+	var optLabel string
 	switch optLevel {
 	case "0":
 		bazelArgs = append(bazelArgs, "--copt=-O0", "-c", "dbg")
@@ -282,7 +282,7 @@ func runBazelBuild(release bool, target string, clean bool, verbose bool, optLev
 	copyCmd := execCommand("bash", "-c", script)
 	copyCmd.Stdout = os.Stdout
 	copyCmd.Stderr = os.Stderr
-	copyCmd.Run() // Ignore errors - may have no artifacts
+	_ = copyCmd.Run() // Ignore errors - may have no artifacts
 
 	fmt.Printf("%s✓ Build successful%s\n", Green, Reset)
 	fmt.Printf("  Artifacts in: %s/\n", outputDir)
@@ -293,9 +293,8 @@ func runMesonBuild(release bool, target string, clean bool, verbose bool, optLev
 	buildDir := "builddir"
 
 	// Determine build type and optimization from flags
-	buildType := "debug"
-	optimization := "0" // Meson optimization: 0, 1, 2, 3, s
-	optLabel := "debug"
+	// Determine build type and optimization from flags
+	var buildType, optimization, optLabel string
 
 	switch optLevel {
 	case "0":
@@ -376,7 +375,7 @@ func runMesonBuild(release bool, target string, clean bool, verbose bool, optLev
 		reconfigCmd.Stdout = os.Stdout
 		reconfigCmd.Stderr = os.Stderr
 		// Ignore reconfigure errors - may fail if no changes needed
-		reconfigCmd.Run()
+		_ = reconfigCmd.Run()
 	}
 
 	// Build
@@ -429,7 +428,7 @@ func runMesonBuild(release bool, target string, clean bool, verbose bool, optLev
 	`, outputDir))
 	copyCmd.Stdout = os.Stdout
 	copyCmd.Stderr = os.Stderr
-	copyCmd.Run()
+	_ = copyCmd.Run()
 
 	fmt.Printf("%s✓ Build successful%s\n", Green, Reset)
 	fmt.Printf("  Artifacts in: %s/\n", outputDir)

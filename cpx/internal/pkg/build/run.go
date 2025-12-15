@@ -194,11 +194,7 @@ func RunProject(release bool, target string, execArgs []string, verbose bool, op
 	if err == nil {
 		for _, exe := range executables {
 			dest := filepath.Join(finalBuildDir, filepath.Base(exe))
-			if err := copyAndSign(exe, dest); err != nil {
-				// We don't error out here to mimic previous behavior where copy errors were ignored
-				// But maybe we should log it if verbose?
-				// For now, silently continue to match previous "cp" behavior, but copyAndSign logs nothing
-			}
+			_ = copyAndSign(exe, dest)
 		}
 	}
 

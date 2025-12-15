@@ -113,7 +113,7 @@ func runRemoveTargetCmd(_ *cobra.Command, args []string) error {
 
 		fmt.Printf("\n%sEnter target numbers to remove (comma-separated, or 'all'):%s ", Cyan, Reset)
 		var input string
-		fmt.Scanln(&input)
+		_, _ = fmt.Scanln(&input)
 
 		var selectedToRemove []string
 

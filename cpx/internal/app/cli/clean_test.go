@@ -95,7 +95,7 @@ func TestCleanMeson(t *testing.T) {
 	tmpDir := t.TempDir()
 	oldWd, err := os.Getwd()
 	require.NoError(t, err)
-	defer os.Chdir(oldWd)
+	defer func() { _ = os.Chdir(oldWd) }()
 	require.NoError(t, os.Chdir(tmpDir))
 
 	// Create Meson project files
@@ -125,10 +125,10 @@ func TestCleanMeson(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// Recreate dirs for each test
-			os.MkdirAll("builddir", 0755)
-			os.MkdirAll("build", 0755)
-			os.MkdirAll("subprojects/packagecache", 0755)
-			os.MkdirAll("build-release", 0755)
+			_ = os.MkdirAll("builddir", 0755)
+			_ = os.MkdirAll("build", 0755)
+			_ = os.MkdirAll("subprojects/packagecache", 0755)
+			_ = os.MkdirAll("build-release", 0755)
 
 			err := cleanMeson(tt.all)
 			assert.NoError(t, err)
@@ -147,7 +147,7 @@ func TestCleanCMake(t *testing.T) {
 	tmpDir := t.TempDir()
 	oldWd, err := os.Getwd()
 	require.NoError(t, err)
-	defer os.Chdir(oldWd)
+	defer func() { _ = os.Chdir(oldWd) }()
 	require.NoError(t, os.Chdir(tmpDir))
 
 	// Create CMake project files
@@ -177,11 +177,11 @@ func TestCleanCMake(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// Recreate dirs for each test
-			os.MkdirAll(".bin/native", 0755)
-			os.MkdirAll(".bin/ci", 0755)
-			os.MkdirAll("out", 0755)
-			os.MkdirAll("cmake-build-debug", 0755)
-			os.MkdirAll("build-release", 0755)
+			_ = os.MkdirAll(".bin/native", 0755)
+			_ = os.MkdirAll(".bin/ci", 0755)
+			_ = os.MkdirAll("out", 0755)
+			_ = os.MkdirAll("cmake-build-debug", 0755)
+			_ = os.MkdirAll("build-release", 0755)
 
 			err := cleanCMake(tt.all)
 			assert.NoError(t, err)
@@ -200,7 +200,7 @@ func TestRemoveDir(t *testing.T) {
 	tmpDir := t.TempDir()
 	oldWd, err := os.Getwd()
 	require.NoError(t, err)
-	defer os.Chdir(oldWd)
+	defer func() { _ = os.Chdir(oldWd) }()
 	require.NoError(t, os.Chdir(tmpDir))
 
 	tests := []struct {
@@ -281,7 +281,7 @@ func TestRunClean(t *testing.T) {
 			tmpDir := t.TempDir()
 			oldWd, err := os.Getwd()
 			require.NoError(t, err)
-			defer os.Chdir(oldWd)
+			defer func() { _ = os.Chdir(oldWd) }()
 			require.NoError(t, os.Chdir(tmpDir))
 
 			// Create project file
@@ -295,7 +295,7 @@ func TestRunClean(t *testing.T) {
 			// Create a mock command
 			cmd := CleanCmd()
 			if tt.all {
-				cmd.Flags().Set("all", "true")
+				_ = cmd.Flags().Set("all", "true")
 			}
 
 			err = cmd.Execute()

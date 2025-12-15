@@ -58,9 +58,9 @@ func bumpVersion(bumpType string) error {
 	}
 
 	major, minor, patch := 0, 0, 0
-	fmt.Sscanf(parts[0], "%d", &major)
-	fmt.Sscanf(parts[1], "%d", &minor)
-	fmt.Sscanf(parts[2], "%d", &patch)
+	_, _ = fmt.Sscanf(parts[0], "%d", &major)
+	_, _ = fmt.Sscanf(parts[1], "%d", &minor)
+	_, _ = fmt.Sscanf(parts[2], "%d", &patch)
 
 	switch bumpType {
 	case "major":

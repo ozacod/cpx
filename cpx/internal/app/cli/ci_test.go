@@ -64,8 +64,8 @@ func TestRunRemoveTarget(t *testing.T) {
 
 	// Change to temp dir for cpx-ci.yaml I/O
 	oldWd, _ := os.Getwd()
-	os.Chdir(tmpDir)
-	defer os.Chdir(oldWd)
+	require.NoError(t, os.Chdir(tmpDir))
+	defer func() { _ = os.Chdir(oldWd) }()
 
 	// Create initial cpx-ci.yaml with 3 targets using new format
 	ciConfig := &config.CIConfig{

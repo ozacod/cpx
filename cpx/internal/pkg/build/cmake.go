@@ -255,11 +255,7 @@ func BuildProject(release bool, jobs int, target string, clean bool, optLevel st
 	if err == nil {
 		for _, exe := range executables {
 			dest := filepath.Join(finalBuildDir, filepath.Base(exe))
-			if err := copyAndSign(exe, dest); err != nil {
-				// Don't error out, just log?? No, error if copy fails
-				// But we did continue before. RunProject warns multiple executables.
-				// Let's just continue
-			}
+			_ = copyAndSign(exe, dest)
 		}
 	}
 

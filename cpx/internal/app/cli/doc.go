@@ -119,7 +119,7 @@ USE_MDFILE_AS_MAINPAGE = README.md
 		}
 
 		if openCmd != "" {
-			exec.Command(openCmd, indexPath).Start()
+			_ = exec.Command(openCmd, indexPath).Start()
 		}
 	}
 

@@ -312,11 +312,12 @@ func createProjectFromTUI(config tui.ProjectConfig, vcpkgClient *vcpkg.Client) e
 
 	// Generate README based on package manager
 	var readme string
-	if cfg.PackageManager == "bazel" {
+	switch cfg.PackageManager {
+	case "bazel":
 		readme = templates.GenerateBazelReadme(projectName, cppStandard, cfg.IsLibrary)
-	} else if cfg.PackageManager == "meson" {
+	case "meson":
 		readme = templates.GenerateMesonReadme(projectName, cppStandard, cfg.IsLibrary)
-	} else {
+	default:
 		readme = templates.GenerateVcpkgReadme(projectName, cppStandard, cfg.IsLibrary)
 	}
 	if err := os.WriteFile(filepath.Join(projectName, "README.md"), []byte(readme), 0644); err != nil {
@@ -405,12 +406,12 @@ func createProjectFromTUI(config tui.ProjectConfig, vcpkgClient *vcpkg.Client) e
 			if cfg.UseHooks && (len(cfg.PreCommit) > 0 || len(cfg.PrePush) > 0) {
 				// Change to project directory to install hooks
 				originalDir, _ := os.Getwd()
-				os.Chdir(projectName)
+				_ = os.Chdir(projectName)
 				if err := git.InstallHooksWithConfig(cfg.PreCommit, cfg.PrePush); err != nil {
 					// Non-fatal: just skip hooks if installation fails
 					fmt.Printf("%sWarning: Could not install git hooks: %v%s\n", Yellow, err, Reset)
 				}
-				os.Chdir(originalDir)
+				_ = os.Chdir(originalDir)
 			}
 		}
 	}
@@ -453,7 +454,7 @@ func setupVcpkgProject(client *vcpkg.Client, targetDir, _ string, _ bool, depend
 	if err != nil {
 		return fmt.Errorf("failed to get current directory: %w", err)
 	}
-	defer os.Chdir(originalDir)
+	defer func() { _ = os.Chdir(originalDir) }()
 
 	if err := os.Chdir(targetDir); err != nil {
 		return fmt.Errorf("failed to change to project directory: %w", err)
