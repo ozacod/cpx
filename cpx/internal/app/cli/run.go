@@ -80,6 +80,9 @@ func runRun(cmd *cobra.Command, args []string, client *vcpkg.Client) error {
 
 	projectType := DetectProjectType()
 
+	// Check for missing build tools and warn the user
+	WarnMissingBuildTools(projectType)
+
 	switch projectType {
 	case ProjectTypeBazel:
 		return runBazelRun(release, target, args, verbose, optLevel, sanitizer)

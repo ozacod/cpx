@@ -723,71 +723,6 @@ func handleBuildMode(target config.CITarget, projectRoot string, rebuild bool) (
 	return imageName, nil
 }
 
-func buildDockerImage(dockerfilePath, imageName string, rebuild bool) error {
-	// Check if image already exists
-	if !rebuild {
-		cmd := exec.Command("docker", "images", "-q", imageName)
-		output, err := cmd.Output()
-		if err == nil && len(output) > 0 {
-			fmt.Printf("  %s Docker image %s already exists%s\n", Green, imageName, Reset)
-			return nil
-		}
-	}
-
-	fmt.Printf("  %s Building Docker image: %s...%s\n", Cyan, imageName, Reset)
-
-	// Get absolute paths
-	absDockerfilePath, err := filepath.Abs(dockerfilePath)
-	if err != nil {
-		return fmt.Errorf("failed to get absolute dockerfile path: %w", err)
-	}
-
-	// Get directory containing the Dockerfile (build context)
-	dockerfileDir, err := filepath.Abs(filepath.Dir(dockerfilePath))
-	if err != nil {
-		return fmt.Errorf("failed to get absolute dockerfile directory: %w", err)
-	}
-
-	// Verify Dockerfile exists
-	if _, err := os.Stat(absDockerfilePath); os.IsNotExist(err) {
-		return fmt.Errorf("dockerfile not found: %s", absDockerfilePath)
-	}
-
-	// Build Docker image with platform flag if specified
-	// Use buildx for better multi-arch support
-	buildArgs := []string{"buildx", "build", "-f", absDockerfilePath, "-t", imageName}
-	// if platform != "" {
-	// 	buildArgs = append(buildArgs, "--platform", platform)
-	// }
-	buildArgs = append(buildArgs, "--load") // Load into local Docker daemon
-	buildArgs = append(buildArgs, dockerfileDir)
-
-	cmd := exec.Command("docker", buildArgs...)
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-
-	// If buildx fails, fall back to regular docker build
-	if err := cmd.Run(); err != nil {
-		fmt.Printf("  %s  docker buildx failed, trying regular docker build...%s\n", Yellow, Reset)
-		// Fallback to regular docker build
-		buildArgs = []string{"build", "-f", absDockerfilePath, "-t", imageName}
-		// if platform != "" {
-		// 	buildArgs = append(buildArgs, "--platform", platform)
-		// }
-		buildArgs = append(buildArgs, dockerfileDir)
-
-		cmd = exec.Command("docker", buildArgs...)
-		cmd.Stdout = os.Stdout
-		cmd.Stderr = os.Stderr
-		if err := cmd.Run(); err != nil {
-			return fmt.Errorf("docker build failed: %w", err)
-		}
-	}
-
-	fmt.Printf("  %s Docker image %s built successfully%s\n", Green, imageName, Reset)
-	return nil
-}
-
 // detectProjectType detects if the project is an executable or library by checking CMakeLists.txt
 func detectProjectType(projectRoot string) (bool, error) {
 	cmakeListsPath := filepath.Join(projectRoot, "CMakeLists.txt")
@@ -1409,6 +1344,13 @@ echo "  Build complete!"
 
 // runNativeBuild runs a native CMake build on the host system
 func runNativeBuild(target config.CITarget, projectRoot, outputDir string, buildConfig config.CIBuild) error {
+	// Detect project type and check for missing build tools
+	projectType := DetectProjectType()
+	missing := WarnMissingBuildTools(projectType)
+	if len(missing) > 0 {
+		fmt.Printf("  %sNote: Native build may fail due to missing tools%s\n", Yellow, Reset)
+	}
+
 	// Create target-specific output directory
 	targetOutputDir := filepath.Join(outputDir, target.Name)
 	if err := os.MkdirAll(targetOutputDir, 0755); err != nil {
