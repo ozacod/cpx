@@ -138,9 +138,13 @@ Cross-compile for multiple targets using Docker. Requires `cpx.ci` configuration
 | Command | Description |
 |---------|-------------|
 | `ci build` | Build for all targets using Docker |
-| `ci run` | Build and run a specific target (`--target`) |
-| `ci add-target` | Add a build target to cpx.ci |
-| `ci add-target list` | List all available targets interactively |
+| `ci build --target <name>` | Build specific target only |
+| `ci run --target <name>` | Build and run a specific target |
+| `ci add-target [targets...]` | Add build target(s) to cpx.ci |
+| `ci add-target` | Interactive target manager (add/remove) |
+| `ci rm-target [targets...]` | Remove build target(s) from cpx.ci |
+| `ci rm-target list` | Interactive target removal from cpx.ci |
+| `ci register <Dockerfile.name>` | Register a custom Dockerfile target |
 
 ### Config Commands (`cpx config`)
 
