@@ -25,7 +25,8 @@ func BuildCmd(client *vcpkg.Client) *cobra.Command {
   cpx build --clean      # Clean rebuild
   cpx build --asan       # Build with AddressSanitizer
   cpx build --tsan       # Build with ThreadSanitizer
-  cpx build --watch      # Watch for changes and rebuild`,
+  cpx build --watch      # Watch for changes and rebuild
+  cpx build all          # Build all CI targets (Docker)`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return runBuild(cmd, args, client)
 		},
@@ -44,6 +45,21 @@ func BuildCmd(client *vcpkg.Client) *cobra.Command {
 	cmd.Flags().Bool("tsan", false, "Build with ThreadSanitizer")
 	cmd.Flags().Bool("msan", false, "Build with MemorySanitizer")
 	cmd.Flags().Bool("ubsan", false, "Build with UndefinedBehaviorSanitizer")
+
+	// Add 'all' subcommand for building all CI targets
+	allCmd := &cobra.Command{
+		Use:   "all",
+		Short: "Build all CI targets using Docker",
+		Long:  "Build for all targets defined in cpx-ci.yaml using Docker containers.",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			target, _ := cmd.Flags().GetString("target")
+			rebuild, _ := cmd.Flags().GetBool("rebuild")
+			return runCIBuild(target, rebuild, false)
+		},
+	}
+	allCmd.Flags().String("target", "", "Build only specific target (default: all)")
+	allCmd.Flags().Bool("rebuild", false, "Rebuild Docker images even if they exist")
+	cmd.AddCommand(allCmd)
 
 	return cmd
 }

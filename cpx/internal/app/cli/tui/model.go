@@ -422,12 +422,6 @@ func (m Model) handleEnter() (tea.Model, tea.Cmd) {
 			Complete: true,
 		})
 
-		m.questions = append(m.questions, Question{
-			Question: "Sounds good! You can come back and run git init later.",
-			Answer:   "",
-			Complete: true,
-		})
-
 		// Start creating
 		m.step = StepCreating
 		return m, tickCreation()

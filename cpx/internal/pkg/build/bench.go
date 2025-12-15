@@ -22,9 +22,9 @@ func RunBenchmarks(verbose bool, vcpkgClient *vcpkg.Client) error {
 	}
 	fmt.Printf("%s Running benchmarks for '%s'...%s\n", "\033[36m", projectName, "\033[0m")
 
-	// Default to debug for benchmarks if no config specified
-	// Use .cache/native/debug for building benchmarks
-	buildDir := filepath.Join(".cache", "native", "debug")
+	// Default to release for benchmarks (benchmarks should be optimized)
+	// Use .cache/native/bench for building benchmarks (separate from normal builds)
+	buildDir := filepath.Join(".cache", "native", "bench")
 	benchTarget := projectName + "_bench"
 
 	// Check if configure is needed
@@ -44,7 +44,7 @@ func RunBenchmarks(verbose bool, vcpkgClient *vcpkg.Client) error {
 	if needsConfigure {
 		currentStep++
 		if verbose {
-			fmt.Printf("%s  Configuring CMake...%s\n", "\033[36m", "\033[0m")
+			fmt.Printf("%s  Configuring CMake (with benchmarks enabled)...%s\n", "\033[36m", "\033[0m")
 		} else {
 			fmt.Printf("\r\033[2K%s[%d/%d]%s Configuring...", colorCyan, currentStep, totalSteps, colorReset)
 		}
@@ -54,16 +54,20 @@ func RunBenchmarks(verbose bool, vcpkgClient *vcpkg.Client) error {
 		vcpkgInstalledDir := filepath.Join(cwd, ".cache", "native", "vcpkg_installed")
 		vcpkgInstallArg := "-DVCPKG_INSTALLED_DIR=" + vcpkgInstalledDir
 
+		// Enable benchmarks with Release build type for optimal performance
+		enableBenchArg := "-DENABLE_BENCHMARKS=ON"
+		buildTypeArg := "-DCMAKE_BUILD_TYPE=Release"
+
 		// Check if CMakePresets.json exists, use preset if available
 		if _, err := os.Stat("CMakePresets.json"); err == nil {
-			cmd := exec.Command("cmake", "--preset=default", "-B", buildDir, vcpkgInstallArg)
+			cmd := exec.Command("cmake", "--preset=default", "-B", buildDir, vcpkgInstallArg, enableBenchArg, buildTypeArg)
 			cmd.Env = os.Environ()
 			if err := runCMakeConfigure(cmd, verbose); err != nil {
 				fmt.Println()
 				return fmt.Errorf("cmake configure failed (preset 'default'): %w", err)
 			}
 		} else {
-			cmd := exec.Command("cmake", "-B", buildDir, vcpkgInstallArg)
+			cmd := exec.Command("cmake", "-B", buildDir, vcpkgInstallArg, enableBenchArg, buildTypeArg)
 			if err := runCMakeConfigure(cmd, verbose); err != nil {
 				fmt.Println()
 				return fmt.Errorf("cmake configure failed: %w", err)

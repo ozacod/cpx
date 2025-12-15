@@ -188,6 +188,18 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 `, projectName, projectVersion, cppStandard))
 
+	// Add options for tests and benchmarks if they are included
+	if includeTests || includeBench {
+		sb.WriteString("# Build options\n")
+		if includeTests {
+			sb.WriteString("option(ENABLE_TESTING \"Build tests\" OFF)\n")
+		}
+		if includeBench {
+			sb.WriteString("option(ENABLE_BENCHMARKS \"Build benchmarks\" OFF)\n")
+		}
+		sb.WriteString("\n")
+	}
+
 	if isExe {
 		sb.WriteString(fmt.Sprintf(`# Executable
 add_executable(%s
@@ -218,15 +230,19 @@ target_include_directories(%s
 
 	if includeTests {
 		sb.WriteString(`# Testing
-enable_testing()
-add_subdirectory(tests)
+if(ENABLE_TESTING)
+    enable_testing()
+    add_subdirectory(tests)
+endif()
 `)
 	}
 
 	if includeBench {
 		sb.WriteString(`
 # Benchmarks
-add_subdirectory(bench)
+if(ENABLE_BENCHMARKS)
+    add_subdirectory(bench)
+endif()
 `)
 	}
 
@@ -488,21 +504,67 @@ IndentCaseLabels: true
 	}
 }
 
-// generateCpxCI generates a cpx.ci file with empty targets
+// generateCpxCI generates a cpx-ci.yaml file with empty targets
 func GenerateCpxCI() string {
-	return `# cpx.ci - Cross-compilation configuration
-# This file defines which Docker images to use for building your project
-# Add targets to build for different platforms
+	return `# cpx-ci.yaml - Cross-compilation configuration
+# This file defines targets for building your project
 
-# List of targets to build
 targets:
-  # - image: linux-amd64
+  # Example: Pull a pre-built image from registry
+  # - name: "ci-ubuntu"
+  #   active: true                 # Set to false to skip this target (default: true)
+  #   runner: "docker"
+  #   docker:
+  #     mode: "pull"              # pull, local, or build
+  #     image: "ubuntu:22.04"
+  #     platform: "linux/amd64"
+  #     pullPolicy: "ifNotPresent" # always, never, ifNotPresent
+  #   # Per-target build configuration (overrides global defaults)
+  #   build_type: "Release"       # Debug, Release, RelWithDebInfo, MinSizeRel
+  #   cmake_options: []           # Additional CMake arguments
+  #   build_options: []           # Additional build arguments (cmake --build args)
+  #   env:                        # Environment variables
+  #     CC: "gcc"
+  #     CXX: "g++"
 
-  # - image: linux-arm64
+  # Example: Use a local image (no network)
+  # - name: "my-toolchain"
+  #   runner: "docker"
+  #   docker:
+  #     mode: "local"
+  #     image: "my-toolchain:latest"
+  #   build_type: "Debug"
 
-# Build configuration
+  # Example: Build from Dockerfile (with content-based caching)
+  # - name: "ci-dockerfile"
+  #   runner: "docker"
+  #   docker:
+  #     mode: "build"
+  #     image: "cpx-dev"          # tag for the built image
+  #     platform: "linux/arm64"
+  #     build:
+  #       context: "."
+  #       dockerfile: "Dockerfile"
+  #       args:
+  #         GCC_VER: "13"
+  #   build_type: "RelWithDebInfo"
+  #   cmake_options:
+  #     - "-DENABLE_TESTS=ON"
+
+  # Example: Native build (runs on host, CMake only)
+  # - name: "local-debug"
+  #   runner: "native"
+  #   build_type: "Debug"
+  #   cmake_options:
+  #     - "-DCMAKE_EXPORT_COMPILE_COMMANDS=ON"
+  #   env:
+  #     CC: "clang"
+  #     CXX: "clang++"
+
+# Global build configuration (used as defaults if not specified per-target)
 build:
   # CMake build type (Debug, Release, RelWithDebInfo, MinSizeRel)
+  # Note: Per-target build_type overrides this
   type: Release
 
   # Optimization level (0, 1, 2, 3, s, fast)
@@ -511,10 +573,10 @@ build:
   # Number of parallel jobs (0 = auto)
   jobs: 0
 
-  # Additional CMake arguments
+  # Additional CMake arguments (per-target cmake_options overrides this)
   cmake_args: []
 
-  # Additional build arguments
+  # Additional build arguments (per-target build_options overrides this)
   build_args: []
 
 # Output directory for artifacts

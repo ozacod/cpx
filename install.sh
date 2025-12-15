@@ -450,66 +450,6 @@ create_config_file() {
     return 0
 }
 
-# Install dockerfiles to config directory
-install_dockerfiles() {
-    OS=$1
-
-    CONFIG_DIR=$(get_config_dir "$OS")
-    DOCKERFILES_DIR="$CONFIG_DIR/dockerfiles"
-
-    # Check if dockerfiles already exist
-    if [ -d "$DOCKERFILES_DIR" ] && [ -f "$DOCKERFILES_DIR/Dockerfile.linux-amd64" ]; then
-        printf "%bDockerfiles already installed.%b\n" "$GREEN" "$NC" >&2
-        return 0
-    fi
-
-    printf "%bInstalling dockerfiles...%b\n" "$CYAN" "$NC" >&2
-
-    # Create dockerfiles directory
-    if ! mkdir -p "$DOCKERFILES_DIR" 2>/dev/null; then
-        printf "%bWarning: Failed to create dockerfiles directory: %s%b\n" "$YELLOW" "$DOCKERFILES_DIR" "$NC" >&2
-        return 1
-    fi
-
-    # List of dockerfiles to download
-    DOCKERFILES=(
-        "Dockerfile.linux-amd64"
-        "Dockerfile.linux-amd64-musl"
-        "Dockerfile.linux-arm64"
-        "Dockerfile.linux-arm64-musl"
-        "cpx.ci.example"
-        "README.md"
-    )
-
-    # Download each dockerfile from GitHub
-    BASE_URL="https://raw.githubusercontent.com/$REPO/main/dockerfiles"
-    FAILED=0
-
-    for dockerfile in "${DOCKERFILES[@]}"; do
-        DEST_PATH="$DOCKERFILES_DIR/$dockerfile"
-        DOWNLOAD_URL="$BASE_URL/$dockerfile"
-
-        if [ "$DOWNLOADER" = "curl" ]; then
-            if ! curl -fsSL "$DOWNLOAD_URL" -o "$DEST_PATH" 2>/dev/null; then
-                printf "%bWarning: Failed to download %s%b\n" "$YELLOW" "$dockerfile" "$NC" >&2
-                FAILED=1
-            fi
-        else
-            if ! wget -q "$DOWNLOAD_URL" -O "$DEST_PATH" 2>/dev/null; then
-                printf "%bWarning: Failed to download %s%b\n" "$YELLOW" "$dockerfile" "$NC" >&2
-                FAILED=1
-            fi
-        fi
-    done
-
-    if [ $FAILED -eq 0 ]; then
-        printf "%bSuccessfully installed dockerfiles to %s%b\n" "$GREEN" "$DOCKERFILES_DIR" "$NC" >&2
-        return 0
-    else
-        printf "%bWarning: Some dockerfiles failed to download. You can download them later with 'cpx upgrade'.%b\n" "$YELLOW" "$NC" >&2
-        return 1
-    fi
-}
 
 main() {
     print_banner
@@ -530,8 +470,6 @@ main() {
     printf "\n"
     create_config_file "$OS" "" || true
 
-    # Install dockerfiles
-    install_dockerfiles "$OS" || true
 
     # Try to install/configure vcpkg (non-fatal if it fails)
     # Skip on Windows unless in Git Bash/MSYS2

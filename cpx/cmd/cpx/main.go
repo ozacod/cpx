@@ -51,13 +51,16 @@ func main() {
 	rootCmd.AddCommand(cli.ReleaseCmd())
 	rootCmd.AddCommand(cli.UpgradeCmd())
 	rootCmd.AddCommand(cli.ConfigCmd())
-	rootCmd.AddCommand(cli.CICmd())
 	rootCmd.AddCommand(cli.WorkflowCmd())
 	rootCmd.AddCommand(cli.HooksCmd())
 	rootCmd.AddCommand(cli.UpdateCmd())
 
-	// Handle vcpkg passthrough for unknown commands
-	// Check if command exists before executing
+	// CI target management (promoted from 'cpx ci' subcommands)
+	rootCmd.AddCommand(cli.AddTargetCmd())
+	rootCmd.AddCommand(cli.RmTargetCmd())
+
+	// Handle vcpkg passthrough for specific commands only
+	// Only forward: install, remove, add-port
 	if len(os.Args) > 1 {
 		command := os.Args[1]
 		// Skip version/help flags - cobra handles these
@@ -71,19 +74,24 @@ func main() {
 					break
 				}
 			}
-			// If not found, try vcpkg passthrough
+			// If not found, check if it's a whitelisted vcpkg command
 			if !found {
-				if client != nil {
-					if err := client.RunCommand(os.Args[1:]); err != nil {
-						fmt.Fprintf(os.Stderr, "%sError:%s Failed to run vcpkg command: %v\n", cli.Red, cli.Reset, err)
-						fmt.Fprintf(os.Stderr, "Make sure vcpkg is installed and configured: cpx config set-vcpkg-root <path>\n")
-						os.Exit(1)
+				// Only allow specific vcpkg commands to be forwarded
+				allowedVcpkgCommands := []string{"install", "remove", "add-port"}
+				if slices.Contains(allowedVcpkgCommands, command) {
+					if client != nil {
+						if err := client.RunCommand(os.Args[1:]); err != nil {
+							fmt.Fprintf(os.Stderr, "%sError:%s Failed to run vcpkg command: %v\n", cli.Red, cli.Reset, err)
+							fmt.Fprintf(os.Stderr, "Make sure vcpkg is installed and configured: cpx config set-vcpkg-root <path>\n")
+							os.Exit(1)
+						}
+						return
 					}
-					return
+					// If client is nil, we can't run vcpkg command
+					fmt.Fprintf(os.Stderr, "%sError:%s vcpkg client not initialized. Run: cpx config set-vcpkg-root <path>\n", cli.Red, cli.Reset)
+					os.Exit(1)
 				}
-				// If client is nil, we can't run vcpkg command
-				fmt.Fprintf(os.Stderr, "%sError:%s Unknown command '%s' and vcpkg client not initialized\n", cli.Red, cli.Reset, command)
-				os.Exit(1)
+				// Unknown command - let cobra handle it (will show help)
 			}
 		}
 	}

@@ -1,0 +1,100 @@
+# cpx-ci.yaml - Cross-compilation configuration
+# Supports three Docker modes: pull, local, build
+# Also supports native runner for host builds
+#
+# Each target can have its own build configuration that overrides global defaults:
+#   build_type: Debug, Release, RelWithDebInfo, MinSizeRel (default: Release)
+#   cmake_options: Additional CMake arguments for this target
+#   build_options: Additional build arguments (cmake --build args)
+#   env: Environment variables for the build
+
+targets:
+  # MODE: pull - Download image from registry
+  - name: "ci-ubuntu-amd64"
+    runner: "docker"
+    docker:
+      mode: "pull"
+      image: "ubuntu:22.04"
+      platform: "linux/amd64"
+      pullPolicy: "ifNotPresent"  # always, never, ifNotPresent
+    # Per-target build configuration (overrides global defaults)
+    build_type: "Release"
+    # cmake_options: []
+    # build_options: []
+    # env:
+    #   CC: "gcc"
+    #   CXX: "g++"
+
+  # MODE: pull - ARM64 variant with Debug build
+  - name: "ci-ubuntu-arm64"
+    runner: "docker"
+    docker:
+      mode: "pull"
+      image: "ubuntu:22.04"
+      platform: "linux/arm64"
+      pullPolicy: "ifNotPresent"
+    build_type: "Debug"  # Different build type for this target
+
+  # MODE: local - Use existing local image (no network)
+  # - name: "my-toolchain"
+  #   runner: "docker"
+  #   docker:
+  #     mode: "local"
+  #     image: "my-toolchain:latest"
+  #     platform: "linux/arm64"
+  #   build_type: "RelWithDebInfo"
+  #   cmake_options:
+  #     - "-DENABLE_ASAN=ON"
+
+  # MODE: build - Build from Dockerfile with content-based caching
+  # Image tag: cpx/<name>:<hash> (hash based on Dockerfile + args)
+  # - name: "ci-custom"
+  #   runner: "docker"
+  #   docker:
+  #     mode: "build"
+  #     image: "cpx-dev"
+  #     platform: "linux/arm64"
+  #     build:
+  #       context: "."
+  #       dockerfile: "dockerfiles/dev.Dockerfile"
+  #       args:
+  #         GCC_VER: "13"
+  #         LLVM_VER: "17"
+  #   build_type: "MinSizeRel"
+  #   cmake_options:
+  #     - "-DBUILD_SHARED_LIBS=ON"
+
+  # NATIVE: Build on host machine (CMake only)
+  # - name: "local-debug"
+  #   runner: "native"
+  #   build_type: "Debug"
+  #   cmake_options:
+  #     - "-DCMAKE_EXPORT_COMPILE_COMMANDS=ON"
+  #   build_options:
+  #     - "--verbose"
+  #   env:
+  #     CC: "clang"
+  #     CXX: "clang++"
+  #     CFLAGS: "-fsanitize=address"
+  #     CXXFLAGS: "-fsanitize=address"
+
+# Global build configuration (used as defaults if not specified per-target)
+build:
+  # CMake build type (Debug, Release, RelWithDebInfo, MinSizeRel)
+  # Note: Per-target build_type overrides this
+  type: Release
+
+  # Optimization level (0, 1, 2, 3, s, fast)
+  optimization: 2
+
+  # Number of parallel jobs (0 = auto)
+  jobs: 0
+
+  # Additional CMake arguments (per-target cmake_options overrides this)
+  cmake_args: []
+
+  # Additional build arguments (per-target build_options overrides this)
+  build_args: []
+
+# Output directory for artifacts
+output: .bin/ci

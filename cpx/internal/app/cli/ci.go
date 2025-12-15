@@ -1,10 +1,13 @@
 package cli
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"sort"
 	"strings"
 
 	"github.com/ozacod/cpx/internal/app/cli/tui"
@@ -17,14 +20,14 @@ func CICmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "ci",
 		Short: "Cross-compile for multiple targets using Docker",
-		Long:  "Cross-compile for multiple targets using Docker. Requires cpx.ci configuration file.",
+		Long:  "Cross-compile for multiple targets using Docker. Requires cpx-ci.yaml configuration file.",
 	}
 
 	// Add build subcommand - builds all or specific target
 	buildCmd := &cobra.Command{
 		Use:   "build",
 		Short: "Build for all targets using Docker",
-		Long:  "Build for all targets defined in cpx.ci using Docker containers.",
+		Long:  "Build for all targets defined in cpx-ci.yaml using Docker containers.",
 		RunE:  runCIBuildCmd,
 	}
 	buildCmd.Flags().String("target", "", "Build only specific target (default: all)")
@@ -46,8 +49,8 @@ func CICmd() *cobra.Command {
 	// Add add-target subcommand
 	addTargetCmd := &cobra.Command{
 		Use:   "add-target [target...]",
-		Short: "Add or manage build targets in cpx.ci",
-		Long:  "Scan available targets and add a build target to cpx.ci configuration. If no arguments are provided, opens an interactive target manager to add/remove targets.",
+		Short: "Add or manage build targets in cpx-ci.yaml",
+		Long:  "Scan available targets and add a build target to cpx-ci.yaml configuration. If no arguments are provided, opens an interactive target manager to add/remove targets.",
 		RunE:  runAddTarget,
 	}
 	cmd.AddCommand(addTargetCmd)
@@ -55,30 +58,20 @@ func CICmd() *cobra.Command {
 	// Add rm-target subcommand
 	rmTargetCmd := &cobra.Command{
 		Use:   "rm-target [target...]",
-		Short: "Remove a build target from cpx.ci",
-		Long:  "Remove one or more build targets from cpx.ci configuration.",
+		Short: "Remove a build target from cpx-ci.yaml",
+		Long:  "Remove one or more build targets from cpx-ci.yaml configuration.",
 		RunE:  runRemoveTarget,
 	}
 
 	// Add list subcommand to rm-target
 	listRemoveTargetsCmd := &cobra.Command{
 		Use:   "list",
-		Short: "List all targets in cpx.ci and select to remove",
-		Long:  "List all targets defined in cpx.ci and lets you choose which to remove.",
+		Short: "List all targets in cpx-ci.yaml and select to remove",
+		Long:  "List all targets defined in cpx-ci.yaml and lets you choose which to remove.",
 		RunE:  runListRemoveTargets,
 	}
 	rmTargetCmd.AddCommand(listRemoveTargetsCmd)
 	cmd.AddCommand(rmTargetCmd)
-
-	// Add register subcommand
-	registerCmd := &cobra.Command{
-		Use:   "register [file]",
-		Short: "Register a new Dockerfile target",
-		Long:  "Register a new Dockerfile target to the local cpx configuration. The file must be named in the format 'Dockerfile.<name>'.",
-		Args:  cobra.ExactArgs(1),
-		RunE:  runRegisterTarget,
-	}
-	cmd.AddCommand(registerCmd)
 
 	return cmd
 }
@@ -96,48 +89,11 @@ func runCIRun(cmd *cobra.Command, _ []string) error {
 	return runCIBuild(target, rebuild, true)
 }
 
-// runAddTarget adds a build target to cpx.ci
-// If args are provided, adds those specific targets.
-// If no args are provided, opens interactive target manager.
+// runAddTarget adds a build target to cpx-ci.yaml
+// Opens interactive TUI to configure the target.
 func runAddTarget(_ *cobra.Command, args []string) error {
-	// Get dockerfiles directory
-	homeDir, err := os.UserHomeDir()
-	if err != nil {
-		return fmt.Errorf("failed to get home directory: %w", err)
-	}
-	dockerfilesDir := filepath.Join(homeDir, ".config", "cpx", "dockerfiles")
-
-	// Check if directory exists
-	if _, err := os.Stat(dockerfilesDir); os.IsNotExist(err) {
-		return fmt.Errorf("dockerfiles directory not found: %s\n  Run 'cpx upgrade' to download Dockerfiles", dockerfilesDir)
-	}
-
-	// Scan for Dockerfile.* files
-	entries, err := os.ReadDir(dockerfilesDir)
-	if err != nil {
-		return fmt.Errorf("failed to read dockerfiles directory: %w", err)
-	}
-
-	availableTargetsMap := make(map[string]bool)
-	var availableTargets []string
-	for _, entry := range entries {
-		if entry.IsDir() {
-			continue
-		}
-		name := entry.Name()
-		if strings.HasPrefix(name, "Dockerfile.") && !strings.HasSuffix(name, ".example") {
-			targetName := strings.TrimPrefix(name, "Dockerfile.")
-			availableTargets = append(availableTargets, targetName)
-			availableTargetsMap[targetName] = true
-		}
-	}
-
-	if len(availableTargets) == 0 {
-		return fmt.Errorf("no Dockerfiles found in %s", dockerfilesDir)
-	}
-
-	// Load existing cpx.ci or create new one
-	ciConfig, err := config.LoadCI("cpx.ci")
+	// Load existing cpx-ci.yaml or create new one
+	ciConfig, err := config.LoadCI("cpx-ci.yaml")
 	if err != nil {
 		// Create new config
 		ciConfig = &config.CIConfig{
@@ -153,147 +109,57 @@ func runAddTarget(_ *cobra.Command, args []string) error {
 
 	// Get existing target names
 	existingTargets := make(map[string]bool)
-	var existingTargetNames []string
 	for _, t := range ciConfig.Targets {
 		existingTargets[t.Name] = true
-		existingTargetNames = append(existingTargetNames, t.Name)
-	}
-
-	// Check if args provided
-	if len(args) > 0 {
-		var selectedTargets []string
-		for _, arg := range args {
-			// Validate target exists
-			if !availableTargetsMap[arg] {
-				return fmt.Errorf("unknown target: %s\n  Available targets: %s", arg, strings.Join(availableTargets, ", "))
-			}
-			// Skip if already exists
-			if existingTargets[arg] {
-				fmt.Printf("%sTarget %s already in cpx.ci, skipping%s\n", Yellow, arg, Reset)
-				continue
-			}
-			selectedTargets = append(selectedTargets, arg)
-		}
-
-		if len(selectedTargets) == 0 {
-			fmt.Printf("%sNo new targets added%s\n", Yellow, Reset)
-			return nil
-		}
-
-		// Add selected targets
-		for _, targetName := range selectedTargets {
-			target := deriveTargetConfig(targetName)
-			ciConfig.Targets = append(ciConfig.Targets, target)
-			fmt.Printf("%s+ Added target: %s%s\n", Green, targetName, Reset)
-		}
-
-		// Save cpx.ci
-		if err := config.SaveCI(ciConfig, "cpx.ci"); err != nil {
-			return err
-		}
-
-		fmt.Printf("\n%sSaved cpx.ci with %d target(s)%s\n", Green, len(ciConfig.Targets), Reset)
-		return nil
-	}
-
-	// Interactive Mode (Target Manager)
-	// Build targets list for TUI
-	var targets []tui.Target
-	for _, name := range availableTargets {
-		targets = append(targets, tui.Target{
-			Name:     name,
-			Platform: describePlatform(name),
-		})
 	}
 
 	// Run interactive TUI
-	selectedTargets, err := tui.RunTargetSelection(targets, existingTargetNames, "Manage Build Targets")
+	targetConfig, err := tui.RunAddTargetTUI()
 	if err != nil {
 		return fmt.Errorf("TUI error: %w", err)
 	}
 
-	if len(selectedTargets) == 0 {
-		fmt.Printf("%sNo targets selected - clearing all targets%s\n", Yellow, Reset)
-	}
-
-	// Calculate changes
-	selectedMap := make(map[string]bool)
-	for _, t := range selectedTargets {
-		selectedMap[t] = true
-	}
-
-	var added, removed []string
-
-	// Find added
-	for _, t := range selectedTargets {
-		if !existingTargets[t] {
-			added = append(added, t)
-		}
-	}
-
-	// Find removed
-	for t := range existingTargets {
-		if !selectedMap[t] {
-			removed = append(removed, t)
-		}
-	}
-
-	if len(added) == 0 && len(removed) == 0 {
-		fmt.Printf("No changes made.\n")
+	if targetConfig == nil {
+		// User cancelled
 		return nil
 	}
 
-	// Rebuild targets list: existing (kept) + new
-	var newTargets []config.CITarget
-
-	// Keep existing targets that are still selected
-	for _, t := range ciConfig.Targets {
-		if selectedMap[t.Name] {
-			newTargets = append(newTargets, t)
-		}
+	// Check if target already exists
+	if existingTargets[targetConfig.Name] {
+		return fmt.Errorf("target '%s' already exists in cpx-ci.yaml", targetConfig.Name)
 	}
 
-	// Add new targets
-	for _, name := range added {
-		newTargets = append(newTargets, deriveTargetConfig(name))
-	}
+	// Convert to CITarget and add
+	target := targetConfig.ToCITarget()
+	ciConfig.Targets = append(ciConfig.Targets, target)
 
-	ciConfig.Targets = newTargets
-
-	// Save cpx.ci
-	if err := config.SaveCI(ciConfig, "cpx.ci"); err != nil {
+	// Save cpx-ci.yaml
+	if err := config.SaveCI(ciConfig, "cpx-ci.yaml"); err != nil {
 		return err
 	}
 
-	// Print summary
-	for _, t := range added {
-		fmt.Printf("%s+ Added target: %s%s\n", Green, t, Reset)
-	}
-	for _, t := range removed {
-		fmt.Printf("%s- Removed target: %s%s\n", Red, t, Reset)
-	}
-
-	fmt.Printf("\n%sSaved cpx.ci with %d target(s)%s\n", Green, len(ciConfig.Targets), Reset)
+	fmt.Printf("\n%s+ Added target: %s%s\n", Green, targetConfig.Name, Reset)
+	fmt.Printf("%sSaved cpx-ci.yaml with %d target(s)%s\n", Green, len(ciConfig.Targets), Reset)
 	return nil
 }
 
-// runRemoveTarget removes targets from cpx.ci
+// runRemoveTarget removes targets from cpx-ci.yaml
 func runRemoveTarget(_ *cobra.Command, args []string) error {
-	// Load existing cpx.ci
-	ciConfig, err := config.LoadCI("cpx.ci")
+	// Load existing cpx-ci.yaml
+	ciConfig, err := config.LoadCI("cpx-ci.yaml")
 	if err != nil {
-		return fmt.Errorf("failed to load cpx.ci: %w\n  No cpx.ci file found in current directory", err)
+		return fmt.Errorf("failed to load cpx-ci.yaml: %w\n  No cpx-ci.yaml file found in current directory", err)
 	}
 
 	if len(ciConfig.Targets) == 0 {
-		fmt.Printf("%sNo targets in cpx.ci to remove%s\n", Yellow, Reset)
+		fmt.Printf("%sNo targets in cpx-ci.yaml to remove%s\n", Yellow, Reset)
 		return nil
 	}
 
 	// If no args, use interactive mode
 	if len(args) == 0 {
 		// simple interactive mode
-		fmt.Printf("%sTargets in cpx.ci:%s\n", Cyan, Reset)
+		fmt.Printf("%sTargets in cpx-ci.yaml:%s\n", Cyan, Reset)
 		for i, t := range ciConfig.Targets {
 			fmt.Printf("  %d. %s\n", i+1, t.Name)
 		}
@@ -349,7 +215,7 @@ func runRemoveTarget(_ *cobra.Command, args []string) error {
 
 	if len(removed) == 0 {
 		fmt.Printf("%sNo matching targets found to remove%s\n\n", Yellow, Reset)
-		fmt.Printf("Available targets in cpx.ci:\n")
+		fmt.Printf("Available targets in cpx-ci.yaml:\n")
 		for _, t := range ciConfig.Targets {
 			fmt.Printf("  - %s\n", t.Name)
 		}
@@ -358,27 +224,27 @@ func runRemoveTarget(_ *cobra.Command, args []string) error {
 
 	// Update and save config
 	ciConfig.Targets = newTargets
-	if err := config.SaveCI(ciConfig, "cpx.ci"); err != nil {
+	if err := config.SaveCI(ciConfig, "cpx-ci.yaml"); err != nil {
 		return err
 	}
 
 	for _, name := range removed {
 		fmt.Printf("%s- Removed target: %s%s\n", Red, name, Reset)
 	}
-	fmt.Printf("\n%sSaved cpx.ci with %d target(s)%s\n", Green, len(ciConfig.Targets), Reset)
+	fmt.Printf("\n%sSaved cpx-ci.yaml with %d target(s)%s\n", Green, len(ciConfig.Targets), Reset)
 	return nil
 }
 
-// runListRemoveTargets shows all targets in cpx.ci and lets user select to remove
+// runListRemoveTargets shows all targets in cpx-ci.yaml and lets user select to remove
 func runListRemoveTargets(_ *cobra.Command, _ []string) error {
-	// Load existing cpx.ci
-	ciConfig, err := config.LoadCI("cpx.ci")
+	// Load existing cpx-ci.yaml
+	ciConfig, err := config.LoadCI("cpx-ci.yaml")
 	if err != nil {
-		return fmt.Errorf("failed to load cpx.ci: %w\n  No cpx.ci file found in current directory", err)
+		return fmt.Errorf("failed to load cpx-ci.yaml: %w\n  No cpx-ci.yaml file found in current directory", err)
 	}
 
 	if len(ciConfig.Targets) == 0 {
-		fmt.Printf("%sNo targets in cpx.ci to remove%s\n", Yellow, Reset)
+		fmt.Printf("%sNo targets in cpx-ci.yaml to remove%s\n", Yellow, Reset)
 		return nil
 	}
 
@@ -419,65 +285,14 @@ func runListRemoveTargets(_ *cobra.Command, _ []string) error {
 	}
 
 	ciConfig.Targets = newTargets
-	if err := config.SaveCI(ciConfig, "cpx.ci"); err != nil {
+	if err := config.SaveCI(ciConfig, "cpx-ci.yaml"); err != nil {
 		return err
 	}
 
 	for name := range toRemove {
 		fmt.Printf("%s- Removed target: %s%s\n", Red, name, Reset)
 	}
-	fmt.Printf("\n%sSaved cpx.ci with %d target(s)%s\n", Green, len(ciConfig.Targets), Reset)
-	return nil
-}
-
-// runRegisterTarget registers a new Dockerfile target
-func runRegisterTarget(_ *cobra.Command, args []string) error {
-	sourcePath := args[0]
-	baseName := filepath.Base(sourcePath)
-
-	// Validate filename format
-	if !strings.HasPrefix(baseName, "Dockerfile.") || len(baseName) <= len("Dockerfile.") {
-		return fmt.Errorf("filename must match format 'Dockerfile.<name>' (e.g., Dockerfile.custom-target)")
-	}
-
-	// Validate source file exists
-	if _, err := os.Stat(sourcePath); os.IsNotExist(err) {
-		return fmt.Errorf("file not found: %s", sourcePath)
-	}
-
-	// Get config directory
-	homeDir, err := os.UserHomeDir()
-	if err != nil {
-		return fmt.Errorf("failed to get home directory: %w", err)
-	}
-	dockerfilesDir := filepath.Join(homeDir, ".config", "cpx", "dockerfiles")
-
-	// Ensure directory exists
-	if err := os.MkdirAll(dockerfilesDir, 0755); err != nil {
-		return fmt.Errorf("failed to create dockerfiles directory: %w", err)
-	}
-
-	destPath := filepath.Join(dockerfilesDir, baseName)
-
-	// Check if target already exists
-	if _, err := os.Stat(destPath); err == nil {
-		return fmt.Errorf("target already exists: %s\n  Remove it manually to overwrite: rm %s", baseName, destPath)
-	}
-
-	// Copy file
-	input, err := os.ReadFile(sourcePath)
-	if err != nil {
-		return fmt.Errorf("failed to read source file: %w", err)
-	}
-
-	if err := os.WriteFile(destPath, input, 0644); err != nil {
-		return fmt.Errorf("failed to write target file: %w", err)
-	}
-
-	targetName := strings.TrimPrefix(baseName, "Dockerfile.")
-	fmt.Printf("%sSuccessfully registered target: %s%s\n", Green, targetName, Reset)
-	fmt.Printf("You can now add it using: cpx ci add-target %s\n", targetName)
-
+	fmt.Printf("\n%sSaved cpx-ci.yaml with %d target(s)%s\n", Green, len(ciConfig.Targets), Reset)
 	return nil
 }
 
@@ -510,27 +325,34 @@ func describePlatform(name string) string {
 	return osName + " " + archName
 }
 
-// deriveTargetConfig derives a CITarget from a target name
+// deriveTargetConfig derives a CITarget from a target name (predefined Dockerfile)
 func deriveTargetConfig(name string) config.CITarget {
-	target := config.CITarget{
-		Source: name,
+	// Get the dockerfiles directory
+	homeDir, _ := os.UserHomeDir()
+	dockerfilesDir := filepath.Join(homeDir, ".config", "cpx", "dockerfiles")
+
+	// Derive platform from name (e.g., linux-amd64 -> linux/amd64)
+	platform := ""
+	parts := strings.Split(name, "-")
+	if len(parts) >= 2 {
+		osName := parts[0] // linux
+		arch := parts[1]   // amd64, arm64
+		platform = osName + "/" + arch
 	}
 
-	// Derive platform from name
-	// parts := strings.Split(name, "-")
-	// if len(parts) >= 2 {
-	// 	os := parts[0]   // linux
-	// 	arch := parts[1] // amd64, arm64
-	//
-	// 	switch os {
-	// 	case "linux":
-	// 		if arch == "amd64" {
-	// 			// target.Platform = "linux/amd64"
-	// 		} else if arch == "arm64" {
-	// 			// target.Platform = "linux/arm64"
-	// 		}
-	// 	}
-	// }
+	target := config.CITarget{
+		Name:   name,
+		Runner: "docker",
+		Docker: &config.DockerConfig{
+			Mode:     "build",
+			Image:    "cpx-" + name,
+			Platform: platform,
+			Build: &config.DockerBuildConfig{
+				Context:    dockerfilesDir,
+				Dockerfile: filepath.Join(dockerfilesDir, "Dockerfile."+name),
+			},
+		},
+	}
 
 	return target
 }
@@ -543,12 +365,11 @@ func runCIBuild(targetName string, rebuild bool, executeAfterBuild bool) error {
 		return nil
 	}
 	ciCommandExecuted = true
-	// fmt.Printf("%s[DEBUG] Starting CI build (PID: %d)%s\n", Yellow, os.Getpid(), Reset)
 
-	// Load cpx.ci configuration
-	ciConfig, err := config.LoadCI("cpx.ci")
+	// Load cpx-ci.yaml configuration
+	ciConfig, err := config.LoadCI("cpx-ci.yaml")
 	if err != nil {
-		return fmt.Errorf("failed to load cpx.ci: %w\n  Create cpx.ci file or run 'cpx build' for local builds", err)
+		return fmt.Errorf("failed to load cpx-ci.yaml: %w\n  Create cpx-ci.yaml file or run 'cpx build' for local builds", err)
 	}
 
 	// Filter targets if specific target requested
@@ -559,34 +380,35 @@ func runCIBuild(targetName string, rebuild bool, executeAfterBuild bool) error {
 			if t.Name == targetName {
 				targets = []config.CITarget{t}
 				found = true
+				// Warn if explicitly targeting an inactive target
+				if !t.IsActive() {
+					fmt.Printf("%sWarning: Target '%s' is marked as inactive%s\n", Yellow, targetName, Reset)
+				}
 				break
 			}
 		}
 		if !found {
-			return fmt.Errorf("target '%s' not found in cpx.ci", targetName)
+			return fmt.Errorf("target '%s' not found in cpx-ci.yaml", targetName)
 		}
+	} else {
+		// Filter out inactive targets when building all
+		var activeTargets []config.CITarget
+		var skippedCount int
+		for _, t := range ciConfig.Targets {
+			if t.IsActive() {
+				activeTargets = append(activeTargets, t)
+			} else {
+				skippedCount++
+			}
+		}
+		if skippedCount > 0 {
+			fmt.Printf("%sSkipping %d inactive target(s)%s\n", Yellow, skippedCount, Reset)
+		}
+		targets = activeTargets
 	}
 
 	if len(targets) == 0 {
-		return fmt.Errorf("no targets defined in cpx.ci")
-	}
-
-	// Get Dockerfiles directory from config
-	configDir, err := config.GetConfigDir()
-	if err != nil {
-		return fmt.Errorf("failed to get config directory: %w", err)
-	}
-	dockerfilesDir := filepath.Join(configDir, "dockerfiles")
-
-	// Get absolute path to dockerfiles directory
-	absDockerfilesDir, err := filepath.Abs(dockerfilesDir)
-	if err != nil {
-		return fmt.Errorf("failed to get absolute dockerfiles directory: %w", err)
-	}
-
-	// Verify dockerfiles directory exists
-	if _, err := os.Stat(absDockerfilesDir); os.IsNotExist(err) {
-		return fmt.Errorf("dockerfiles directory not found: %s\n  Run 'cpx upgrade' to download Dockerfiles", absDockerfilesDir)
+		return fmt.Errorf("no active targets defined in cpx-ci.yaml")
 	}
 
 	// Create output directory
@@ -598,7 +420,7 @@ func runCIBuild(targetName string, rebuild bool, executeAfterBuild bool) error {
 		return fmt.Errorf("failed to create output directory: %w", err)
 	}
 
-	fmt.Printf("%s Building for %d target(s) using Docker...%s\n", Cyan, len(targets), Reset)
+	fmt.Printf("%s Building for %d target(s)...%s\n", Cyan, len(targets), Reset)
 
 	// Get project root
 	projectRoot, err := findProjectRoot()
@@ -606,47 +428,47 @@ func runCIBuild(targetName string, rebuild bool, executeAfterBuild bool) error {
 		return fmt.Errorf("failed to get project root: %w", err)
 	}
 
-	// Pre-create cache directories for all targets before Docker operations
-	// Docker requires mount source directories to exist on the host
+	// Pre-create cache directories for all targets
 	cacheBaseDir := filepath.Join(projectRoot, ".cache", "ci")
 	if err := os.MkdirAll(cacheBaseDir, 0755); err != nil {
 		return fmt.Errorf("failed to create cache directory: %w", err)
 	}
 	for _, target := range targets {
-		targetCacheDir := filepath.Join(cacheBaseDir, target.Name, ".vcpkg_cache")
-		if err := os.MkdirAll(targetCacheDir, 0755); err != nil {
-			return fmt.Errorf("failed to create target cache directory: %w", err)
+		if target.Runner == "docker" && target.Docker != nil {
+			// Docker targets need vcpkg cache
+			targetCacheDir := filepath.Join(cacheBaseDir, target.Name, ".vcpkg_cache")
+			if err := os.MkdirAll(targetCacheDir, 0755); err != nil {
+				return fmt.Errorf("failed to create target cache directory: %w", err)
+			}
 		}
 	}
 
 	// Build and run for each target
 	for i, target := range targets {
 		if executeAfterBuild {
-			fmt.Printf("\n%s[%d/%d] Building and running target: %s%s\n", Cyan, i+1, len(targets), target.Name, Reset)
+			fmt.Printf("\n%s[%d/%d] Building and running target: %s (%s)%s\n", Cyan, i+1, len(targets), target.Name, target.Runner, Reset)
 		} else {
-			fmt.Printf("\n%s[%d/%d] Building target: %s%s\n", Cyan, i+1, len(targets), target.Name, Reset)
+			fmt.Printf("\n%s[%d/%d] Building target: %s (%s)%s\n", Cyan, i+1, len(targets), target.Name, target.Runner, Reset)
 		}
 
-		// Build Docker image
-		// Check if Dockerfile exists as specified, or try prepending Dockerfile.
-		dockerfilePath := filepath.Join(absDockerfilesDir, target.Source)
-		if _, err := os.Stat(dockerfilePath); os.IsNotExist(err) {
-			// Try prepending Dockerfile.
-			altPath := filepath.Join(absDockerfilesDir, "Dockerfile."+target.Source)
-			if _, err := os.Stat(altPath); err == nil {
-				dockerfilePath = altPath
-			} else {
-				return fmt.Errorf("dockerfile not found: %s (or Dockerfile.%s)\n  Run 'cpx upgrade' to download Dockerfiles", target.Source, target.Source)
+		// Dispatch based on runner type
+		if target.Runner == "native" {
+			// Native build
+			if err := runNativeBuild(target, projectRoot, outputDir, ciConfig.Build); err != nil {
+				return fmt.Errorf("failed to build target %s: %w", target.Name, err)
 			}
-		}
+		} else {
+			// Docker build (default)
+			// Resolve Docker image based on mode
+			imageName, err := resolveDockerImage(target, projectRoot, rebuild)
+			if err != nil {
+				return fmt.Errorf("failed to resolve Docker image for %s: %w", target.Name, err)
+			}
 
-		if err := buildDockerImage(dockerfilePath, target.Tag, rebuild); err != nil {
-			return fmt.Errorf("failed to build Docker image %s: %w", target.Tag, err)
-		}
-
-		// Run build in Docker container
-		if err := runDockerBuild(target, projectRoot, outputDir, ciConfig.Build, executeAfterBuild); err != nil {
-			return fmt.Errorf("failed to build target %s: %w", target.Name, err)
+			// Run build in Docker container
+			if err := runDockerBuildWithImage(target, imageName, projectRoot, outputDir, ciConfig.Build, executeAfterBuild); err != nil {
+				return fmt.Errorf("failed to build target %s: %w", target.Name, err)
+			}
 		}
 
 		if executeAfterBuild {
@@ -671,8 +493,8 @@ func findProjectRoot() (string, error) {
 
 	// Walk up the directory tree looking for project markers
 	for {
-		// Check for cpx.ci or CMakeLists.txt or MODULE.bazel (project markers)
-		if _, err := os.Stat(filepath.Join(dir, "cpx.ci")); err == nil {
+		// Check for cpx-ci.yaml or CMakeLists.txt or MODULE.bazel (project markers)
+		if _, err := os.Stat(filepath.Join(dir, "cpx-ci.yaml")); err == nil {
 			return dir, nil
 		}
 		if _, err := os.Stat(filepath.Join(dir, "CMakeLists.txt")); err == nil {
@@ -693,6 +515,217 @@ func findProjectRoot() (string, error) {
 		}
 		dir = parent
 	}
+}
+
+// hashDockerBuildConfig computes a hash of Dockerfile content + build args
+// Returns first 12 characters of the SHA256 hash
+func hashDockerBuildConfig(dockerfilePath string, args map[string]string) (string, error) {
+	// Read Dockerfile content
+	content, err := os.ReadFile(dockerfilePath)
+	if err != nil {
+		return "", fmt.Errorf("failed to read Dockerfile: %w", err)
+	}
+
+	// Create hash input: dockerfile content + sorted args
+	h := sha256.New()
+	h.Write(content)
+
+	// Sort args keys for deterministic hashing
+	if len(args) > 0 {
+		keys := make([]string, 0, len(args))
+		for k := range args {
+			keys = append(keys, k)
+		}
+		sort.Strings(keys)
+
+		for _, k := range keys {
+			h.Write([]byte(k))
+			h.Write([]byte("="))
+			h.Write([]byte(args[k]))
+			h.Write([]byte("\n"))
+		}
+	}
+
+	// Return first 12 chars of hex hash
+	return hex.EncodeToString(h.Sum(nil))[:12], nil
+}
+
+// resolveDockerImage resolves the Docker image based on target configuration
+// Returns the image name/tag to use for running the container
+func resolveDockerImage(target config.CITarget, projectRoot string, rebuild bool) (string, error) {
+	if target.Docker == nil {
+		return "", fmt.Errorf("docker configuration is required for docker runner")
+	}
+
+	switch target.Docker.Mode {
+	case "pull":
+		return handlePullMode(target, rebuild)
+	case "local":
+		return handleLocalMode(target)
+	case "build":
+		return handleBuildMode(target, projectRoot, rebuild)
+	default:
+		return "", fmt.Errorf("unknown docker mode: %s", target.Docker.Mode)
+	}
+}
+
+// handlePullMode handles the "pull" Docker mode
+func handlePullMode(target config.CITarget, rebuild bool) (string, error) {
+	imageName := target.Docker.Image
+	pullPolicy := target.Docker.PullPolicy
+
+	// Check if image exists locally
+	imageExists := false
+	cmd := exec.Command("docker", "images", "-q", imageName)
+	output, err := cmd.Output()
+	if err == nil && len(output) > 0 {
+		imageExists = true
+	}
+
+	// Determine if we should pull
+	shouldPull := false
+	switch pullPolicy {
+	case "always":
+		shouldPull = true
+	case "never":
+		if !imageExists {
+			return "", fmt.Errorf("image %s not found locally and pullPolicy is 'never'", imageName)
+		}
+		shouldPull = false
+	case "ifNotPresent", "":
+		shouldPull = !imageExists
+	default:
+		return "", fmt.Errorf("unknown pullPolicy: %s", pullPolicy)
+	}
+
+	// Force pull if rebuild is requested
+	if rebuild {
+		shouldPull = true
+	}
+
+	if shouldPull {
+		fmt.Printf("  %s Pulling Docker image: %s...%s\n", Cyan, imageName, Reset)
+		pullArgs := []string{"pull"}
+		if target.Docker.Platform != "" {
+			pullArgs = append(pullArgs, "--platform", target.Docker.Platform)
+		}
+		pullArgs = append(pullArgs, imageName)
+
+		cmd := exec.Command("docker", pullArgs...)
+		cmd.Stdout = os.Stdout
+		cmd.Stderr = os.Stderr
+		if err := cmd.Run(); err != nil {
+			return "", fmt.Errorf("docker pull failed: %w", err)
+		}
+		fmt.Printf("  %s Docker image %s pulled successfully%s\n", Green, imageName, Reset)
+	} else {
+		fmt.Printf("  %s Docker image %s already exists%s\n", Green, imageName, Reset)
+	}
+
+	return imageName, nil
+}
+
+// handleLocalMode handles the "local" Docker mode
+func handleLocalMode(target config.CITarget) (string, error) {
+	imageName := target.Docker.Image
+
+	// Verify image exists locally
+	cmd := exec.Command("docker", "images", "-q", imageName)
+	output, err := cmd.Output()
+	if err != nil || len(output) == 0 {
+		return "", fmt.Errorf("local image %s not found. Use 'docker pull' or 'docker build' to create it", imageName)
+	}
+
+	fmt.Printf("  %s Using local Docker image: %s%s\n", Green, imageName, Reset)
+	return imageName, nil
+}
+
+// handleBuildMode handles the "build" Docker mode with content-based hashing
+func handleBuildMode(target config.CITarget, projectRoot string, rebuild bool) (string, error) {
+	if target.Docker.Build == nil {
+		return "", fmt.Errorf("build configuration is required for mode: build")
+	}
+
+	// Resolve Dockerfile path
+	dockerfilePath := target.Docker.Build.Dockerfile
+	if !filepath.IsAbs(dockerfilePath) {
+		dockerfilePath = filepath.Join(projectRoot, dockerfilePath)
+	}
+
+	// Verify Dockerfile exists
+	if _, err := os.Stat(dockerfilePath); os.IsNotExist(err) {
+		return "", fmt.Errorf("dockerfile not found: %s", dockerfilePath)
+	}
+
+	// Compute hash from Dockerfile + build args
+	hash, err := hashDockerBuildConfig(dockerfilePath, target.Docker.Build.Args)
+	if err != nil {
+		return "", err
+	}
+
+	// Generate tag: cpx/<target_name>:<hash>
+	imageName := fmt.Sprintf("cpx/%s:%s", target.Name, hash)
+
+	// Check if image with exact tag exists
+	if !rebuild {
+		cmd := exec.Command("docker", "images", "-q", imageName)
+		output, err := cmd.Output()
+		if err == nil && len(output) > 0 {
+			fmt.Printf("  %s Docker image %s already exists (hash match)%s\n", Green, imageName, Reset)
+			return imageName, nil
+		}
+	}
+
+	// Build the image
+	fmt.Printf("  %s Building Docker image: %s...%s\n", Cyan, imageName, Reset)
+
+	// Resolve build context
+	buildContext := target.Docker.Build.Context
+	if buildContext == "" {
+		buildContext = "."
+	}
+	if !filepath.IsAbs(buildContext) {
+		buildContext = filepath.Join(projectRoot, buildContext)
+	}
+
+	// Build Docker image
+	buildArgs := []string{"buildx", "build", "-f", dockerfilePath, "-t", imageName}
+	if target.Docker.Platform != "" {
+		buildArgs = append(buildArgs, "--platform", target.Docker.Platform)
+	}
+	// Add build args
+	for k, v := range target.Docker.Build.Args {
+		buildArgs = append(buildArgs, "--build-arg", fmt.Sprintf("%s=%s", k, v))
+	}
+	buildArgs = append(buildArgs, "--load") // Load into local Docker daemon
+	buildArgs = append(buildArgs, buildContext)
+
+	cmd := exec.Command("docker", buildArgs...)
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+
+	// If buildx fails, fall back to regular docker build
+	if err := cmd.Run(); err != nil {
+		fmt.Printf("  %s docker buildx failed, trying regular docker build...%s\n", Yellow, Reset)
+		buildArgs = []string{"build", "-f", dockerfilePath, "-t", imageName}
+		if target.Docker.Platform != "" {
+			buildArgs = append(buildArgs, "--platform", target.Docker.Platform)
+		}
+		for k, v := range target.Docker.Build.Args {
+			buildArgs = append(buildArgs, "--build-arg", fmt.Sprintf("%s=%s", k, v))
+		}
+		buildArgs = append(buildArgs, buildContext)
+
+		cmd = exec.Command("docker", buildArgs...)
+		cmd.Stdout = os.Stdout
+		cmd.Stderr = os.Stderr
+		if err := cmd.Run(); err != nil {
+			return "", fmt.Errorf("docker build failed: %w", err)
+		}
+	}
+
+	fmt.Printf("  %s Docker image %s built successfully%s\n", Green, imageName, Reset)
+	return imageName, nil
 }
 
 func buildDockerImage(dockerfilePath, imageName string, rebuild bool) error {
@@ -799,7 +832,8 @@ func detectProjectType(projectRoot string) (bool, error) {
 	return true, nil
 }
 
-func runDockerBuild(target config.CITarget, projectRoot, outputDir string, buildConfig config.CIBuild, executeAfterBuild bool) error {
+// runDockerBuildWithImage runs a Docker build with the specified image name
+func runDockerBuildWithImage(target config.CITarget, imageName, projectRoot, outputDir string, buildConfig config.CIBuild, executeAfterBuild bool) error {
 	// Create target-specific output directory
 	targetOutputDir := filepath.Join(outputDir, target.Name)
 	if err := os.MkdirAll(targetOutputDir, 0755); err != nil {
@@ -813,12 +847,12 @@ func runDockerBuild(target config.CITarget, projectRoot, outputDir string, build
 	}
 
 	if isBazel {
-		return runDockerBazelBuild(target, projectRoot, outputDir, buildConfig)
+		return runDockerBazelBuildWithImage(target, imageName, projectRoot, outputDir, buildConfig)
 	}
 
 	// Check if this is a Meson project
 	if _, err := os.Stat(filepath.Join(projectRoot, "meson.build")); err == nil {
-		return runDockerMesonBuild(target, projectRoot, outputDir, buildConfig)
+		return runDockerMesonBuildWithImage(target, imageName, projectRoot, outputDir, buildConfig)
 	}
 
 	// Detect project type (executable or library) for CMake projects
@@ -831,8 +865,11 @@ func runDockerBuild(target config.CITarget, projectRoot, outputDir string, build
 	// vcpkg is installed in the Docker images at /opt/vcpkg
 	// No need to mount from host - images are self-contained
 
-	// Determine build type and optimization
-	buildType := buildConfig.Type
+	// Determine build type (per-target overrides global)
+	buildType := target.BuildType
+	if buildType == "" {
+		buildType = buildConfig.Type
+	}
 	if buildType == "" {
 		buildType = "Release"
 	}
@@ -841,6 +878,19 @@ func runDockerBuild(target config.CITarget, projectRoot, outputDir string, build
 	if optLevel == "" {
 		optLevel = "2"
 	}
+
+	// Determine CMake and build options (per-target overrides global)
+	cmakeOptions := target.CMakeOptions
+	if len(cmakeOptions) == 0 {
+		cmakeOptions = buildConfig.CMakeArgs
+	}
+	buildOptions := target.BuildOptions
+	if len(buildOptions) == 0 {
+		buildOptions = buildConfig.BuildArgs
+	}
+
+	// Merge environment variables (target.Env is used in Docker container)
+	envVars := target.Env
 
 	// Create a persistent build directory for this target on the host
 	// This allows CMake to cache build artifacts (.o files, dependencies, etc.)
@@ -877,15 +927,15 @@ func runDockerBuild(target config.CITarget, projectRoot, outputDir string, build
 	// This is more reliable than environment variables
 	cmakeArgs = append(cmakeArgs, "-DVCPKG_DISABLE_REGISTRY_UPDATE=ON")
 
-	// Add custom CMake args
-	cmakeArgs = append(cmakeArgs, buildConfig.CMakeArgs...)
+	// Add custom CMake args (per-target or global)
+	cmakeArgs = append(cmakeArgs, cmakeOptions...)
 
 	// Build command arguments
 	buildArgs := []string{"--build", containerBuildDir, "--config", buildType}
 	if buildConfig.Jobs > 0 {
 		buildArgs = append(buildArgs, "--parallel", fmt.Sprintf("%d", buildConfig.Jobs))
 	}
-	buildArgs = append(buildArgs, buildConfig.BuildArgs...)
+	buildArgs = append(buildArgs, buildOptions...)
 
 	// Determine artifact copying based on project type
 	var copyCommand string
@@ -957,10 +1007,19 @@ find %s -maxdepth 2 -type f \( -name "lib*.a" -o -name "lib*.so" -o -name "lib*.
 	vcpkgBuildtreesPath := "/tmp/.vcpkg_cache/buildtrees"
 	binaryCachePath := "/tmp/.vcpkg_cache/binary"
 
+	// Generate environment variable exports for the build script
+	var envExports string
+	if len(envVars) > 0 {
+		envExports = "# User-defined environment variables\n"
+		for k, v := range envVars {
+			envExports += fmt.Sprintf("export %s=\"%s\"\n", k, v)
+		}
+	}
+
 	// Bash build script for Linux/macOS
 	buildScript := fmt.Sprintf(`#!/bin/bash
 set -e
-export VCPKG_ROOT=/opt/vcpkg
+%sexport VCPKG_ROOT=/opt/vcpkg
 export PATH="${VCPKG_ROOT}:${PATH}"
 # Set vcpkg to use manifest mode
 export VCPKG_FEATURE_FLAGS=manifests
@@ -1000,7 +1059,7 @@ mkdir -p /output/%s
 %s
 echo " Build complete!"
 %s
-`, vcpkgInstalledPath, vcpkgDownloadsPath, vcpkgBuildtreesPath, binaryCachePath, binaryCachePath, containerBuildDir, containerBuildDir, strings.Join(cmakeArgs, " "), strings.Join(buildArgs, " "), target.Name, copyCommand, func() string {
+`, envExports, vcpkgInstalledPath, vcpkgDownloadsPath, vcpkgBuildtreesPath, binaryCachePath, binaryCachePath, containerBuildDir, containerBuildDir, strings.Join(cmakeArgs, " "), strings.Join(buildArgs, " "), target.Name, copyCommand, func() string {
 		if executeAfterBuild {
 			projectName := filepath.Base(projectRoot)
 			return fmt.Sprintf(`
@@ -1042,18 +1101,16 @@ fi
 	// Run Docker container
 	fmt.Printf("  %s Running build in Docker container...%s\n", Cyan, Reset)
 
-	// Use platform from target config
-	// platform := target.Platform
-
 	// Mount only necessary directories:
 	// - Source code (read-only to avoid modifying host files)
 	// - Build directory (for caching CMake build artifacts) - mount to a subdirectory that can be created
 	// - Output directory (for artifacts)
 	// - vcpkg cache directory (from build/.vcpkg_cache to /tmp/.vcpkg_cache)
 	dockerArgs := []string{"run", "--rm"}
-	// if platform != "" {
-	// 	dockerArgs = append(dockerArgs, "--platform", platform)
-	// }
+	// Add platform flag if specified (prevents warning on cross-platform runs)
+	if target.Docker != nil && target.Docker.Platform != "" {
+		dockerArgs = append(dockerArgs, "--platform", target.Docker.Platform)
+	}
 	// Mount paths for Linux/macOS containers
 	// Build directory is mounted to /tmp/build to avoid read-only /workspace mount issues
 	// vcpkg cache is mounted to /tmp/.vcpkg_cache for the same reason
@@ -1076,7 +1133,7 @@ fi
 		"-v", absOutputDir+":"+outputPath, // Mount output directory for artifacts
 		"-v", absVcpkgCacheDir+":"+cachePath, // Mount vcpkg cache
 		"-w", workspacePath,
-		target.Tag,
+		imageName,
 		command, "-c", buildScript)
 
 	cmd := exec.Command("docker", dockerArgs...)
@@ -1091,8 +1148,8 @@ fi
 	return nil
 }
 
-// runDockerBazelBuild runs a Bazel build inside Docker
-func runDockerBazelBuild(target config.CITarget, projectRoot, outputDir string, buildConfig config.CIBuild) error {
+// runDockerBazelBuildWithImage runs a Bazel build inside Docker with specified image
+func runDockerBazelBuildWithImage(target config.CITarget, imageName, projectRoot, outputDir string, buildConfig config.CIBuild) error {
 	// Get absolute paths
 	absProjectRoot, err := filepath.Abs(projectRoot)
 	if err != nil {
@@ -1111,9 +1168,13 @@ func runDockerBazelBuild(target config.CITarget, projectRoot, outputDir string, 
 		return fmt.Errorf("failed to create bazel cache directory: %w", err)
 	}
 
-	// Determine build config
+	// Determine build config (per-target overrides global)
+	buildType := target.BuildType
+	if buildType == "" {
+		buildType = buildConfig.Type
+	}
 	bazelConfig := "release"
-	if buildConfig.Type == "Debug" || buildConfig.Type == "debug" {
+	if buildType == "Debug" || buildType == "debug" {
 		bazelConfig = "debug"
 	}
 
@@ -1124,6 +1185,15 @@ func runDockerBazelBuild(target config.CITarget, projectRoot, outputDir string, 
 		return fmt.Errorf("failed to create bazel repo cache directory: %w", err)
 	}
 
+	// Generate environment variable exports for the build script
+	var envExports string
+	if len(target.Env) > 0 {
+		envExports = "# User-defined environment variables\n"
+		for k, v := range target.Env {
+			envExports += fmt.Sprintf("export %s=\"%s\"\n", k, v)
+		}
+	}
+
 	// Create Bazel build script
 	// Use --output_base to keep Bazel's output completely separate from the workspace
 	// Use HOME=/root to reuse Bazel downloaded during Docker image build
@@ -1132,7 +1202,7 @@ func runDockerBazelBuild(target config.CITarget, projectRoot, outputDir string, 
 	// Use --repository_cache to persist downloaded dependencies
 	buildScript := fmt.Sprintf(`#!/bin/bash
 set -e
-echo "  Building with Bazel..."
+%secho "  Building with Bazel..."
 # Use HOME=/root to reuse Bazel pre-downloaded during Docker image build
 export HOME=/root
 BAZEL_OUTPUT_BASE=/bazel-cache
@@ -1158,16 +1228,16 @@ find "$BAZEL_OUTPUT_BASE" -path "*/bin/*" -type f \( -name "lib*.a" -o -name "li
     ! -name "*.pic.a" \
     -exec cp {} /output/%s/ \; 2>/dev/null || true
 echo "  Build complete!"
-`, bazelConfig, target.Name, target.Name, target.Name)
+`, envExports, bazelConfig, target.Name, target.Name, target.Name)
 
 	// Run Docker container
 	fmt.Printf("  %s Running Bazel build in Docker container...%s\n", Cyan, Reset)
 
-	// platform := target.Platform
 	dockerArgs := []string{"run", "--rm"}
-	// if platform != "" {
-	// 	dockerArgs = append(dockerArgs, "--platform", platform)
-	// }
+	// Add platform flag if specified (prevents warning on cross-platform runs)
+	if target.Docker != nil && target.Docker.Platform != "" {
+		dockerArgs = append(dockerArgs, "--platform", target.Docker.Platform)
+	}
 
 	// Mount workspace as read-only to prevent Bazel from creating files in it
 	// Mount output directory separately
@@ -1179,7 +1249,7 @@ echo "  Build complete!"
 		"-v", bazelCacheDir+":/bazel-cache",
 		"-v", bazelRepoCacheDir+":/bazel-repo-cache",
 		"-w", "/workspace",
-		target.Tag,
+		imageName,
 		"bash", "-c", buildScript)
 
 	cmd := exec.Command("docker", dockerArgs...)
@@ -1193,8 +1263,8 @@ echo "  Build complete!"
 	return nil
 }
 
-// runDockerMesonBuild runs a Meson build inside Docker
-func runDockerMesonBuild(target config.CITarget, projectRoot, outputDir string, buildConfig config.CIBuild) error {
+// runDockerMesonBuildWithImage runs a Meson build inside Docker with specified image
+func runDockerMesonBuildWithImage(target config.CITarget, imageName, projectRoot, outputDir string, buildConfig config.CIBuild) error {
 	// Get absolute paths
 	absProjectRoot, err := filepath.Abs(projectRoot)
 	if err != nil {
@@ -1216,9 +1286,13 @@ func runDockerMesonBuild(target config.CITarget, projectRoot, outputDir string, 
 		return fmt.Errorf("failed to get absolute path for build directory: %w", err)
 	}
 
-	// Determine build type
+	// Determine build type (per-target overrides global)
+	buildTypeConfig := target.BuildType
+	if buildTypeConfig == "" {
+		buildTypeConfig = buildConfig.Type
+	}
 	buildType := "release"
-	if buildConfig.Type == "Debug" || buildConfig.Type == "debug" {
+	if buildTypeConfig == "Debug" || buildTypeConfig == "debug" {
 		buildType = "debug"
 	}
 
@@ -1230,6 +1304,15 @@ func runDockerMesonBuild(target config.CITarget, projectRoot, outputDir string, 
 	absSubprojectsDir, err := filepath.Abs(hostSubprojectsDir)
 	if err != nil {
 		return fmt.Errorf("failed to get absolute path for subprojects directory: %w", err)
+	}
+
+	// Generate environment variable exports for the build script
+	var envExports string
+	if len(target.Env) > 0 {
+		envExports = "# User-defined environment variables\n"
+		for k, v := range target.Env {
+			envExports += fmt.Sprintf("export %s=\"%s\"\n", k, v)
+		}
 	}
 
 	// Build Meson arguments
@@ -1260,7 +1343,7 @@ func runDockerMesonBuild(target config.CITarget, projectRoot, outputDir string, 
 
 	buildScript := fmt.Sprintf(`#!/bin/bash
 set -e
-# Ensure build directory exists (mounted from host)
+%s# Ensure build directory exists (mounted from host)
 mkdir -p /tmp/builddir
 
 # Symlink /tmp/builddir to /workspace/builddir so Meson finds it where we expect,
@@ -1297,16 +1380,16 @@ find /tmp/builddir -maxdepth 2 -type f \( -name "*.a" -o -name "*.so" -o -name "
 ls -la /workspace/out/%s/ 2>/dev/null || echo "  (no artifacts found)"
 
 echo "  Build complete!"
-`, strings.Join(setupArgs[2:], " "), target.Name, target.Name, target.Name, target.Name, target.Name)
+`, envExports, strings.Join(setupArgs[2:], " "), target.Name, target.Name, target.Name, target.Name, target.Name)
 
 	// Run Docker container
 	fmt.Printf("  %s Running Meson build in Docker container...%s\n", Cyan, Reset)
 
-	// platform := target.Platform
 	dockerArgs := []string{"run", "--rm"}
-	// if platform != "" {
-	// 	dockerArgs = append(dockerArgs, "--platform", platform)
-	// }
+	// Add platform flag if specified (prevents warning on cross-platform runs)
+	if target.Docker != nil && target.Docker.Platform != "" {
+		dockerArgs = append(dockerArgs, "--platform", target.Docker.Platform)
+	}
 
 	// Mounts
 	dockerArgs = append(dockerArgs,
@@ -1315,7 +1398,7 @@ echo "  Build complete!"
 		"-v", absSubprojectsDir+":/workspace/subprojects", // Subprojects read-write for downloading wraps
 		"-v", absOutputDir+":/workspace/out", // Output dir
 		"-w", "/workspace",
-		target.Tag,
+		imageName,
 		"bash", "-c", buildScript)
 
 	cmd := exec.Command("docker", dockerArgs...)
@@ -1326,5 +1409,154 @@ echo "  Build complete!"
 		return fmt.Errorf("docker meson build failed: %w", err)
 	}
 
+	return nil
+}
+
+// runNativeBuild runs a native CMake build on the host system
+func runNativeBuild(target config.CITarget, projectRoot, outputDir string, buildConfig config.CIBuild) error {
+	// Create target-specific output directory
+	targetOutputDir := filepath.Join(outputDir, target.Name)
+	if err := os.MkdirAll(targetOutputDir, 0755); err != nil {
+		return fmt.Errorf("failed to create target output directory: %w", err)
+	}
+
+	// Create persistent build directory for caching
+	hostBuildDir := filepath.Join(projectRoot, ".cache", "ci", target.Name)
+	if err := os.MkdirAll(hostBuildDir, 0755); err != nil {
+		return fmt.Errorf("failed to create build directory: %w", err)
+	}
+
+	// Get absolute paths
+	absBuildDir, err := filepath.Abs(hostBuildDir)
+	if err != nil {
+		return fmt.Errorf("failed to get absolute path for build directory: %w", err)
+	}
+	absProjectRoot, err := filepath.Abs(projectRoot)
+	if err != nil {
+		return fmt.Errorf("failed to get absolute path for project root: %w", err)
+	}
+	absOutputDir, err := filepath.Abs(targetOutputDir)
+	if err != nil {
+		return fmt.Errorf("failed to get absolute path for output directory: %w", err)
+	}
+
+	// Determine build type (per-target overrides global)
+	buildType := target.BuildType
+	if buildType == "" {
+		buildType = buildConfig.Type
+	}
+	if buildType == "" {
+		buildType = "Release"
+	}
+	optLevel := buildConfig.Optimization
+	if optLevel == "" {
+		optLevel = "2"
+	}
+
+	// Determine CMake and build options (per-target overrides global)
+	cmakeOptions := target.CMakeOptions
+	if len(cmakeOptions) == 0 {
+		cmakeOptions = buildConfig.CMakeArgs
+	}
+	buildOptions := target.BuildOptions
+	if len(buildOptions) == 0 {
+		buildOptions = buildConfig.BuildArgs
+	}
+
+	// Build CMake arguments
+	cmakeArgs := []string{
+		"-GNinja",
+		"-B", absBuildDir,
+		"-S", absProjectRoot,
+		"-DCMAKE_BUILD_TYPE=" + buildType,
+		"-DCMAKE_CXX_FLAGS=-O" + optLevel,
+	}
+
+	// Add custom CMake args (per-target or global)
+	cmakeArgs = append(cmakeArgs, cmakeOptions...)
+
+	// Set environment variables from target config
+	env := os.Environ()
+	for k, v := range target.Env {
+		env = append(env, fmt.Sprintf("%s=%s", k, v))
+	}
+
+	// Check if already configured
+	ninjaFile := filepath.Join(absBuildDir, "build.ninja")
+	if _, err := os.Stat(ninjaFile); os.IsNotExist(err) {
+		fmt.Printf("  %s Configuring CMake (Ninja)...%s\n", Cyan, Reset)
+		cmd := exec.Command("cmake", cmakeArgs...)
+		cmd.Env = env
+		cmd.Stdout = os.Stdout
+		cmd.Stderr = os.Stderr
+		if err := cmd.Run(); err != nil {
+			return fmt.Errorf("cmake configure failed: %w", err)
+		}
+	} else {
+		fmt.Printf("  %s Build directory already configured, skipping setup.%s\n", Green, Reset)
+	}
+
+	// Build
+	fmt.Printf("  %s Building...%s\n", Cyan, Reset)
+	buildArgs := []string{"--build", absBuildDir, "--config", buildType}
+	if buildConfig.Jobs > 0 {
+		buildArgs = append(buildArgs, "--parallel", fmt.Sprintf("%d", buildConfig.Jobs))
+	}
+	buildArgs = append(buildArgs, buildOptions...)
+
+	cmd := exec.Command("cmake", buildArgs...)
+	cmd.Env = env
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("cmake build failed: %w", err)
+	}
+
+	// Copy artifacts
+	fmt.Printf("  %s Copying artifacts...%s\n", Cyan, Reset)
+
+	// Find and copy executables
+	entries, err := os.ReadDir(absBuildDir)
+	if err != nil {
+		return fmt.Errorf("failed to read build directory: %w", err)
+	}
+
+	for _, entry := range entries {
+		if entry.IsDir() {
+			continue
+		}
+		name := entry.Name()
+		// Skip non-artifacts
+		if strings.HasSuffix(name, ".ninja") || strings.HasSuffix(name, ".cmake") ||
+			strings.HasSuffix(name, ".txt") || strings.HasSuffix(name, ".json") ||
+			strings.HasPrefix(name, "CMake") {
+			continue
+		}
+
+		srcPath := filepath.Join(absBuildDir, name)
+		info, err := entry.Info()
+		if err != nil {
+			continue
+		}
+
+		// Check if file is executable or a library
+		isExec := info.Mode()&0111 != 0
+		isLib := strings.HasPrefix(name, "lib") && (strings.HasSuffix(name, ".a") ||
+			strings.HasSuffix(name, ".so") || strings.HasSuffix(name, ".dylib"))
+
+		if isExec || isLib {
+			dstPath := filepath.Join(absOutputDir, name)
+			input, err := os.ReadFile(srcPath)
+			if err != nil {
+				continue
+			}
+			if err := os.WriteFile(dstPath, input, info.Mode()); err != nil {
+				continue
+			}
+			fmt.Printf("    Copied: %s\n", name)
+		}
+	}
+
+	fmt.Printf("  %s Build complete!%s\n", Green, Reset)
 	return nil
 }

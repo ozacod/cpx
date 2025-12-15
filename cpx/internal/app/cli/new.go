@@ -376,10 +376,10 @@ func createProjectFromTUI(config tui.ProjectConfig, vcpkgClient *vcpkg.Client) e
 		}
 	}
 
-	// Generate cpx.ci file
+	// Generate cpx-ci.yaml file
 	cpxCI := templates.GenerateCpxCI()
-	if err := os.WriteFile(filepath.Join(projectName, "cpx.ci"), []byte(cpxCI), 0644); err != nil {
-		return fmt.Errorf("failed to write cpx.ci: %w", err)
+	if err := os.WriteFile(filepath.Join(projectName, "cpx-ci.yaml"), []byte(cpxCI), 0644); err != nil {
+		return fmt.Errorf("failed to write cpx-ci.yaml: %w", err)
 	}
 
 	// Setup vcpkg if enabled (skip for bazel)

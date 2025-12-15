@@ -115,6 +115,7 @@ Google's multi-language build system. `cpx` manages `MODULE.bazel` (Bzlmod).
 | `add <pkg>` | Add a dependency (supports vcpkg, WrapDB, Bazel) |
 | `remove <pkg>` | Remove a dependency |
 | `build` | Compile project (`--release`, `--asan`, `--tsan`, `--msan`, `--ubsan`) |
+| `build all` | Build all CI targets using Docker (from cpx-ci.yaml) |
 | `run` | Build and run executable (`--asan`, `--tsan`, `--msan`, `--ubsan`) |
 | `test` | Run tests (`--filter`) |
 | `bench` | Run benchmarks |
@@ -132,19 +133,15 @@ Google's multi-language build system. `cpx` manages `MODULE.bazel` (Bzlmod).
 | `workflow` | Generate CI/CD workflow files |
 | `upgrade` | Self-update to the latest version |
 
-### CI Commands (`cpx ci`)
-Cross-compile for multiple targets using Docker. Requires `cpx.ci` configuration file.
+### Target Management
+
+Manage cross-compilation targets (Docker-based builds). Requires `cpx-ci.yaml` configuration file.
 
 | Command | Description |
 |---------|-------------|
-| `ci build` | Build for all targets using Docker |
-| `ci build --target <name>` | Build specific target only |
-| `ci run --target <name>` | Build and run a specific target |
-| `ci add-target [targets...]` | Add build target(s) to cpx.ci |
-| `ci add-target` | Interactive target manager (add/remove) |
-| `ci rm-target [targets...]` | Remove build target(s) from cpx.ci |
-| `ci rm-target list` | Interactive target removal from cpx.ci |
-| `ci register <Dockerfile.name>` | Register a custom Dockerfile target |
+| `add-target` | Interactive wizard to add a new build target |
+| `rm-target [targets...]` | Remove build target(s) from cpx-ci.yaml |
+| `rm-target list` | Interactive target removal from cpx-ci.yaml |
 
 ### Config Commands (`cpx config`)
 

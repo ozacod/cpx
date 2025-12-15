@@ -23,8 +23,8 @@ func RunTests(verbose bool, filter string, vcpkgClient *vcpkg.Client) error {
 	fmt.Printf("%s Running tests for '%s'...%s\n", "\033[36m", projectName, "\033[0m")
 
 	// Default to debug for tests if no config specified
-	// Use .cache/native/debug for building tests
-	buildDir := filepath.Join(".cache", "native", "debug")
+	// Use .cache/native/test for building tests (separate from normal builds)
+	buildDir := filepath.Join(".cache", "native", "test")
 
 	// Check if configure is needed
 	needsConfigure := false
@@ -43,7 +43,7 @@ func RunTests(verbose bool, filter string, vcpkgClient *vcpkg.Client) error {
 	if needsConfigure {
 		currentStep++
 		if verbose {
-			fmt.Printf("%s  Configuring CMake...%s\n", "\033[36m", "\033[0m")
+			fmt.Printf("%s  Configuring CMake (with testing enabled)...%s\n", "\033[36m", "\033[0m")
 		} else {
 			fmt.Printf("\r\033[2K%s[%d/%d]%s Configuring...", colorCyan, currentStep, totalSteps, colorReset)
 		}
@@ -53,10 +53,13 @@ func RunTests(verbose bool, filter string, vcpkgClient *vcpkg.Client) error {
 		vcpkgInstalledDir := filepath.Join(cwd, ".cache", "native", "vcpkg_installed")
 		vcpkgInstallArg := "-DVCPKG_INSTALLED_DIR=" + vcpkgInstalledDir
 
+		// Enable testing
+		enableTestingArg := "-DENABLE_TESTING=ON"
+
 		// Check if CMakePresets.json exists, use preset if available
 		if _, err := os.Stat("CMakePresets.json"); err == nil {
 			// Use "default" preset (VCPKG_ROOT is now set from config)
-			cmd := exec.Command("cmake", "--preset=default", "-B", buildDir, vcpkgInstallArg)
+			cmd := exec.Command("cmake", "--preset=default", "-B", buildDir, vcpkgInstallArg, enableTestingArg)
 			cmd.Env = os.Environ()
 			if err := runCMakeConfigure(cmd, verbose); err != nil {
 				fmt.Println()
@@ -64,7 +67,7 @@ func RunTests(verbose bool, filter string, vcpkgClient *vcpkg.Client) error {
 			}
 		} else {
 			// Fallback to traditional cmake configure
-			cmd := exec.Command("cmake", "-B", buildDir, vcpkgInstallArg)
+			cmd := exec.Command("cmake", "-B", buildDir, vcpkgInstallArg, enableTestingArg)
 			if err := runCMakeConfigure(cmd, verbose); err != nil {
 				fmt.Println()
 				return fmt.Errorf("cmake configure failed: %w", err)
