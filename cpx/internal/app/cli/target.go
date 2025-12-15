@@ -59,14 +59,14 @@ func runAddTargetCmd(_ *cobra.Command, args []string) error {
 		}
 	}
 
-	// Get existing target names
-	existingTargets := make(map[string]bool)
+	// Get existing target names as a slice
+	var existingTargetNames []string
 	for _, t := range ciConfig.Targets {
-		existingTargets[t.Name] = true
+		existingTargetNames = append(existingTargetNames, t.Name)
 	}
 
-	// Run interactive TUI
-	targetConfig, err := tui.RunAddTargetTUI()
+	// Run interactive TUI (pass existing targets for validation)
+	targetConfig, err := tui.RunAddTargetTUI(existingTargetNames)
 	if err != nil {
 		return fmt.Errorf("TUI error: %w", err)
 	}
@@ -74,11 +74,6 @@ func runAddTargetCmd(_ *cobra.Command, args []string) error {
 	if targetConfig == nil {
 		// User cancelled
 		return nil
-	}
-
-	// Check if target already exists
-	if existingTargets[targetConfig.Name] {
-		return fmt.Errorf("target '%s' already exists in cpx-ci.yaml", targetConfig.Name)
 	}
 
 	// Convert to CITarget and add
