@@ -10,60 +10,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestDeriveTargetConfig(t *testing.T) {
-	tests := []struct {
-		name             string
-		targetName       string
-		expectedName     string
-		expectedRunner   string
-		expectedMode     string
-		expectedImage    string
-		expectedPlatform string
-	}{
-		{
-			name:             "Linux AMD64",
-			targetName:       "linux-amd64",
-			expectedName:     "linux-amd64",
-			expectedRunner:   "docker",
-			expectedMode:     "build",
-			expectedImage:    "cpx-linux-amd64",
-			expectedPlatform: "linux/amd64",
-		},
-		{
-			name:             "Linux ARM64",
-			targetName:       "linux-arm64",
-			expectedName:     "linux-arm64",
-			expectedRunner:   "docker",
-			expectedMode:     "build",
-			expectedImage:    "cpx-linux-arm64",
-			expectedPlatform: "linux/arm64",
-		},
-		{
-			name:             "Linux AMD64 MUSL",
-			targetName:       "linux-amd64-musl",
-			expectedName:     "linux-amd64-musl",
-			expectedRunner:   "docker",
-			expectedMode:     "build",
-			expectedImage:    "cpx-linux-amd64-musl",
-			expectedPlatform: "linux/amd64",
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			result := deriveTargetConfig(tt.targetName)
-			assert.Equal(t, tt.expectedName, result.Name)
-			assert.Equal(t, tt.expectedRunner, result.Runner)
-			require.NotNil(t, result.Docker)
-			assert.Equal(t, tt.expectedMode, result.Docker.Mode)
-			assert.Equal(t, tt.expectedImage, result.Docker.Image)
-			assert.Equal(t, tt.expectedPlatform, result.Docker.Platform)
-			require.NotNil(t, result.Docker.Build)
-			assert.Contains(t, result.Docker.Build.Dockerfile, "Dockerfile."+tt.targetName)
-		})
-	}
-}
-
 func TestSaveCIConfig(t *testing.T) {
 	tmpDir := t.TempDir()
 	ciPath := filepath.Join(tmpDir, "cpx-ci.yaml")
@@ -112,9 +58,6 @@ func TestSaveCIConfig(t *testing.T) {
 	assert.Equal(t, ".bin/ci", loadedConfig.Output)
 }
 
-// TestRunAddTargetWithArgs removed because add-target now uses interactive TUI
-// which cannot be tested without a TTY
-
 func TestRunRemoveTarget(t *testing.T) {
 	// Setup: create temp dir
 	tmpDir := t.TempDir()
@@ -137,7 +80,7 @@ func TestRunRemoveTarget(t *testing.T) {
 	require.NoError(t, config.SaveCI(ciConfig, "cpx-ci.yaml"))
 
 	// Test 1: Remove single target
-	err := runRemoveTarget(nil, []string{"linux-amd64"})
+	err := runRemoveTargetCmd(nil, []string{"linux-amd64"})
 	require.NoError(t, err)
 
 	// Verify
@@ -148,7 +91,7 @@ func TestRunRemoveTarget(t *testing.T) {
 	assert.Equal(t, "windows-amd64", loaded.Targets[1].Name)
 
 	// Test 2: Remove multiple targets
-	err = runRemoveTarget(nil, []string{"linux-arm64", "windows-amd64"})
+	err = runRemoveTargetCmd(nil, []string{"linux-arm64", "windows-amd64"})
 	require.NoError(t, err)
 
 	// Verify
@@ -162,7 +105,7 @@ func TestRunRemoveTarget(t *testing.T) {
 	require.NoError(t, config.SaveCI(ciConfig, "cpx-ci.yaml"))
 
 	// If none match, it should return nil (based on implementation) but print message
-	err = runRemoveTarget(nil, []string{"non-existent"})
+	err = runRemoveTargetCmd(nil, []string{"non-existent"})
 	require.NoError(t, err) // Should not return error, just print "No matching targets"
 
 	loaded, err = config.LoadCI("cpx-ci.yaml")

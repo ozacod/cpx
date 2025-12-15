@@ -239,3 +239,32 @@ func runListRemoveTargetsCmd(_ *cobra.Command, _ []string) error {
 	fmt.Printf("\n%sSaved cpx-ci.yaml with %d target(s)%s\n", Green, len(ciConfig.Targets), Reset)
 	return nil
 }
+
+// describePlatform returns a human-readable platform description
+func describePlatform(name string) string {
+	parts := strings.Split(name, "-")
+	if len(parts) < 2 {
+		return ""
+	}
+	os := parts[0]
+	arch := parts[1]
+
+	osNames := map[string]string{
+		"linux": "Linux",
+	}
+	archNames := map[string]string{
+		"amd64": "x86_64",
+		"arm64": "ARM64",
+	}
+
+	osName := osNames[os]
+	if osName == "" {
+		osName = os
+	}
+	archName := archNames[arch]
+	if archName == "" {
+		archName = arch
+	}
+
+	return osName + " " + archName
+}
