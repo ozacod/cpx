@@ -730,6 +730,6 @@ func TestGenerateClangFormat(t *testing.T) {
 func TestGenerateCpxCI(t *testing.T) {
 	result := GenerateCpxCI()
 
-	assert.Contains(t, result, "targets:")
+	assert.Contains(t, result, "toolchains:")
 	assert.Contains(t, result, "build:")
 }

@@ -64,7 +64,7 @@ func generateGitHubActionsWorkflow() error {
 
 	// Try to load cpx-ci.yaml (optional - will create basic workflow if not found)
 	ciConfigPath := filepath.Join(projectRoot, "cpx-ci.yaml")
-	ciConfig, err := config.LoadCI(ciConfigPath)
+	ciConfig, err := config.LoadToolchains(ciConfigPath)
 	outputDir := "out"
 	if err != nil {
 		fmt.Printf("%s Warning: cpx-ci.yaml not found. Creating basic workflow.%s\n", Yellow, Reset)
@@ -141,7 +141,7 @@ func generateGitLabCI() error {
 
 	// Try to load cpx-ci.yaml (optional - will create basic CI if not found)
 	ciConfigPath := filepath.Join(projectRoot, "cpx-ci.yaml")
-	ciConfig, err := config.LoadCI(ciConfigPath)
+	ciConfig, err := config.LoadToolchains(ciConfigPath)
 	outputDir := "out"
 	if err != nil {
 		fmt.Printf("%s Warning: cpx-ci.yaml not found. Creating basic CI configuration.%s\n", Yellow, Reset)

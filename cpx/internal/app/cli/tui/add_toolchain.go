@@ -13,21 +13,21 @@ import (
 	"github.com/ozacod/cpx/pkg/config"
 )
 
-// CITargetStep represents the current step in the target creation flow
-type CITargetStep int
+// ToolchainStep represents the current step in the target creation flow
+type ToolchainStep int
 
 const (
-	CIStepName CITargetStep = iota
-	CIStepRunner
-	CIStepDockerMode
-	CIStepDockerImage
-	CIStepCheckingImage // New: async checking step
-	CIStepDockerfile    // for build mode
-	CIStepBuildContext  // for build mode
-	CIStepPlatform
-	CIStepBuildType
-	CIStepConfirm
-	CIStepDone
+	ToolchainStepName ToolchainStep = iota
+	ToolchainStepRunner
+	ToolchainStepDockerMode
+	ToolchainStepDockerImage
+	ToolchainStepCheckingImage // New: async checking step
+	ToolchainStepDockerfile    // for build mode
+	ToolchainStepBuildContext  // for build mode
+	ToolchainStepPlatform
+	ToolchainStepBuildType
+	ToolchainStepConfirm
+	ToolchainStepDone
 )
 
 // ImageCheckResult is the result of async image checking
@@ -41,9 +41,9 @@ type ImageCheckProgress struct {
 	Phase string // "pulling", "checking"
 }
 
-// CITargetModel represents the TUI state for adding a CI target
-type CITargetModel struct {
-	step           CITargetStep
+// ToolchainModel represents the TUI state for adding a CI target
+type ToolchainModel struct {
+	step           ToolchainStep
 	textInput      textinput.Model
 	spinner        spinner.Model
 	cursor         int
@@ -77,8 +77,8 @@ type CITargetModel struct {
 	currentQuestion string
 }
 
-// CITargetConfig is the result of the TUI
-type CITargetConfig struct {
+// ToolchainConfig is the result of the TUI
+type ToolchainConfig struct {
 	Name         string
 	Runner       string
 	DockerMode   string
@@ -89,8 +89,8 @@ type CITargetConfig struct {
 	BuildType    string
 }
 
-// NewCITargetModel creates a new model for adding a CI target
-func NewCITargetModel(existingTargets []string) CITargetModel {
+// NewToolchainModel creates a new model for adding a CI target
+func NewToolchainModel(existingTargets []string) ToolchainModel {
 	ti := textinput.New()
 	ti.Placeholder = "linux-amd64"
 	ti.Focus()
@@ -111,8 +111,8 @@ func NewCITargetModel(existingTargets []string) CITargetModel {
 	s.Spinner = spinner.Dot
 	s.Style = spinnerStyle
 
-	return CITargetModel{
-		step:              CIStepName,
+	return ToolchainModel{
+		step:              ToolchainStepName,
 		textInput:         ti,
 		spinner:           s,
 		cursor:            0,
@@ -129,17 +129,17 @@ func NewCITargetModel(existingTargets []string) CITargetModel {
 	}
 }
 
-func (m CITargetModel) Init() tea.Cmd {
+func (m ToolchainModel) Init() tea.Cmd {
 	return tea.Batch(textinput.Blink, m.spinner.Tick)
 }
 
-func (m CITargetModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+func (m ToolchainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
 
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
 		// Don't allow input during checking
-		if m.step == CIStepCheckingImage {
+		if m.step == ToolchainStepCheckingImage {
 			if msg.String() == "ctrl+c" || msg.String() == "esc" {
 				m.quitting = true
 				m.cancelled = true
@@ -178,7 +178,7 @@ func (m CITargetModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.checkingStatus = ""
 			// Proceed to build type selection
 			m.currentQuestion = "Build type?"
-			m.step = CIStepBuildType
+			m.step = ToolchainStepBuildType
 			m.cursor = 0
 		} else {
 			m.errorMsg = msg.Error
@@ -189,7 +189,7 @@ func (m CITargetModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			// Return to image name step to let user try a different image
 			m.currentQuestion = "Docker image name/tag?"
-			m.step = CIStepDockerImage
+			m.step = ToolchainStepDockerImage
 			m.textInput.Reset()
 			if m.dockerMode == "pull" {
 				m.textInput.Placeholder = "ubuntu:22.04"
@@ -222,9 +222,9 @@ func (m CITargetModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, cmd
 }
 
-func (m CITargetModel) isTextInputStep() bool {
-	return m.step == CIStepName || m.step == CIStepDockerImage ||
-		m.step == CIStepDockerfile || m.step == CIStepBuildContext
+func (m ToolchainModel) isTextInputStep() bool {
+	return m.step == ToolchainStepName || m.step == ToolchainStepDockerImage ||
+		m.step == ToolchainStepDockerfile || m.step == ToolchainStepBuildContext
 }
 
 // checkDockerImageExists checks if a Docker image exists locally
@@ -462,12 +462,12 @@ func checkImageAsync(image, dockerMode, platform string) tea.Cmd {
 	return checkImagePullCmd(image, dockerMode, platform)
 }
 
-func (m CITargetModel) handleEnter() (tea.Model, tea.Cmd) {
+func (m ToolchainModel) handleEnter() (tea.Model, tea.Cmd) {
 	// Clear previous warnings
 	m.warnMsg = ""
 
 	switch m.step {
-	case CIStepName:
+	case ToolchainStepName:
 		name := strings.TrimSpace(m.textInput.Value())
 		if name == "" {
 			m.errorMsg = "Target name cannot be empty"
@@ -491,10 +491,10 @@ func (m CITargetModel) handleEnter() (tea.Model, tea.Cmd) {
 		})
 
 		m.currentQuestion = "Which runner should be used?"
-		m.step = CIStepRunner
+		m.step = ToolchainStepRunner
 		m.cursor = 0
 
-	case CIStepRunner:
+	case ToolchainStepRunner:
 		m.runner = m.runnerOptions[m.cursor]
 
 		// For native runner, check if required build tools are available
@@ -519,15 +519,15 @@ func (m CITargetModel) handleEnter() (tea.Model, tea.Cmd) {
 				return m, nil
 			}
 			m.currentQuestion = "Docker mode?"
-			m.step = CIStepDockerMode
+			m.step = ToolchainStepDockerMode
 			m.cursor = 0
 		} else {
 			m.currentQuestion = "Build type?"
-			m.step = CIStepBuildType
+			m.step = ToolchainStepBuildType
 			m.cursor = 0
 		}
 
-	case CIStepDockerMode:
+	case ToolchainStepDockerMode:
 		m.dockerMode = m.dockerModeOptions[m.cursor]
 
 		m.questions = append(m.questions, Question{
@@ -538,14 +538,14 @@ func (m CITargetModel) handleEnter() (tea.Model, tea.Cmd) {
 
 		if m.dockerMode == "build" {
 			m.currentQuestion = "Dockerfile path?"
-			m.step = CIStepDockerfile
+			m.step = ToolchainStepDockerfile
 
 			m.textInput.Reset()
 			m.textInput.Placeholder = "Dockerfile"
 			m.textInput.Focus()
 		} else {
 			m.currentQuestion = "Docker image name/tag?"
-			m.step = CIStepDockerImage
+			m.step = ToolchainStepDockerImage
 
 			m.textInput.Reset()
 			if m.dockerMode == "pull" {
@@ -556,7 +556,7 @@ func (m CITargetModel) handleEnter() (tea.Model, tea.Cmd) {
 			m.textInput.Focus()
 		}
 
-	case CIStepDockerfile:
+	case ToolchainStepDockerfile:
 		dockerfile := strings.TrimSpace(m.textInput.Value())
 		if dockerfile == "" {
 			dockerfile = "Dockerfile"
@@ -577,13 +577,13 @@ func (m CITargetModel) handleEnter() (tea.Model, tea.Cmd) {
 		})
 
 		m.currentQuestion = "Build context directory?"
-		m.step = CIStepBuildContext
+		m.step = ToolchainStepBuildContext
 
 		m.textInput.Reset()
 		m.textInput.Placeholder = "."
 		m.textInput.Focus()
 
-	case CIStepBuildContext:
+	case ToolchainStepBuildContext:
 		context := strings.TrimSpace(m.textInput.Value())
 		if context == "" {
 			context = "."
@@ -609,13 +609,13 @@ func (m CITargetModel) handleEnter() (tea.Model, tea.Cmd) {
 		})
 
 		m.currentQuestion = "Tag for the built image?"
-		m.step = CIStepDockerImage
+		m.step = ToolchainStepDockerImage
 
 		m.textInput.Reset()
 		m.textInput.Placeholder = "cpx-" + m.name
 		m.textInput.Focus()
 
-	case CIStepDockerImage:
+	case ToolchainStepDockerImage:
 		image := strings.TrimSpace(m.textInput.Value())
 		if image == "" {
 			if m.dockerMode == "pull" {
@@ -634,11 +634,11 @@ func (m CITargetModel) handleEnter() (tea.Model, tea.Cmd) {
 			Complete: true,
 		})
 		m.currentQuestion = "Target platform?"
-		m.step = CIStepPlatform
+		m.step = ToolchainStepPlatform
 		m.cursor = 0
 		return m, nil
 
-	case CIStepPlatform:
+	case ToolchainStepPlatform:
 		if m.cursor == len(m.platformOptions)-1 {
 			m.platform = ""
 		} else {
@@ -655,17 +655,17 @@ func (m CITargetModel) handleEnter() (tea.Model, tea.Cmd) {
 		// For build mode, skip image check and go directly to build type
 		if m.dockerMode == "build" {
 			m.currentQuestion = "Build type?"
-			m.step = CIStepBuildType
+			m.step = ToolchainStepBuildType
 			m.cursor = 0
 			return m, nil
 		}
 
 		// For pull/local modes, now check the image with the correct platform
-		m.step = CIStepCheckingImage
+		m.step = ToolchainStepCheckingImage
 		m.checkingStatus = ""
 		return m, tea.Batch(m.spinner.Tick, checkImageAsync(m.image, m.dockerMode, m.platform))
 
-	case CIStepBuildType:
+	case ToolchainStepBuildType:
 		m.buildType = m.buildTypeOptions[m.cursor]
 
 		m.questions = append(m.questions, Question{
@@ -674,44 +674,44 @@ func (m CITargetModel) handleEnter() (tea.Model, tea.Cmd) {
 			Complete: true,
 		})
 
-		m.step = CIStepDone
+		m.step = ToolchainStepDone
 		return m, tea.Quit
 	}
 
 	return m, nil
 }
 
-func (m CITargetModel) getMaxCursor() int {
+func (m ToolchainModel) getMaxCursor() int {
 	switch m.step {
-	case CIStepRunner:
+	case ToolchainStepRunner:
 		return len(m.runnerOptions) - 1
-	case CIStepDockerMode:
+	case ToolchainStepDockerMode:
 		return len(m.dockerModeOptions) - 1
-	case CIStepPlatform:
+	case ToolchainStepPlatform:
 		return len(m.platformOptions) - 1
-	case CIStepBuildType:
+	case ToolchainStepBuildType:
 		return len(m.buildTypeOptions) - 1
 	default:
 		return 0
 	}
 }
 
-func (m CITargetModel) View() string {
+func (m ToolchainModel) View() string {
 	if m.quitting && m.cancelled {
 		return "\n  " + dimStyle.Render("Cancelled.") + "\n\n"
 	}
 
-	if m.step == CIStepDone {
+	if m.step == ToolchainStepDone {
 		return ""
 	}
 
 	var s strings.Builder
 
 	// Header
-	s.WriteString(dimStyle.Render("cpx add-target") + "\n\n")
+	s.WriteString(dimStyle.Render("cpx add-toolchain") + "\n\n")
 
 	// Title
-	s.WriteString(cyanBold.Render("Add CI Target") + "\n\n")
+	s.WriteString(cyanBold.Render("Add Toolchain") + "\n\n")
 
 	// Render completed questions
 	for _, q := range m.questions {
@@ -719,7 +719,7 @@ func (m CITargetModel) View() string {
 	}
 
 	// Show spinner during checking
-	if m.step == CIStepCheckingImage {
+	if m.step == ToolchainStepCheckingImage {
 		if m.checkingStatus == "checking" {
 			s.WriteString("\n" + m.spinner.View() + " " + questionStyle.Render("Checking build tools in image...") + "\n")
 		} else {
@@ -731,13 +731,13 @@ func (m CITargetModel) View() string {
 		s.WriteString(questionMark.Render("?") + " " + questionStyle.Render(m.currentQuestion) + " ")
 
 		switch m.step {
-		case CIStepName:
+		case ToolchainStepName:
 			s.WriteString(cyanBold.Render(m.textInput.View()))
 			if m.errorMsg != "" {
 				s.WriteString("\n  " + errorStyle.Render("✗ "+m.errorMsg))
 			}
 
-		case CIStepRunner:
+		case ToolchainStepRunner:
 			s.WriteString(dimStyle.Render(m.runnerOptions[m.cursor]))
 			s.WriteString("\n")
 			for i, opt := range m.runnerOptions {
@@ -757,7 +757,7 @@ func (m CITargetModel) View() string {
 				s.WriteString("\n  " + errorStyle.Render("✗ "+m.errorMsg))
 			}
 
-		case CIStepDockerMode:
+		case ToolchainStepDockerMode:
 			s.WriteString(dimStyle.Render(m.dockerModeOptions[m.cursor]))
 			s.WriteString("\n")
 			for i, opt := range m.dockerModeOptions {
@@ -777,21 +777,21 @@ func (m CITargetModel) View() string {
 				s.WriteString(fmt.Sprintf("  %s %s%s\n", cursor, opt, desc))
 			}
 
-		case CIStepDockerfile:
+		case ToolchainStepDockerfile:
 			s.WriteString(cyanBold.Render(m.textInput.View()))
 			s.WriteString("\n" + dimStyle.Render("  (e.g., Dockerfile, dockerfiles/Dockerfile.ubuntu)"))
 			if m.errorMsg != "" {
 				s.WriteString("\n  " + errorStyle.Render("✗ "+m.errorMsg))
 			}
 
-		case CIStepBuildContext:
+		case ToolchainStepBuildContext:
 			s.WriteString(cyanBold.Render(m.textInput.View()))
 			s.WriteString("\n" + dimStyle.Render("  (e.g., . for current directory)"))
 			if m.errorMsg != "" {
 				s.WriteString("\n  " + errorStyle.Render("✗ "+m.errorMsg))
 			}
 
-		case CIStepDockerImage:
+		case ToolchainStepDockerImage:
 			s.WriteString(cyanBold.Render(m.textInput.View()))
 			if m.dockerMode == "local" {
 				s.WriteString("\n" + dimStyle.Render("  (must exist locally - use 'docker images' to check)"))
@@ -800,7 +800,7 @@ func (m CITargetModel) View() string {
 				s.WriteString("\n  " + errorStyle.Render("✗ "+m.errorMsg))
 			}
 
-		case CIStepPlatform:
+		case ToolchainStepPlatform:
 			s.WriteString(dimStyle.Render(m.platformOptions[m.cursor]))
 			s.WriteString("\n")
 			for i, opt := range m.platformOptions {
@@ -811,7 +811,7 @@ func (m CITargetModel) View() string {
 				s.WriteString(fmt.Sprintf("  %s %s\n", cursor, opt))
 			}
 
-		case CIStepBuildType:
+		case ToolchainStepBuildType:
 			s.WriteString(dimStyle.Render(m.buildTypeOptions[m.cursor]))
 			s.WriteString("\n")
 			for i, opt := range m.buildTypeOptions {
@@ -831,8 +831,8 @@ func (m CITargetModel) View() string {
 }
 
 // GetConfig returns the target configuration
-func (m CITargetModel) GetConfig() CITargetConfig {
-	return CITargetConfig{
+func (m ToolchainModel) GetConfig() ToolchainConfig {
+	return ToolchainConfig{
 		Name:         m.name,
 		Runner:       m.runner,
 		DockerMode:   m.dockerMode,
@@ -845,13 +845,13 @@ func (m CITargetModel) GetConfig() CITargetConfig {
 }
 
 // IsCancelled returns true if the user cancelled
-func (m CITargetModel) IsCancelled() bool {
+func (m ToolchainModel) IsCancelled() bool {
 	return m.cancelled
 }
 
 // ToCITarget converts the config to a CITarget
-func (c CITargetConfig) ToCITarget() config.CITarget {
-	target := config.CITarget{
+func (c ToolchainConfig) ToCITarget() config.Toolchain {
+	target := config.Toolchain{
 		Name:      c.Name,
 		Runner:    c.Runner,
 		BuildType: c.BuildType,
@@ -875,9 +875,9 @@ func (c CITargetConfig) ToCITarget() config.CITarget {
 	return target
 }
 
-// RunAddTargetTUI runs the interactive TUI for adding a target
-func RunAddTargetTUI(existingTargets []string) (*CITargetConfig, error) {
-	m := NewCITargetModel(existingTargets)
+// RunAddTargetTUI runs the interactive TUI for adding a toolchain
+func RunAddTargetTUI(existingTargets []string) (*ToolchainConfig, error) {
+	m := NewToolchainModel(existingTargets)
 	p := tea.NewProgram(m)
 
 	finalModel, err := p.Run()
@@ -885,7 +885,7 @@ func RunAddTargetTUI(existingTargets []string) (*CITargetConfig, error) {
 		return nil, err
 	}
 
-	model := finalModel.(CITargetModel)
+	model := finalModel.(ToolchainModel)
 	if model.IsCancelled() {
 		return nil, nil
 	}

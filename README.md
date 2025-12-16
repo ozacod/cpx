@@ -37,7 +37,7 @@ Read the full docs at [cpx-dev.vercel.app/docs](https://cpx-dev.vercel.app/docs)
 - **Code Quality**: Built-in support for `clang-format`, `clang-tidy`, `cppcheck`, and `flawfinder`.
   - `cpx analyze` runs a comprehensive static analysis report.
 - **Sanitizers**: Easy flags for ASan, TSan, MSan, UBSan.
-- **CI/CD**: Generate Docker-based CI targets (Linux/Windows/Alpine) with `cpx add-target`.
+- **Cross-Compilation**: Generate Docker-based toolchains (Linux/Windows/Alpine) with `cpx add-toolchain`.
 - **Smart Tool Detection**: Automatically validates environment and warns about missing build tools.
 
 ## Install
@@ -116,8 +116,10 @@ Google's multi-language build system. `cpx` manages `MODULE.bazel` (Bzlmod).
 | `add <pkg>` | Add a dependency (supports vcpkg, WrapDB, Bazel) |
 | `remove <pkg>` | Remove a dependency |
 | `build` | Compile project (`--release`, `--asan`, `--tsan`, `--msan`, `--ubsan`) |
-| `build all` | Build all CI targets using Docker (from cpx-ci.yaml) |
+| `build --toolchain <name>` | Build using a toolchain in Docker (from cpx-ci.yaml) |
+| `build all` | Build all toolchains using Docker (from cpx-ci.yaml) |
 | `run` | Build and run executable (`--asan`, `--tsan`, `--msan`, `--ubsan`) |
+| `run --toolchain <name>` | Build and run in Docker toolchain |
 | `test` | Run tests (`--filter`) |
 | `bench` | Run benchmarks |
 | `fmt` | Format code using `clang-format` |
@@ -134,15 +136,15 @@ Google's multi-language build system. `cpx` manages `MODULE.bazel` (Bzlmod).
 | `workflow` | Generate CI/CD workflow files |
 | `upgrade` | Self-update to the latest version |
 
-### Target Management
+### Cross-Compilation & Toolchains
 
-Manage cross-compilation targets (Docker-based builds). Requires `cpx-ci.yaml` configuration file.
+Manage Docker-based build toolchains defined in `cpx-ci.yaml`.
 
 | Command | Description |
 |---------|-------------|
-| `add-target` | Interactive wizard with validation to add build targets |
-| `rm-target [targets...]` | Remove build target(s) from cpx-ci.yaml |
-| `rm-target list` | Interactive target removal from cpx-ci.yaml |
+| `add-toolchain` | Interactive wizard to add build toolchains |
+| `rm-toolchain [toolchain...]` | Remove toolchain(s) from cpx-ci.yaml |
+| `rm-toolchain list` | Interactive toolchain removal from cpx-ci.yaml |
 
 ### Config Commands (`cpx config`)
 

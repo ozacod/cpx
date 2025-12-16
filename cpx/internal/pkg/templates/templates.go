@@ -518,22 +518,22 @@ IndentCaseLabels: true
 	}
 }
 
-// generateCpxCI generates a cpx-ci.yaml file with empty targets
+// GenerateCpxCI generates a cpx-ci.yaml file with empty toolchains
 func GenerateCpxCI() string {
-	return `# cpx-ci.yaml - Cross-compilation configuration
-# This file defines targets for building your project
+	return `# cpx-ci.yaml - Toolchain configuration
+# This file defines toolchains for building your project
 
-targets:
+toolchains:
   # Example: Pull a pre-built image from registry
-  # - name: "ci-ubuntu"
-  #   active: true                 # Set to false to skip this target (default: true)
+  # - name: "alpine-gcc"
+  #   active: true                 # Set to false to skip this toolchain (default: true)
   #   runner: "docker"
   #   docker:
   #     mode: "pull"              # pull, local, or build
-  #     image: "ubuntu:22.04"
+  #     image: "alpine:latest"
   #     platform: "linux/amd64"
   #     pullPolicy: "ifNotPresent" # always, never, ifNotPresent
-  #   # Per-target build configuration (overrides global defaults)
+  #   # Per-toolchain build configuration (overrides global defaults)
   #   build_type: "Release"       # Debug, Release, RelWithDebInfo, MinSizeRel
   #   cmake_options: []           # Additional CMake arguments
   #   build_options: []           # Additional build arguments (cmake --build args)
@@ -550,7 +550,7 @@ targets:
   #   build_type: "Debug"
 
   # Example: Build from Dockerfile (with content-based caching)
-  # - name: "ci-dockerfile"
+  # - name: "custom-toolchain"
   #   runner: "docker"
   #   docker:
   #     mode: "build"
@@ -575,10 +575,10 @@ targets:
   #     CC: "clang"
   #     CXX: "clang++"
 
-# Global build configuration (used as defaults if not specified per-target)
+# Global build configuration (used as defaults if not specified per-toolchain)
 build:
   # CMake build type (Debug, Release, RelWithDebInfo, MinSizeRel)
-  # Note: Per-target build_type overrides this
+  # Note: Per-toolchain build_type overrides this
   type: Release
 
   # Optimization level (0, 1, 2, 3, s, fast)
@@ -587,10 +587,10 @@ build:
   # Number of parallel jobs (0 = auto)
   jobs: 0
 
-  # Additional CMake arguments (per-target cmake_options overrides this)
+  # Additional CMake arguments (per-toolchain cmake_options overrides this)
   cmake_args: []
 
-  # Additional build arguments (per-target build_options overrides this)
+  # Additional build arguments (per-toolchain build_options overrides this)
   build_args: []
 
 # Output directory for artifacts

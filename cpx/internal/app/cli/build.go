@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -26,7 +27,7 @@ func BuildCmd(client *vcpkg.Client) *cobra.Command {
   cpx build --clean      # Clean rebuild
   cpx build --asan       # Build with AddressSanitizer
   cpx build --tsan       # Build with ThreadSanitizer
-  cpx build all          # Build all CI targets (Docker)`,
+  cpx build all          # Build all toolchains (Docker)`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return runBuild(cmd, args, client)
 		},
@@ -35,7 +36,7 @@ func BuildCmd(client *vcpkg.Client) *cobra.Command {
 	cmd.Flags().BoolP("release", "r", false, "Release build (-O2). Default is debug")
 	cmd.Flags().Bool("debug", false, "Debug build (-O0). Default; kept for compatibility")
 	cmd.Flags().IntP("jobs", "j", 0, "Parallel jobs for build (0 = auto)")
-	cmd.Flags().String("target", "", "Specific target to build")
+	cmd.Flags().String("toolchain", "", "Toolchain to build (from cpx-ci.yaml)")
 	cmd.Flags().BoolP("clean", "c", false, "Clean build directory before building")
 	cmd.Flags().StringP("opt", "O", "", "Override optimization level: 0,1,2,3,s,fast")
 	cmd.Flags().Bool("verbose", false, "Show full build output")
@@ -46,18 +47,18 @@ func BuildCmd(client *vcpkg.Client) *cobra.Command {
 	cmd.Flags().Bool("ubsan", false, "Build with UndefinedBehaviorSanitizer")
 	cmd.Flags().Bool("list", false, "List available build targets")
 
-	// Add 'all' subcommand for building all CI targets
+	// Add 'all' subcommand for building all toolchains
 	allCmd := &cobra.Command{
 		Use:   "all",
-		Short: "Build all CI targets using Docker",
-		Long:  "Build for all targets defined in cpx-ci.yaml using Docker containers.",
+		Short: "Build all toolchains using Docker",
+		Long:  "Build for all toolchains defined in cpx-ci.yaml using Docker containers.",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			target, _ := cmd.Flags().GetString("target")
+			toolchain, _ := cmd.Flags().GetString("toolchain")
 			rebuild, _ := cmd.Flags().GetBool("rebuild")
-			return runCIBuild(target, rebuild, false)
+			return runToolchainBuild(toolchain, rebuild, false)
 		},
 	}
-	allCmd.Flags().String("target", "", "Build only specific target (default: all)")
+	allCmd.Flags().String("toolchain", "", "Build only specific toolchain (default: all)")
 	allCmd.Flags().Bool("rebuild", false, "Rebuild Docker images even if they exist")
 	cmd.AddCommand(allCmd)
 
@@ -67,10 +68,16 @@ func BuildCmd(client *vcpkg.Client) *cobra.Command {
 func runBuild(cmd *cobra.Command, _ []string, client *vcpkg.Client) error {
 	release, _ := cmd.Flags().GetBool("release")
 	jobs, _ := cmd.Flags().GetInt("jobs")
-	target, _ := cmd.Flags().GetString("target")
+	toolchain, _ := cmd.Flags().GetString("toolchain")
 	clean, _ := cmd.Flags().GetBool("clean")
 	optLevel, _ := cmd.Flags().GetString("opt")
 	verbose, _ := cmd.Flags().GetBool("verbose")
+
+	// --toolchain is for CI builds (Docker)
+	// Use `cpx build all --toolchain <name>` for the same behavior
+	if toolchain != "" {
+		return runToolchainBuild(toolchain, false, false)
+	}
 
 	// Parse sanitizer flags
 	asan, _ := cmd.Flags().GetBool("asan")
@@ -113,23 +120,23 @@ func runBuild(cmd *cobra.Command, _ []string, client *vcpkg.Client) error {
 		if list {
 			return listBazelTargets()
 		}
-		return runBazelBuild(release, target, clean, verbose, optLevel, sanitizer)
+		return runBazelBuild(release, "", clean, verbose, optLevel, sanitizer)
 	case ProjectTypeMeson:
 		if list {
 			return listMesonTargets()
 		}
-		return runMesonBuild(release, target, clean, verbose, optLevel, sanitizer)
+		return runMesonBuild(release, "", clean, verbose, optLevel, sanitizer)
 	case ProjectTypeVcpkg:
 		if list {
 			return listCMakeTargets(release, optLevel, client)
 		}
-		return build.BuildProject(release, jobs, target, clean, optLevel, verbose, sanitizer, client)
+		return build.BuildProject(release, jobs, "", clean, optLevel, verbose, sanitizer, client)
 	default:
 		// Fall back to CMake build even without vcpkg.json
 		if list {
 			return listCMakeTargets(release, optLevel, client)
 		}
-		return build.BuildProject(release, jobs, target, clean, optLevel, verbose, sanitizer, client)
+		return build.BuildProject(release, jobs, "", clean, optLevel, verbose, sanitizer, client)
 	}
 }
 
@@ -149,15 +156,35 @@ func listMesonTargets() error {
 	}
 
 	fmt.Printf("%sListing Meson targets...%s\n", Cyan, Reset)
-	// introspection gives JSON, but for CLI output we can use 'meson compile --list-targets' in newer versions
-	// or parse introspect. Let's try compile --list-targets first as it's simpler if available.
-	// If not, we can fall back to introspect.
-	// Note: 'meson compile --list-targets' works with ninja backend.
 
-	cmd := execCommand("meson", "compile", "-C", buildDir, "--list-targets")
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-	return cmd.Run()
+	// Use meson introspect to get targets as JSON, then format nicely
+	cmd := execCommand("meson", "introspect", "--targets", buildDir)
+	output, err := cmd.Output()
+	if err != nil {
+		return fmt.Errorf("failed to introspect meson targets: %w", err)
+	}
+
+	// Parse JSON output and display nicely
+	// Format: [{"name": "target", "type": "executable", ...}, ...]
+	type MesonTarget struct {
+		Name     string   `json:"name"`
+		Type     string   `json:"type"`
+		Filename []string `json:"filename"`
+	}
+
+	var targets []MesonTarget
+	if err := json.Unmarshal(output, &targets); err != nil {
+		// If JSON parsing fails, just print the raw output
+		fmt.Println(string(output))
+		return nil
+	}
+
+	fmt.Printf("Targets in %s:\n", buildDir)
+	for _, t := range targets {
+		fmt.Printf("  %s (%s)\n", t.Name, t.Type)
+	}
+
+	return nil
 }
 
 func listCMakeTargets(release bool, optLevel string, client *vcpkg.Client) error {

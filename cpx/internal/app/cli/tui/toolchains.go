@@ -8,24 +8,24 @@ import (
 	"github.com/charmbracelet/lipgloss"
 )
 
-// Target represents a build target
-type Target struct {
+// ToolchainItem represents a build toolchain for selection
+type ToolchainItem struct {
 	Name     string
 	Platform string // Human-readable platform description
 }
 
-// TargetState represents the current state of the target selection UI
-type TargetState int
+// ToolchainListState represents the current state of the list UI
+type ToolchainListState int
 
 const (
-	TargetStateSelecting TargetState = iota
-	TargetStateDone
+	ToolchainListStateSelecting ToolchainListState = iota
+	ToolchainListStateDone
 )
 
-// TargetModel represents the target selection TUI state
-type TargetModel struct {
-	state    TargetState
-	targets  []Target
+// ToolchainListModel represents the toolchain selection TUI state
+type ToolchainListModel struct {
+	state    ToolchainListState
+	items    []ToolchainItem
 	cursor   int
 	selected map[int]bool
 	quitting bool
@@ -34,32 +34,32 @@ type TargetModel struct {
 	Title    string // Custom title for the selection screen
 }
 
-// TargetResultMsg is returned when selection is complete
-type TargetResultMsg struct {
+// ToolchainListResultMsg is returned when selection is complete
+type ToolchainListResultMsg struct {
 	Selected []string
 }
 
-// NewTargetModel creates a new target selection model
-func NewTargetModel(targets []Target, initialSelection []string, title string) TargetModel {
+// NewToolchainListModel creates a new toolchain selection model
+func NewToolchainListModel(items []ToolchainItem, initialSelection []string, title string) ToolchainListModel {
 	if title == "" {
-		title = "Select Build Targets"
+		title = "Select Toolchains"
 	}
 
 	selected := make(map[int]bool)
-	targetMap := make(map[string]int)
-	for i, t := range targets {
-		targetMap[t.Name] = i
+	itemMap := make(map[string]int)
+	for i, t := range items {
+		itemMap[t.Name] = i
 	}
 
 	for _, name := range initialSelection {
-		if idx, ok := targetMap[name]; ok {
+		if idx, ok := itemMap[name]; ok {
 			selected[idx] = true
 		}
 	}
 
-	return TargetModel{
-		state:    TargetStateSelecting,
-		targets:  targets,
+	return ToolchainListModel{
+		state:    ToolchainListStateSelecting,
+		items:    items,
 		selected: selected,
 		viewSize: 15,
 		Title:    title,
@@ -67,12 +67,12 @@ func NewTargetModel(targets []Target, initialSelection []string, title string) T
 }
 
 // Init initializes the model
-func (m TargetModel) Init() tea.Cmd {
+func (m ToolchainListModel) Init() tea.Cmd {
 	return nil
 }
 
 // Update handles messages and updates the model
-func (m TargetModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+func (m ToolchainListModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
 		switch msg.String() {
@@ -85,7 +85,7 @@ func (m TargetModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if len(m.selected) == 0 {
 				m.selected[m.cursor] = true
 			}
-			m.state = TargetStateDone
+			m.state = ToolchainListStateDone
 			return m, tea.Quit
 
 		case "up", "k":
@@ -97,7 +97,7 @@ func (m TargetModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 
 		case "down", "j":
-			if m.cursor < len(m.targets)-1 {
+			if m.cursor < len(m.items)-1 {
 				m.cursor++
 				if m.cursor >= m.viewport+m.viewSize {
 					m.viewport = m.cursor - m.viewSize + 1
@@ -114,18 +114,18 @@ func (m TargetModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "tab":
 			// Tab to select and move down
 			m.selected[m.cursor] = true
-			if m.cursor < len(m.targets)-1 {
+			if m.cursor < len(m.items)-1 {
 				m.cursor++
 				if m.cursor >= m.viewport+m.viewSize {
 					m.viewport = m.cursor - m.viewSize + 1
 				}
-			} else if m.cursor < len(m.targets)-1 {
+			} else if m.cursor < len(m.items)-1 {
 				m.cursor++
 			}
 
 		case "a":
 			// 'a' to select all
-			for i := range m.targets {
+			for i := range m.items {
 				m.selected[i] = true
 			}
 
@@ -139,7 +139,7 @@ func (m TargetModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 // View renders the UI
-func (m TargetModel) View() string {
+func (m ToolchainListModel) View() string {
 	if m.quitting {
 		return ""
 	}
@@ -149,15 +149,15 @@ func (m TargetModel) View() string {
 	// Header
 	s.WriteString(cyanBold.Render(m.Title) + "\n\n")
 
-	if len(m.targets) == 0 {
-		s.WriteString(dimStyle.Render("No targets available.\n"))
+	if len(m.items) == 0 {
+		s.WriteString(dimStyle.Render("No toolchains available.\n"))
 		return s.String()
 	}
 
 	// Results with viewport
 	end := m.viewport + m.viewSize
-	if end > len(m.targets) {
-		end = len(m.targets)
+	if end > len(m.items) {
+		end = len(m.items)
 	}
 
 	// Show scroll indicator if needed
@@ -166,7 +166,7 @@ func (m TargetModel) View() string {
 	}
 
 	for i := m.viewport; i < end; i++ {
-		target := m.targets[i]
+		item := m.items[i]
 		prefix := "  "
 		style := lipgloss.NewStyle()
 
@@ -181,12 +181,12 @@ func (m TargetModel) View() string {
 			checkbox = greenCheck.Render("[✓]")
 		}
 
-		name := target.Name
+		name := item.Name
 		if len(name) > 20 {
 			name = name[:17] + "..."
 		}
 
-		platform := target.Platform
+		platform := item.Platform
 		if len(platform) > 20 {
 			platform = platform[:17] + "..."
 		}
@@ -199,7 +199,7 @@ func (m TargetModel) View() string {
 	}
 
 	// Show scroll indicator if needed
-	if end < len(m.targets) {
+	if end < len(m.items) {
 		s.WriteString(dimStyle.Render("  ↓ more below\n"))
 	}
 
@@ -217,26 +217,26 @@ func (m TargetModel) View() string {
 	return s.String()
 }
 
-// GetSelected returns the names of selected targets
-func (m TargetModel) GetSelected() []string {
+// GetSelected returns the names of selected toolchains
+func (m ToolchainListModel) GetSelected() []string {
 	var selected []string
 	for i := range m.selected {
-		selected = append(selected, m.targets[i].Name)
+		selected = append(selected, m.items[i].Name)
 	}
 	return selected
 }
 
-// RunTargetSelection runs the target selection TUI and returns selected targets
-func RunTargetSelection(targets []Target, initialSelection []string, title string) ([]string, error) {
-	m := NewTargetModel(targets, initialSelection, title)
+// RunToolchainSelection runs the selection TUI and returns selected names
+func RunToolchainSelection(items []ToolchainItem, initialSelection []string, title string) ([]string, error) {
+	m := NewToolchainListModel(items, initialSelection, title)
 	p := tea.NewProgram(m)
 	finalModel, err := p.Run()
 	if err != nil {
 		return nil, err
 	}
 
-	tm := finalModel.(TargetModel)
-	if tm.quitting && tm.state != TargetStateDone {
+	tm := finalModel.(ToolchainListModel)
+	if tm.quitting && tm.state != ToolchainListStateDone {
 		return nil, nil // User cancelled
 	}
 

@@ -31,7 +31,7 @@ Arguments after -- are passed to the binary.`,
 	}
 
 	cmd.Flags().Bool("release", false, "Build in release mode (-O2). Default is debug")
-	cmd.Flags().String("target", "", "Executable target to run (useful if multiple)")
+	cmd.Flags().String("toolchain", "", "Toolchain to run in Docker (from cpx-ci.yaml)")
 	cmd.Flags().StringP("opt", "O", "", "Override optimization level: 0,1,2,3,s,fast")
 	cmd.Flags().Bool("verbose", false, "Show full build output")
 	// Sanitizer flags
@@ -45,9 +45,14 @@ Arguments after -- are passed to the binary.`,
 
 func runRun(cmd *cobra.Command, args []string, client *vcpkg.Client) error {
 	release, _ := cmd.Flags().GetBool("release")
-	target, _ := cmd.Flags().GetString("target")
+	toolchain, _ := cmd.Flags().GetString("toolchain")
 	optLevel, _ := cmd.Flags().GetString("opt")
 	verbose, _ := cmd.Flags().GetBool("verbose")
+
+	// --toolchain is for CI builds (Docker)
+	if toolchain != "" {
+		return runToolchainBuild(toolchain, false, true) // executeAfterBuild=true
+	}
 
 	// Parse sanitizer flags
 	asan, _ := cmd.Flags().GetBool("asan")
@@ -85,14 +90,14 @@ func runRun(cmd *cobra.Command, args []string, client *vcpkg.Client) error {
 
 	switch projectType {
 	case ProjectTypeBazel:
-		return runBazelRun(release, target, args, verbose, optLevel, sanitizer)
+		return runBazelRun(release, "", args, verbose, optLevel, sanitizer)
 	case ProjectTypeMeson:
-		return runMesonRun(release, target, args, verbose, optLevel, sanitizer)
+		return runMesonRun(release, "", args, verbose, optLevel, sanitizer)
 	case ProjectTypeVcpkg:
-		return build.RunProject(release, target, args, verbose, optLevel, sanitizer, client)
+		return build.RunProject(release, "", args, verbose, optLevel, sanitizer, client)
 	default:
 		// Fall back to CMake run even without vcpkg.json
-		return build.RunProject(release, target, args, verbose, optLevel, sanitizer, client)
+		return build.RunProject(release, "", args, verbose, optLevel, sanitizer, client)
 	}
 }
 

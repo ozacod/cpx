@@ -72,6 +72,28 @@ func RunCppcheck(enable, output string, xml, csv, quiet, force, inlineSuppr bool
 		cppcheckArgs = append(cppcheckArgs, "--std="+std)
 	}
 
+	// Add exclusions for build system directories and external dependencies
+	// to prevent scanning third-party code
+	excludeDirs := []string{
+		"build",       // CMake build dir
+		"builddir",    // Meson build dir
+		"subprojects", // Meson subprojects
+		"external",    // Bazel external
+		".bazel",      // Bazel cache
+		".cache",      // vcpkg cache
+		"bazel-bin",   // Bazel output
+		"bazel-out",   // Bazel output
+		"bazel-testlogs",
+		"out",
+		"bin",
+		".vcpkg",
+	}
+
+	// Exclude any directory starting with "bazel-" (project-specific bazel dirs)
+	for _, dir := range excludeDirs {
+		cppcheckArgs = append(cppcheckArgs, "-i"+dir)
+	}
+
 	// Add target files
 	cppcheckArgs = append(cppcheckArgs, filteredTargets...)
 

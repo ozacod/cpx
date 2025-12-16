@@ -15,7 +15,7 @@ import (
 
 var ciCommandExecuted = false
 
-func runCIBuild(targetName string, rebuild bool, executeAfterBuild bool) error {
+func runToolchainBuild(toolchainName string, rebuild bool, executeAfterBuild bool) error {
 	if ciCommandExecuted {
 		fmt.Printf("%s[DEBUG] CI command already executed in this process (PID: %d), skipping second invocation.%s\n", Yellow, os.Getpid(), Reset)
 		return nil
@@ -23,48 +23,48 @@ func runCIBuild(targetName string, rebuild bool, executeAfterBuild bool) error {
 	ciCommandExecuted = true
 
 	// Load cpx-ci.yaml configuration
-	ciConfig, err := config.LoadCI("cpx-ci.yaml")
+	ciConfig, err := config.LoadToolchains("cpx-ci.yaml")
 	if err != nil {
 		return fmt.Errorf("failed to load cpx-ci.yaml: %w\n  Create cpx-ci.yaml file or run 'cpx build' for local builds", err)
 	}
 
-	// Filter targets if specific target requested
-	targets := ciConfig.Targets
-	if targetName != "" {
+	// Filter toolchains if specific toolchain requested
+	toolchains := ciConfig.Toolchains
+	if toolchainName != "" {
 		found := false
-		for _, t := range ciConfig.Targets {
-			if t.Name == targetName {
-				targets = []config.CITarget{t}
+		for _, t := range ciConfig.Toolchains {
+			if t.Name == toolchainName {
+				toolchains = []config.Toolchain{t}
 				found = true
-				// Warn if explicitly targeting an inactive target
+				// Warn if explicitly targeting an inactive toolchain
 				if !t.IsActive() {
-					fmt.Printf("%sWarning: Target '%s' is marked as inactive%s\n", Yellow, targetName, Reset)
+					fmt.Printf("%sWarning: Toolchain '%s' is marked as inactive%s\n", Yellow, toolchainName, Reset)
 				}
 				break
 			}
 		}
 		if !found {
-			return fmt.Errorf("target '%s' not found in cpx-ci.yaml", targetName)
+			return fmt.Errorf("toolchain '%s' not found in cpx-ci.yaml", toolchainName)
 		}
 	} else {
-		// Filter out inactive targets when building all
-		var activeTargets []config.CITarget
+		// Filter out inactive toolchains when building all
+		var activeToolchains []config.Toolchain
 		var skippedCount int
-		for _, t := range ciConfig.Targets {
+		for _, t := range ciConfig.Toolchains {
 			if t.IsActive() {
-				activeTargets = append(activeTargets, t)
+				activeToolchains = append(activeToolchains, t)
 			} else {
 				skippedCount++
 			}
 		}
 		if skippedCount > 0 {
-			fmt.Printf("%sSkipping %d inactive target(s)%s\n", Yellow, skippedCount, Reset)
+			fmt.Printf("%sSkipping %d inactive toolchain(s)%s\n", Yellow, skippedCount, Reset)
 		}
-		targets = activeTargets
+		toolchains = activeToolchains
 	}
 
-	if len(targets) == 0 {
-		return fmt.Errorf("no active targets defined in cpx-ci.yaml")
+	if len(toolchains) == 0 {
+		return fmt.Errorf("no active toolchains defined in cpx-ci.yaml")
 	}
 
 	// Create output directory
@@ -76,7 +76,7 @@ func runCIBuild(targetName string, rebuild bool, executeAfterBuild bool) error {
 		return fmt.Errorf("failed to create output directory: %w", err)
 	}
 
-	fmt.Printf("%s Building for %d target(s)...%s\n", Cyan, len(targets), Reset)
+	fmt.Printf("%s Building for %d toolchain(s)...%s\n", Cyan, len(toolchains), Reset)
 
 	// Get project root
 	projectRoot, err := findProjectRoot()
@@ -84,58 +84,58 @@ func runCIBuild(targetName string, rebuild bool, executeAfterBuild bool) error {
 		return fmt.Errorf("failed to get project root: %w", err)
 	}
 
-	// Pre-create cache directories for all targets
+	// Pre-create cache directories for all toolchains
 	cacheBaseDir := filepath.Join(projectRoot, ".cache", "ci")
 	if err := os.MkdirAll(cacheBaseDir, 0755); err != nil {
 		return fmt.Errorf("failed to create cache directory: %w", err)
 	}
-	for _, target := range targets {
-		if target.Runner == "docker" && target.Docker != nil {
-			// Docker targets need vcpkg cache
-			targetCacheDir := filepath.Join(cacheBaseDir, target.Name, ".vcpkg_cache")
-			if err := os.MkdirAll(targetCacheDir, 0755); err != nil {
-				return fmt.Errorf("failed to create target cache directory: %w", err)
+	for _, tc := range toolchains {
+		if tc.Runner == "docker" && tc.Docker != nil {
+			// Docker toolchains need vcpkg cache
+			tcCacheDir := filepath.Join(cacheBaseDir, tc.Name, ".vcpkg_cache")
+			if err := os.MkdirAll(tcCacheDir, 0755); err != nil {
+				return fmt.Errorf("failed to create toolchain cache directory: %w", err)
 			}
 		}
 	}
 
-	// Build and run for each target
-	for i, target := range targets {
+	// Build and run for each toolchain
+	for i, tc := range toolchains {
 		if executeAfterBuild {
-			fmt.Printf("\n%s[%d/%d] Building and running target: %s (%s)%s\n", Cyan, i+1, len(targets), target.Name, target.Runner, Reset)
+			fmt.Printf("\n%s[%d/%d] Building and running toolchain: %s (%s)%s\n", Cyan, i+1, len(toolchains), tc.Name, tc.Runner, Reset)
 		} else {
-			fmt.Printf("\n%s[%d/%d] Building target: %s (%s)%s\n", Cyan, i+1, len(targets), target.Name, target.Runner, Reset)
+			fmt.Printf("\n%s[%d/%d] Building toolchain: %s (%s)%s\n", Cyan, i+1, len(toolchains), tc.Name, tc.Runner, Reset)
 		}
 
 		// Dispatch based on runner type
-		if target.Runner == "native" {
+		if tc.Runner == "native" {
 			// Native build
-			if err := runNativeBuild(target, projectRoot, outputDir, ciConfig.Build); err != nil {
-				return fmt.Errorf("failed to build target %s: %w", target.Name, err)
+			if err := runNativeBuild(tc, projectRoot, outputDir, ciConfig.Build); err != nil {
+				return fmt.Errorf("failed to build toolchain %s: %w", tc.Name, err)
 			}
 		} else {
 			// Docker build (default)
 			// Resolve Docker image based on mode
-			imageName, err := resolveDockerImage(target, projectRoot, rebuild)
+			imageName, err := resolveDockerImage(tc, projectRoot, rebuild)
 			if err != nil {
-				return fmt.Errorf("failed to resolve Docker image for %s: %w", target.Name, err)
+				return fmt.Errorf("failed to resolve Docker image for %s: %w", tc.Name, err)
 			}
 
 			// Run build in Docker container
-			if err := runDockerBuildWithImage(target, imageName, projectRoot, outputDir, ciConfig.Build, executeAfterBuild); err != nil {
-				return fmt.Errorf("failed to build target %s: %w", target.Name, err)
+			if err := runDockerBuildWithImage(tc, imageName, projectRoot, outputDir, ciConfig.Build, executeAfterBuild); err != nil {
+				return fmt.Errorf("failed to build toolchain %s: %w", tc.Name, err)
 			}
 		}
 
 		if executeAfterBuild {
-			fmt.Printf("%s Target %s completed%s\n", Green, target.Name, Reset)
+			fmt.Printf("%s Toolchain %s completed%s\n", Green, tc.Name, Reset)
 		} else {
-			fmt.Printf("%s Target %s built successfully%s\n", Green, target.Name, Reset)
+			fmt.Printf("%s Toolchain %s built successfully%s\n", Green, tc.Name, Reset)
 		}
 	}
 
 	if !executeAfterBuild {
-		fmt.Printf("\n%s All targets built successfully!%s\n", Green, Reset)
+		fmt.Printf("\n%s All toolchains built successfully!%s\n", Green, Reset)
 		fmt.Printf("   Artifacts are in: %s\n", outputDir)
 	}
 	return nil
@@ -208,7 +208,7 @@ func hashDockerBuildConfig(dockerfilePath string, args map[string]string) (strin
 
 // resolveDockerImage resolves the Docker image based on target configuration
 // Returns the image name/tag to use for running the container
-func resolveDockerImage(target config.CITarget, projectRoot string, rebuild bool) (string, error) {
+func resolveDockerImage(target config.Toolchain, projectRoot string, rebuild bool) (string, error) {
 	if target.Docker == nil {
 		return "", fmt.Errorf("docker configuration is required for docker runner")
 	}
@@ -226,7 +226,7 @@ func resolveDockerImage(target config.CITarget, projectRoot string, rebuild bool
 }
 
 // handlePullMode handles the "pull" Docker mode
-func handlePullMode(target config.CITarget, rebuild bool) (string, error) {
+func handlePullMode(target config.Toolchain, rebuild bool) (string, error) {
 	imageName := target.Docker.Image
 	pullPolicy := target.Docker.PullPolicy
 
@@ -282,7 +282,7 @@ func handlePullMode(target config.CITarget, rebuild bool) (string, error) {
 }
 
 // handleLocalMode handles the "local" Docker mode
-func handleLocalMode(target config.CITarget) (string, error) {
+func handleLocalMode(target config.Toolchain) (string, error) {
 	imageName := target.Docker.Image
 
 	// Verify image exists locally
@@ -297,7 +297,7 @@ func handleLocalMode(target config.CITarget) (string, error) {
 }
 
 // handleBuildMode handles the "build" Docker mode with content-based hashing
-func handleBuildMode(target config.CITarget, projectRoot string, rebuild bool) (string, error) {
+func handleBuildMode(target config.Toolchain, projectRoot string, rebuild bool) (string, error) {
 	if target.Docker.Build == nil {
 		return "", fmt.Errorf("build configuration is required for mode: build")
 	}
@@ -424,7 +424,7 @@ func detectProjectType(projectRoot string) (bool, error) {
 }
 
 // runDockerBuildWithImage runs a Docker build with the specified image name
-func runDockerBuildWithImage(target config.CITarget, imageName, projectRoot, outputDir string, buildConfig config.CIBuild, executeAfterBuild bool) error {
+func runDockerBuildWithImage(target config.Toolchain, imageName, projectRoot, outputDir string, buildConfig config.ToolchainBuild, executeAfterBuild bool) error {
 	// Create target-specific output directory
 	targetOutputDir := filepath.Join(outputDir, target.Name)
 	if err := os.MkdirAll(targetOutputDir, 0755); err != nil {
@@ -658,12 +658,12 @@ echo ""
 echo " Running %s..."
 # Try to find the main executable - check common locations
 EXEC_PATH=""
-# First, check if there's an executable with the project name in the output directory
-if [ -x "/output/%s/%s" ]; then
-    EXEC_PATH="/output/%s/%s"
-# Check build directory root
-elif [ -x "%s/%s" ]; then
+# First, check build directory root (prioritize build dir over output)
+if [ -x "%s/%s" ]; then
     EXEC_PATH="%s/%s"
+# Check if there's an executable with the project name in the output directory
+elif [ -x "/output/%s/%s" ]; then
+    EXEC_PATH="/output/%s/%s"
 else
     # Search for any ELF executable (excluding tests, benchmarks, and libraries)
     for f in $(find %s -maxdepth 3 -type f -executable ! -name "*_test*" ! -name "*_bench*" ! -name "*.a" ! -name "*.so" ! -name "a.out" ! -path "*/CMakeFiles/*" 2>/dev/null | head -5); do
@@ -682,9 +682,9 @@ if [ -n "$EXEC_PATH" ] && [ -x "$EXEC_PATH" ]; then
     echo " Process exited with code: $EXIT_CODE"
 else
     echo " No executable found to run"
-    echo " Searched for: %s in /output/%s and %s"
+    echo " Searched for: %s in %s and /output/%s"
 fi
-`, projectName, target.Name, projectName, target.Name, projectName, containerBuildDir, projectName, containerBuildDir, projectName, containerBuildDir, projectName, target.Name, containerBuildDir)
+`, projectName, containerBuildDir, projectName, containerBuildDir, projectName, target.Name, projectName, target.Name, projectName, containerBuildDir, projectName, containerBuildDir, target.Name)
 		}
 		return ""
 	}())
@@ -740,7 +740,7 @@ fi
 }
 
 // runDockerBazelBuildWithImage runs a Bazel build inside Docker with specified image
-func runDockerBazelBuildWithImage(target config.CITarget, imageName, projectRoot, outputDir string, buildConfig config.CIBuild) error {
+func runDockerBazelBuildWithImage(target config.Toolchain, imageName, projectRoot, outputDir string, buildConfig config.ToolchainBuild) error {
 	// Get absolute paths
 	absProjectRoot, err := filepath.Abs(projectRoot)
 	if err != nil {
@@ -855,7 +855,7 @@ echo "  Build complete!"
 }
 
 // runDockerMesonBuildWithImage runs a Meson build inside Docker with specified image
-func runDockerMesonBuildWithImage(target config.CITarget, imageName, projectRoot, outputDir string, buildConfig config.CIBuild) error {
+func runDockerMesonBuildWithImage(target config.Toolchain, imageName, projectRoot, outputDir string, buildConfig config.ToolchainBuild) error {
 	// Get absolute paths
 	absProjectRoot, err := filepath.Abs(projectRoot)
 	if err != nil {
@@ -1004,7 +1004,7 @@ echo "  Build complete!"
 }
 
 // runNativeBuild runs a native CMake build on the host system
-func runNativeBuild(target config.CITarget, projectRoot, outputDir string, buildConfig config.CIBuild) error {
+func runNativeBuild(target config.Toolchain, projectRoot, outputDir string, buildConfig config.ToolchainBuild) error {
 	// Detect project type and check for missing build tools
 	projectType := DetectProjectType()
 	missing := WarnMissingBuildTools(projectType)

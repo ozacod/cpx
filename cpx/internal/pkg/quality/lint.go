@@ -23,72 +23,114 @@ func LintCode(fix bool, vcpkg VcpkgSetup) error {
 
 	fmt.Printf("%s Running static analysis...%s\n", Cyan, Reset)
 
-	// Set up vcpkg environment
-	if err := vcpkg.SetupEnv(); err != nil {
-		return fmt.Errorf("failed to setup vcpkg: %w", err)
-	}
+	// Detect project type and find compile_commands.json
+	var compileDb string
+	var buildDir string
 
-	// Check for compile_commands.json and regenerate if needed
-	// Use .cache/native/debug for consistency with build command
-	buildDir := filepath.Join(".cache", "native", "debug")
-	compileDb := filepath.Join(buildDir, "compile_commands.json")
-	needsRegenerate := false
+	// Check for Meson project
+	if _, err := os.Stat("meson.build"); err == nil {
+		buildDir = "builddir"
+		compileDb = filepath.Join(buildDir, "compile_commands.json")
 
-	if _, err := os.Stat(compileDb); os.IsNotExist(err) {
-		needsRegenerate = true
-		fmt.Printf("%s  Generating compile_commands.json...%s\n", Cyan, Reset)
+		if _, err := os.Stat(compileDb); os.IsNotExist(err) {
+			// Try to generate compile_commands.json with meson
+			fmt.Printf("%s  Generating compile_commands.json for Meson project...%s\n", Cyan, Reset)
+			if _, err := os.Stat(buildDir); os.IsNotExist(err) {
+				// Need to run meson setup first
+				cmd := exec.Command("meson", "setup", buildDir)
+				cmd.Stdout = os.Stdout
+				cmd.Stderr = os.Stderr
+				if err := cmd.Run(); err != nil {
+					return fmt.Errorf("failed to setup meson project: %w\n  Run 'cpx build' first", err)
+				}
+			}
+		}
+	} else if _, err := os.Stat("MODULE.bazel"); err == nil {
+		// Bazel project - use bazel-compile-commands or hedron
+		buildDir = "."
+		compileDb = "compile_commands.json"
+
+		if _, err := os.Stat(compileDb); os.IsNotExist(err) {
+			// Try to generate using refresh_compile_commands if available
+			fmt.Printf("%s  Generating compile_commands.json for Bazel project...%s\n", Cyan, Reset)
+			// Check if hedron compile-commands is configured
+			cmd := exec.Command("bazel", "run", "@hedron_compile_commands//:refresh_all")
+			if err := cmd.Run(); err != nil {
+				// Hedron not available, print instructions
+				fmt.Printf("%s  Note: To enable clang-tidy for Bazel, add hedron_compile_commands to your project.%s\n", Yellow, Reset)
+				fmt.Printf("  See: https://github.com/hedronvision/bazel-compile-commands-extractor\n")
+				fmt.Printf("%s  Proceeding without compile_commands.json (limited analysis)...%s\n", Yellow, Reset)
+				compileDb = "" // Will skip compile database usage
+			}
+		}
 	} else {
-		// Check if CMakeCache.txt exists - if not, we need to configure
-		if _, err := os.Stat(filepath.Join(buildDir, "CMakeCache.txt")); os.IsNotExist(err) {
+		// CMake/vcpkg project
+		// Set up vcpkg environment
+		if err := vcpkg.SetupEnv(); err != nil {
+			return fmt.Errorf("failed to setup vcpkg: %w", err)
+		}
+
+		// Use .cache/native/debug for consistency with build command
+		buildDir = filepath.Join(".cache", "native", "debug")
+		compileDb = filepath.Join(buildDir, "compile_commands.json")
+		needsRegenerate := false
+
+		if _, err := os.Stat(compileDb); os.IsNotExist(err) {
 			needsRegenerate = true
-			fmt.Printf("%s  Regenerating compile_commands.json (CMake not configured)...%s\n", Cyan, Reset)
-		}
-	}
-
-	if needsRegenerate {
-		// Get vcpkg root for toolchain file
-		vcpkgPath, err := vcpkg.GetPath()
-		if err != nil {
-			return fmt.Errorf("vcpkg not configured: %w", err)
-		}
-		vcpkgRoot := filepath.Dir(vcpkgPath)
-		toolchainFile := filepath.Join(vcpkgRoot, "scripts", "buildsystems", "vcpkg.cmake")
-
-		// Check if toolchain file exists
-		if _, err := os.Stat(toolchainFile); os.IsNotExist(err) {
-			return fmt.Errorf("vcpkg toolchain file not found: %s\n  Make sure vcpkg is properly installed", toolchainFile)
-		}
-
-		// Configure CMake with vcpkg toolchain
-		// Use shared vcpkg_installed directory
-		cwd, _ := os.Getwd()
-		vcpkgInstalledDir := filepath.Join(cwd, ".cache", "native", "vcpkg_installed")
-		vcpkgInstallArg := "-DVCPKG_INSTALLED_DIR=" + vcpkgInstalledDir
-
-		cmakeArgs := []string{
-			"-B", buildDir,
-			"-DCMAKE_EXPORT_COMPILE_COMMANDS=ON",
-			"-DCMAKE_TOOLCHAIN_FILE=" + toolchainFile,
-			vcpkgInstallArg,
-		}
-
-		// Check if CMakePresets.json exists and use it
-		if _, err := os.Stat("CMakePresets.json"); err == nil {
-			// Use preset if available
-			cmakeArgs = []string{
-				"--preset", "default",
-				"-B", buildDir,
-				"-DCMAKE_EXPORT_COMPILE_COMMANDS=ON",
-				vcpkgInstallArg,
+			fmt.Printf("%s  Generating compile_commands.json...%s\n", Cyan, Reset)
+		} else {
+			// Check if CMakeCache.txt exists - if not, we need to configure
+			if _, err := os.Stat(filepath.Join(buildDir, "CMakeCache.txt")); os.IsNotExist(err) {
+				needsRegenerate = true
+				fmt.Printf("%s  Regenerating compile_commands.json (CMake not configured)...%s\n", Cyan, Reset)
 			}
 		}
 
-		cmd := exec.Command("cmake", cmakeArgs...)
-		cmd.Env = os.Environ()
-		cmd.Stdout = os.Stdout
-		cmd.Stderr = os.Stderr
-		if err := cmd.Run(); err != nil {
-			return fmt.Errorf("failed to generate compile_commands.json: %w\n  Try running 'cpx build' first to configure the project", err)
+		if needsRegenerate {
+			// Get vcpkg root for toolchain file
+			vcpkgPath, err := vcpkg.GetPath()
+			if err != nil {
+				return fmt.Errorf("vcpkg not configured: %w", err)
+			}
+			vcpkgRoot := filepath.Dir(vcpkgPath)
+			toolchainFile := filepath.Join(vcpkgRoot, "scripts", "buildsystems", "vcpkg.cmake")
+
+			// Check if toolchain file exists
+			if _, err := os.Stat(toolchainFile); os.IsNotExist(err) {
+				return fmt.Errorf("vcpkg toolchain file not found: %s\n  Make sure vcpkg is properly installed", toolchainFile)
+			}
+
+			// Configure CMake with vcpkg toolchain
+			// Use shared vcpkg_installed directory
+			cwd, _ := os.Getwd()
+			vcpkgInstalledDir := filepath.Join(cwd, ".cache", "native", "vcpkg_installed")
+			vcpkgInstallArg := "-DVCPKG_INSTALLED_DIR=" + vcpkgInstalledDir
+
+			cmakeArgs := []string{
+				"-B", buildDir,
+				"-DCMAKE_EXPORT_COMPILE_COMMANDS=ON",
+				"-DCMAKE_TOOLCHAIN_FILE=" + toolchainFile,
+				vcpkgInstallArg,
+			}
+
+			// Check if CMakePresets.json exists and use it
+			if _, err := os.Stat("CMakePresets.json"); err == nil {
+				// Use preset if available
+				cmakeArgs = []string{
+					"--preset", "default",
+					"-B", buildDir,
+					"-DCMAKE_EXPORT_COMPILE_COMMANDS=ON",
+					vcpkgInstallArg,
+				}
+			}
+
+			cmd := exec.Command("cmake", cmakeArgs...)
+			cmd.Env = os.Environ()
+			cmd.Stdout = os.Stdout
+			cmd.Stderr = os.Stderr
+			if err := cmd.Run(); err != nil {
+				return fmt.Errorf("failed to generate compile_commands.json: %w\n  Try running 'cpx build' first to configure the project", err)
+			}
 		}
 	}
 
@@ -106,8 +148,22 @@ func LintCode(fix bool, vcpkg VcpkgSetup) error {
 				if err != nil || info.IsDir() {
 					return nil
 				}
-				// Skip build directories and other common ignored paths
-				if strings.Contains(path, "/build/") || strings.Contains(path, "\\build\\") || strings.Contains(path, "/.cache/") {
+				// Skip build directories, cache, and third-party dependencies
+				// Check for common build/cache directory patterns
+				if strings.HasPrefix(path, ".cache") ||
+					strings.HasPrefix(path, ".bin") ||
+					strings.HasPrefix(path, "build") ||
+					strings.HasPrefix(path, "builddir") ||
+					strings.HasPrefix(path, "subprojects") ||
+					strings.HasPrefix(path, "out") ||
+					strings.HasPrefix(path, ".bazel") ||
+					strings.HasPrefix(path, "bazel-") ||
+					strings.Contains(path, "/build/") ||
+					strings.Contains(path, "\\build\\") ||
+					strings.Contains(path, "/.cache/") ||
+					strings.Contains(path, "\\.cache\\") ||
+					strings.Contains(path, "_deps/") ||
+					strings.Contains(path, "CMakeFiles/") {
 					return nil
 				}
 				ext := filepath.Ext(path)
@@ -120,12 +176,16 @@ func LintCode(fix bool, vcpkg VcpkgSetup) error {
 	} else {
 		// Filter out files in build directories and other common ignored paths
 		for _, file := range trackedFiles {
-			// Skip files in build/, out/, bin/, .vcpkg/, etc.
+			// Skip files in build/, out/, bin/, .vcpkg/, builddir/, subprojects/, etc.
 			if strings.HasPrefix(file, "build/") ||
+				strings.HasPrefix(file, "builddir/") ||
+				strings.HasPrefix(file, "subprojects/") ||
 				strings.HasPrefix(file, "out/") ||
 				strings.HasPrefix(file, "bin/") ||
 				strings.HasPrefix(file, ".vcpkg/") ||
 				strings.HasPrefix(file, ".cache/") ||
+				strings.HasPrefix(file, ".bazel/") ||
+				strings.HasPrefix(file, "bazel-") ||
 				strings.Contains(file, "/build/") ||
 				strings.Contains(file, "\\build\\") {
 				continue
@@ -139,21 +199,26 @@ func LintCode(fix bool, vcpkg VcpkgSetup) error {
 		return nil
 	}
 
-	// Verify compile_commands.json exists
-	if _, err := os.Stat(compileDb); os.IsNotExist(err) {
-		return fmt.Errorf("compile_commands.json not found at %s\n  Run 'cpx build' first to generate it", compileDb)
+	// Build clang-tidy args
+	var tidyArgs []string
+
+	// If we have a compile database, use it
+	if compileDb != "" {
+		if _, err := os.Stat(compileDb); os.IsNotExist(err) {
+			return fmt.Errorf("compile_commands.json not found at %s\n  Run 'cpx build' first to generate it", compileDb)
+		}
+		absBuildDir, _ := filepath.Abs(buildDir)
+		tidyArgs = append(tidyArgs, "-p", absBuildDir)
+	}
+
+	if fix {
+		tidyArgs = append(tidyArgs, "-fix")
 	}
 
 	// Get system include paths from the compiler to help clang-tidy find standard headers
 	// This is needed because compile_commands.json might not have all system includes
 	systemIncludes := GetSystemIncludePaths()
 
-	// Run clang-tidy with absolute path to build directory
-	absBuildDir, _ := filepath.Abs(buildDir)
-	tidyArgs := []string{"-p", absBuildDir}
-	if fix {
-		tidyArgs = append(tidyArgs, "-fix")
-	}
 	// Add system include paths as extra arguments
 	for _, include := range systemIncludes {
 		tidyArgs = append(tidyArgs, "--extra-arg=-isystem"+include)

@@ -52,6 +52,7 @@ setup_env.sh
 .sql
 .db
 cpx/cpx-bin
+cpx/cpx_tool
 
 # Build artifacts (CI cache)
 build-*
@@ -63,3 +64,5 @@ subprojects/*
 scripts/*.gif
 content/
 aim.md
+
+cpx/test_all_commands.sh

@@ -114,12 +114,36 @@ func updateSummary(analysis *ComprehensiveAnalysis, toolResults ToolResults) {
 func discoverSourceDirectories(targets []string) []string {
 	var dirs []string
 
+	// Directories to skip (build outputs, external dependencies)
+	skipDirs := map[string]bool{
+		"build":          true,
+		"builddir":       true,
+		"subprojects":    true,
+		"external":       true,
+		".bazel":         true,
+		".cache":         true,
+		"bazel-bin":      true,
+		"bazel-out":      true,
+		"bazel-testlogs": true,
+		"out":            true,
+		"bin":            true,
+		".vcpkg":         true,
+	}
+
 	// Common source directory names
 	commonDirs := []string{"src", "examples", "include", "lib", "libs", "source", "sources", "test", "tests"}
 
 	// If specific targets are provided and they're directories, use them
 	if len(targets) > 0 && targets[0] != "." {
 		for _, target := range targets {
+			// Skip directories in the exclude list
+			if skipDirs[target] {
+				continue
+			}
+			// Skip bazel-* directories
+			if strings.HasPrefix(target, "bazel-") {
+				continue
+			}
 			if info, err := os.Stat(target); err == nil && info.IsDir() {
 				// Check if directory contains C/C++ files (respecting .gitignore)
 				if hasCppFiles(target) {
@@ -231,6 +255,27 @@ func runCppcheckAnalysis(targets []string) ToolResults {
 	// Using --xml with --output-file writes XML directly to the file
 	// Pass directories to scan (cppcheck will scan all non-ignored files in those directories)
 	args := []string{"--enable=all", "--xml", "--xml-version=2", "--output-file=" + tmpXML.Name()}
+
+	// Add exclusions for build system directories and external dependencies
+	// to prevent scanning third-party code
+	excludeDirs := []string{
+		"build",       // CMake build dir
+		"builddir",    // Meson build dir
+		"subprojects", // Meson subprojects
+		"external",    // Bazel external
+		".bazel",      // Bazel cache
+		".cache",      // vcpkg cache
+		"bazel-bin",   // Bazel output
+		"bazel-out",   // Bazel output
+		"bazel-testlogs",
+		"out",
+		"bin",
+		".vcpkg",
+	}
+	for _, dir := range excludeDirs {
+		args = append(args, "-i"+dir)
+	}
+
 	args = append(args, sourceDirs...)
 
 	// Run cppcheck - XML will be written directly to the file

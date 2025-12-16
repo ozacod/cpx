@@ -55,9 +55,9 @@ func main() {
 	rootCmd.AddCommand(cli.HooksCmd())
 	rootCmd.AddCommand(cli.UpdateCmd())
 
-	// CI target management (promoted from 'cpx ci' subcommands)
-	rootCmd.AddCommand(cli.AddTargetCmd())
-	rootCmd.AddCommand(cli.RmTargetCmd())
+	// Toolchain management
+	rootCmd.AddCommand(cli.AddToolchainCmd())
+	rootCmd.AddCommand(cli.RmToolchainCmd())
 
 	// Handle vcpkg passthrough for specific commands only
 	// Only forward: install, remove, add-port
