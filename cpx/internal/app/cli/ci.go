@@ -10,12 +10,13 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/ozacod/cpx/internal/pkg/build"
 	"github.com/ozacod/cpx/pkg/config"
 )
 
 var ciCommandExecuted = false
 
-func runToolchainBuild(toolchainName string, rebuild bool, executeAfterBuild bool) error {
+func runToolchainBuild(toolchainName string, rebuild bool, executeAfterBuild bool, runTests bool, runBenchmarks bool) error {
 	if ciCommandExecuted {
 		fmt.Printf("%s[DEBUG] CI command already executed in this process (PID: %d), skipping second invocation.%s\n", Yellow, os.Getpid(), Reset)
 		return nil
@@ -110,7 +111,7 @@ func runToolchainBuild(toolchainName string, rebuild bool, executeAfterBuild boo
 		// Dispatch based on runner type
 		if tc.Runner == "native" {
 			// Native build
-			if err := runNativeBuild(tc, projectRoot, outputDir, ciConfig.Build); err != nil {
+			if err := runNativeBuild(tc, projectRoot, outputDir, ciConfig.Build, runTests, runBenchmarks); err != nil {
 				return fmt.Errorf("failed to build toolchain %s: %w", tc.Name, err)
 			}
 		} else {
@@ -122,7 +123,7 @@ func runToolchainBuild(toolchainName string, rebuild bool, executeAfterBuild boo
 			}
 
 			// Run build in Docker container
-			if err := runDockerBuildWithImage(tc, imageName, projectRoot, outputDir, ciConfig.Build, executeAfterBuild); err != nil {
+			if err := runDockerBuildWithImage(tc, imageName, projectRoot, outputDir, ciConfig.Build, executeAfterBuild, runTests, runBenchmarks); err != nil {
 				return fmt.Errorf("failed to build toolchain %s: %w", tc.Name, err)
 			}
 		}
@@ -424,7 +425,7 @@ func detectProjectType(projectRoot string) (bool, error) {
 }
 
 // runDockerBuildWithImage runs a Docker build with the specified image name
-func runDockerBuildWithImage(target config.Toolchain, imageName, projectRoot, outputDir string, buildConfig config.ToolchainBuild, executeAfterBuild bool) error {
+func runDockerBuildWithImage(target config.Toolchain, imageName, projectRoot, outputDir string, buildConfig config.ToolchainBuild, executeAfterBuild bool, runTests bool, runBenchmarks bool) error {
 	// Create target-specific output directory
 	targetOutputDir := filepath.Join(outputDir, target.Name)
 	if err := os.MkdirAll(targetOutputDir, 0755); err != nil {
@@ -438,12 +439,12 @@ func runDockerBuildWithImage(target config.Toolchain, imageName, projectRoot, ou
 	}
 
 	if isBazel {
-		return runDockerBazelBuildWithImage(target, imageName, projectRoot, outputDir, buildConfig)
+		return runDockerBazelBuildWithImage(target, imageName, projectRoot, outputDir, buildConfig, runTests, runBenchmarks)
 	}
 
 	// Check if this is a Meson project
 	if _, err := os.Stat(filepath.Join(projectRoot, "meson.build")); err == nil {
-		return runDockerMesonBuildWithImage(target, imageName, projectRoot, outputDir, buildConfig)
+		return runDockerMesonBuildWithImage(target, imageName, projectRoot, outputDir, buildConfig, runTests, runBenchmarks)
 	}
 
 	// Detect project type (executable or library) for CMake projects
@@ -508,6 +509,14 @@ func runDockerBuildWithImage(target config.Toolchain, imageName, projectRoot, ou
 		"-DCMAKE_BUILD_TYPE=" + buildType,
 		"-DCMAKE_TOOLCHAIN_FILE=/opt/vcpkg/scripts/buildsystems/vcpkg.cmake",
 	}
+
+	if runTests {
+		cmakeArgs = append(cmakeArgs, "-DBUILD_TESTING=ON", "-DENABLE_TESTING=ON")
+	}
+
+	if runBenchmarks {
+		cmakeArgs = append(cmakeArgs, "-DENABLE_BENCHMARKS=ON")
+	}
 	// Note: VCPKG_INSTALLED_DIR is set via environment variable in the build script
 	// This is the recommended way to configure vcpkg cache location
 
@@ -530,7 +539,18 @@ func runDockerBuildWithImage(target config.Toolchain, imageName, projectRoot, ou
 
 	// Determine artifact copying based on project type
 	var copyCommand string
-	projectName := filepath.Base(projectRoot)
+	// Try to get exact project name from CMakeLists.txt
+	projectName := build.GetProjectNameFromCMakeLists()
+	if projectName == "" {
+		projectName = filepath.Base(projectRoot)
+	}
+
+	// Add benchmark target if needed
+	if runBenchmarks {
+		// Ensure we build everything plus the benchmark target explicitly
+		// This handles cases where benchmarks are excluded from 'all'
+		buildArgs = append(buildArgs, "--target", "all", projectName+"_bench")
+	}
 
 	if isExe {
 		copyCommand = fmt.Sprintf(`# Copy all executables (main, test, bench) and libraries
@@ -634,23 +654,52 @@ mkdir -p "$VCPKG_INSTALLED_DIR" "$VCPKG_DOWNLOADS" "$VCPKG_BUILDTREES_ROOT" "%s"
 mkdir -p %s
 
 # Check if already configured (incremental build)
-if [ -f "%s/build.ninja" ]; then
-    echo "  Build directory already configured, skipping setup."
-else
-    echo "  Configuring CMake (Ninja)..."
-    cmake %s
-fi
+# Always configure to ensure flags (like -DBUILD_TESTING) are updated
+echo "  Configuring CMake (Ninja)..."
+cmake %s
 
 echo " Building..."
 # Use cmake --build which will re-configure if Build system files changed
 cmake %s
+
+%s
+%s
 
 echo " Copying artifacts..."
 mkdir -p /output/%s
 %s
 echo " Build complete!"
 %s
-`, envExports, vcpkgInstalledPath, vcpkgDownloadsPath, vcpkgBuildtreesPath, binaryCachePath, binaryCachePath, containerBuildDir, containerBuildDir, strings.Join(cmakeArgs, " "), strings.Join(buildArgs, " "), target.Name, copyCommand, func() string {
+`, envExports, vcpkgInstalledPath, vcpkgDownloadsPath, vcpkgBuildtreesPath, binaryCachePath, binaryCachePath, containerBuildDir, strings.Join(cmakeArgs, " "), strings.Join(buildArgs, " "), func() string {
+		if runTests {
+			return fmt.Sprintf(`
+echo " Running tests..."
+cd %s
+ctest --output-on-failure
+cd - > /dev/null
+`, containerBuildDir)
+		}
+		return ""
+	}(), func() string {
+		if runBenchmarks {
+			return fmt.Sprintf(`
+echo " Running benchmarks..."
+# Find and run benchmark executables (convention: ending with _bench)
+cd %s
+found_bench=false
+for bench in $(find . -maxdepth 2 -type f -executable -name "*_bench" 2>/dev/null); do
+    echo "  Running $bench..."
+    $bench
+    found_bench=true
+done
+if [ "$found_bench" = "false" ]; then
+    echo "  No benchmarks found (looking for *_bench executables)"
+fi
+cd - > /dev/null
+`, containerBuildDir)
+		}
+		return ""
+	}(), target.Name, copyCommand, func() string {
 		if executeAfterBuild {
 			projectName := filepath.Base(projectRoot)
 			return fmt.Sprintf(`
@@ -740,7 +789,7 @@ fi
 }
 
 // runDockerBazelBuildWithImage runs a Bazel build inside Docker with specified image
-func runDockerBazelBuildWithImage(target config.Toolchain, imageName, projectRoot, outputDir string, buildConfig config.ToolchainBuild) error {
+func runDockerBazelBuildWithImage(target config.Toolchain, imageName, projectRoot, outputDir string, buildConfig config.ToolchainBuild, runTests bool, runBenchmarks bool) error {
 	// Get absolute paths
 	absProjectRoot, err := filepath.Abs(projectRoot)
 	if err != nil {
@@ -819,7 +868,27 @@ find "$BAZEL_OUTPUT_BASE" -path "*/bin/*" -type f \( -name "lib*.a" -o -name "li
     ! -name "*.pic.a" \
     -exec cp {} /output/%s/ \; 2>/dev/null || true
 echo "  Build complete!"
-`, envExports, bazelConfig, target.Name, target.Name, target.Name)
+%s
+%s
+`, envExports, bazelConfig, func() string {
+		if runTests {
+			return `
+echo "  Running tests..."
+# Run tests with output to stdout
+bazel --output_base="$BAZEL_OUTPUT_BASE" test --config=debug --symlink_prefix=/dev/null --spawn_strategy=local --repository_cache=/bazel-repo-cache --test_output=errors //...
+`
+		}
+		return ""
+	}(), func() string {
+		if runBenchmarks {
+			return `
+echo "  Running benchmarks..."
+# Run benchmarks
+bazel --output_base="$BAZEL_OUTPUT_BASE" run --config=release --symlink_prefix=/dev/null --spawn_strategy=local --repository_cache=/bazel-repo-cache //bench/...
+`
+		}
+		return ""
+	}(), target.Name, target.Name, target.Name)
 
 	// Run Docker container
 	fmt.Printf("  %s Running Bazel build in Docker container...%s\n", Cyan, Reset)
@@ -855,7 +924,7 @@ echo "  Build complete!"
 }
 
 // runDockerMesonBuildWithImage runs a Meson build inside Docker with specified image
-func runDockerMesonBuildWithImage(target config.Toolchain, imageName, projectRoot, outputDir string, buildConfig config.ToolchainBuild) error {
+func runDockerMesonBuildWithImage(target config.Toolchain, imageName, projectRoot, outputDir string, buildConfig config.ToolchainBuild, runTests bool, runBenchmarks bool) error {
 	// Get absolute paths
 	absProjectRoot, err := filepath.Abs(projectRoot)
 	if err != nil {
@@ -971,7 +1040,25 @@ find /tmp/builddir -maxdepth 2 -type f \( -name "*.a" -o -name "*.so" -o -name "
 ls -la /workspace/out/%s/ 2>/dev/null || echo "  (no artifacts found)"
 
 echo "  Build complete!"
-`, envExports, strings.Join(setupArgs[2:], " "), target.Name, target.Name, target.Name, target.Name, target.Name)
+%s
+%s
+`, envExports, strings.Join(setupArgs[2:], " "), func() string {
+		if runTests {
+			return `
+echo "  Running tests..."
+meson test -C /tmp/builddir -v
+`
+		}
+		return ""
+	}(), func() string {
+		if runBenchmarks {
+			return `
+echo "  Running benchmarks..."
+meson test -C /tmp/builddir --benchmark -v
+`
+		}
+		return ""
+	}(), target.Name, target.Name, target.Name, target.Name, target.Name)
 
 	// Run Docker container
 	fmt.Printf("  %s Running Meson build in Docker container...%s\n", Cyan, Reset)
@@ -1004,7 +1091,7 @@ echo "  Build complete!"
 }
 
 // runNativeBuild runs a native CMake build on the host system
-func runNativeBuild(target config.Toolchain, projectRoot, outputDir string, buildConfig config.ToolchainBuild) error {
+func runNativeBuild(target config.Toolchain, projectRoot, outputDir string, buildConfig config.ToolchainBuild, runTests bool, runBenchmarks bool) error {
 	// Detect project type and check for missing build tools
 	projectType := DetectProjectType()
 	missing := WarnMissingBuildTools(projectType)
@@ -1070,6 +1157,14 @@ func runNativeBuild(target config.Toolchain, projectRoot, outputDir string, buil
 		"-DCMAKE_CXX_FLAGS=-O" + optLevel,
 	}
 
+	if runTests {
+		cmakeArgs = append(cmakeArgs, "-DBUILD_TESTING=ON", "-DENABLE_TESTING=ON")
+	}
+
+	if runBenchmarks {
+		cmakeArgs = append(cmakeArgs, "-DENABLE_BENCHMARKS=ON")
+	}
+
 	// Add custom CMake args (per-target or global)
 	cmakeArgs = append(cmakeArgs, cmakeOptions...)
 
@@ -1079,19 +1174,14 @@ func runNativeBuild(target config.Toolchain, projectRoot, outputDir string, buil
 		env = append(env, fmt.Sprintf("%s=%s", k, v))
 	}
 
-	// Check if already configured
-	ninjaFile := filepath.Join(absBuildDir, "build.ninja")
-	if _, err := os.Stat(ninjaFile); os.IsNotExist(err) {
-		fmt.Printf("  %s Configuring CMake (Ninja)...%s\n", Cyan, Reset)
-		cmd := exec.Command("cmake", cmakeArgs...)
-		cmd.Env = env
-		cmd.Stdout = os.Stdout
-		cmd.Stderr = os.Stderr
-		if err := cmd.Run(); err != nil {
-			return fmt.Errorf("cmake configure failed: %w", err)
-		}
-	} else {
-		fmt.Printf("  %s Build directory already configured, skipping setup.%s\n", Green, Reset)
+	// Always configure to ensure flags are updated
+	fmt.Printf("  %s Configuring CMake (Ninja)...%s\n", Cyan, Reset)
+	cmd := exec.Command("cmake", cmakeArgs...)
+	cmd.Env = env
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("cmake configure failed: %w", err)
 	}
 
 	// Build
@@ -1102,7 +1192,16 @@ func runNativeBuild(target config.Toolchain, projectRoot, outputDir string, buil
 	}
 	buildArgs = append(buildArgs, buildOptions...)
 
-	cmd := exec.Command("cmake", buildArgs...)
+	if runBenchmarks {
+		// Try to get exact project name from CMakeLists.txt
+		projectName := build.GetProjectNameFromCMakeLists()
+		if projectName == "" {
+			projectName = filepath.Base(projectRoot)
+		}
+		buildArgs = append(buildArgs, "--target", "all", projectName+"_bench")
+	}
+
+	cmd = exec.Command("cmake", buildArgs...)
 	cmd.Env = env
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
@@ -1156,5 +1255,45 @@ func runNativeBuild(target config.Toolchain, projectRoot, outputDir string, buil
 	}
 
 	fmt.Printf("  %s Build complete!%s\n", Green, Reset)
+
+	if runTests {
+		fmt.Printf("  %s Running tests...%s\n", Cyan, Reset)
+		testCmd := exec.Command("ctest", "--test-dir", absBuildDir, "--output-on-failure")
+		testCmd.Stdout = os.Stdout
+		testCmd.Stderr = os.Stderr
+		if err := testCmd.Run(); err != nil {
+			return fmt.Errorf("tests failed: %w", err)
+		}
+	}
+
+	if runBenchmarks {
+		fmt.Printf("  %s Running benchmarks...%s\n", Cyan, Reset)
+		// Find and run benchmark executables (ending with _bench)
+		entries, err := os.ReadDir(absBuildDir)
+		if err == nil {
+			foundBench := false
+			for _, entry := range entries {
+				if strings.HasSuffix(entry.Name(), "_bench") {
+					info, err := entry.Info()
+					if err == nil && info.Mode()&0111 != 0 {
+						foundBench = true
+						benchPath := filepath.Join(absBuildDir, entry.Name())
+						fmt.Printf("    Running %s...\n", entry.Name())
+						benchCmd := exec.Command(benchPath)
+						benchCmd.Stdout = os.Stdout
+						benchCmd.Stderr = os.Stderr
+						if err := benchCmd.Run(); err != nil {
+							fmt.Printf("    %sBenchmark %s failed: %v%s\n", Yellow, entry.Name(), err, Reset)
+						}
+					}
+				}
+			}
+			if !foundBench {
+				fmt.Printf("    No benchmarks found (looking for *_bench executables)\n")
+			}
+		}
+	}
+
 	return nil
+
 }

@@ -25,6 +25,7 @@ func TestCmd(client *vcpkg.Client) *cobra.Command {
 
 	cmd.Flags().BoolP("verbose", "v", false, "Show verbose test output")
 	cmd.Flags().String("filter", "", "Filter tests by name (ctest regex or bazel target)")
+	cmd.Flags().String("toolchain", "", "Toolchain to run tests in (from cpx-ci.yaml)")
 
 	return cmd
 }
@@ -32,6 +33,16 @@ func TestCmd(client *vcpkg.Client) *cobra.Command {
 func runTest(cmd *cobra.Command, args []string, client *vcpkg.Client) error {
 	verbose, _ := cmd.Flags().GetBool("verbose")
 	filter, _ := cmd.Flags().GetString("filter")
+	toolchain, _ := cmd.Flags().GetString("toolchain")
+
+	// If toolchain is specified, run tests in Docker via CI
+	if toolchain != "" {
+		// Note: Filter is currently not passed to CI tests
+		if filter != "" {
+			fmt.Printf("%sWarning: --filter is currently ignored when running with --toolchain%s\n", Yellow, Reset)
+		}
+		return runToolchainBuild(toolchain, false, false, true, false)
+	}
 
 	// Detect project type
 	projectType := DetectProjectType()

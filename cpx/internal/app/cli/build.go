@@ -55,7 +55,7 @@ func BuildCmd(client *vcpkg.Client) *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			toolchain, _ := cmd.Flags().GetString("toolchain")
 			rebuild, _ := cmd.Flags().GetBool("rebuild")
-			return runToolchainBuild(toolchain, rebuild, false)
+			return runToolchainBuild(toolchain, rebuild, false, false, false)
 		},
 	}
 	allCmd.Flags().String("toolchain", "", "Build only specific toolchain (default: all)")
@@ -76,7 +76,7 @@ func runBuild(cmd *cobra.Command, _ []string, client *vcpkg.Client) error {
 	// --toolchain is for CI builds (Docker)
 	// Use `cpx build all --toolchain <name>` for the same behavior
 	if toolchain != "" {
-		return runToolchainBuild(toolchain, false, false)
+		return runToolchainBuild(toolchain, false, false, true, false)
 	}
 
 	// Parse sanitizer flags

@@ -27,6 +27,7 @@ func BenchCmd(client *vcpkg.Client) *cobra.Command {
 
 	cmd.Flags().BoolP("verbose", "v", false, "Show verbose build output")
 	cmd.Flags().String("target", "", "Specific benchmark target to run (Bazel projects)")
+	cmd.Flags().String("toolchain", "", "Toolchain to run benchmarks in (from cpx-ci.yaml)")
 
 	return cmd
 }
@@ -34,8 +35,18 @@ func BenchCmd(client *vcpkg.Client) *cobra.Command {
 func runBenchCmd(cmd *cobra.Command, args []string, client *vcpkg.Client) error {
 	verbose, _ := cmd.Flags().GetBool("verbose")
 	target, _ := cmd.Flags().GetString("target")
+	toolchain, _ := cmd.Flags().GetString("toolchain")
 
-	// Detect project type
+	// If toolchain is specified, run benchmarks in Docker via CI
+	if toolchain != "" {
+		if target != "" {
+			fmt.Printf("%sWarning: --target is currently ignored when running with --toolchain%s\n", Yellow, Reset)
+		}
+		// We'll update runToolchainBuild to support benchmarks next
+		// Reusing runToolchainBuild with a new parameter for benchmarks
+		// runToolchainBuild(toolchainName, rebuild, executeAfterBuild, runTests, runBenchmarks)
+		return runToolchainBuild(toolchain, false, false, false, true)
+	}
 	projectType := DetectProjectType()
 
 	switch projectType {
