@@ -43,7 +43,13 @@ func runBenchCmd(cmd *cobra.Command, args []string) error {
 		if target != "" {
 			fmt.Printf("%sWarning: --target is currently ignored when running with --toolchain%s\n", colors.Yellow, colors.Reset)
 		}
-		return runToolchainBuild(toolchain, false, false, false, true)
+		return runToolchainBuild(ToolchainBuildOptions{
+			ToolchainName:     toolchain,
+			Rebuild:           false,
+			ExecuteAfterBuild: false,
+			RunTests:          false,
+			RunBenchmarks:     true,
+		})
 	}
 	projectType := DetectProjectType()
 

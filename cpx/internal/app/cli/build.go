@@ -47,15 +47,21 @@ func BuildCmd() *cobra.Command {
 	cmd.Flags().Bool("ubsan", false, "Build with UndefinedBehaviorSanitizer")
 	cmd.Flags().Bool("list", false, "List available build targets")
 
-	// Add 'all' subcommand for building all toolchains
+	//todo: all should be tested
 	allCmd := &cobra.Command{
 		Use:   "all",
 		Short: "Build all toolchains using Docker",
 		Long:  "Build for all toolchains defined in cpx-ci.yaml using Docker containers.",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			toolchain, _ := cmd.Flags().GetString("toolchain")
 			rebuild, _ := cmd.Flags().GetBool("rebuild")
-			return runToolchainBuild(toolchain, rebuild, false, false, false)
+			toolchainName, _ := cmd.Flags().GetString("toolchain")
+			return runToolchainBuild(ToolchainBuildOptions{
+				ToolchainName:     toolchainName,
+				Rebuild:           rebuild,
+				ExecuteAfterBuild: false,
+				RunTests:          false,
+				RunBenchmarks:     false,
+			})
 		},
 	}
 	allCmd.Flags().String("toolchain", "", "Build only specific toolchain (default: all)")
@@ -76,7 +82,13 @@ func runBuild(cmd *cobra.Command, _ []string) error {
 	// --toolchain is for CI builds (Docker)
 	// Use `cpx build all --toolchain <name>` for the same behavior
 	if toolchain != "" {
-		return runToolchainBuild(toolchain, false, false, false, false)
+		return runToolchainBuild(ToolchainBuildOptions{
+			ToolchainName:     toolchain,
+			Rebuild:           false,
+			ExecuteAfterBuild: false,
+			RunTests:          false,
+			RunBenchmarks:     false,
+		})
 	}
 
 	// Parse sanitizer flags

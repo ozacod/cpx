@@ -22,7 +22,15 @@ import (
 
 var ciCommandExecuted = false
 
-func runToolchainBuild(toolchainName string, rebuild bool, executeAfterBuild bool, runTests bool, runBenchmarks bool) error {
+type ToolchainBuildOptions struct {
+	ToolchainName     string
+	Rebuild           bool
+	ExecuteAfterBuild bool
+	RunTests          bool
+	RunBenchmarks     bool
+}
+
+func runToolchainBuild(options ToolchainBuildOptions) error {
 	if ciCommandExecuted {
 		fmt.Printf("%s[DEBUG] CI command already executed in this process (PID: %d), skipping second invocation.%s\n", colors.Yellow, os.Getpid(), colors.Reset)
 		return nil
@@ -37,21 +45,21 @@ func runToolchainBuild(toolchainName string, rebuild bool, executeAfterBuild boo
 
 	// Filter toolchains if specific toolchain requested
 	toolchains := ciConfig.Toolchains
-	if toolchainName != "" {
+	if options.ToolchainName != "" {
 		found := false
 		for _, t := range ciConfig.Toolchains {
-			if t.Name == toolchainName {
+			if t.Name == options.ToolchainName {
 				toolchains = []config.Toolchain{t}
 				found = true
 				// Warn if explicitly targeting an inactive toolchain
 				if !t.IsActive() {
-					fmt.Printf("%sWarning: Toolchain '%s' is marked as inactive%s\n", colors.Yellow, toolchainName, colors.Reset)
+					fmt.Printf("%sWarning: Toolchain '%s' is marked as inactive%s\n", colors.Yellow, options.ToolchainName, colors.Reset)
 				}
 				break
 			}
 		}
 		if !found {
-			return fmt.Errorf("toolchain '%s' not found in cpx-ci.yaml", toolchainName)
+			return fmt.Errorf("toolchain '%s' not found in cpx-ci.yaml", options.ToolchainName)
 		}
 	} else {
 		// Filter out inactive toolchains when building all
@@ -108,7 +116,7 @@ func runToolchainBuild(toolchainName string, rebuild bool, executeAfterBuild boo
 
 	// Build and run for each toolchain
 	for i, tc := range toolchains {
-		if executeAfterBuild {
+		if options.ExecuteAfterBuild {
 			fmt.Printf("\n%s[%d/%d] Building and running toolchain: %s (%s)%s\n", colors.Cyan, i+1, len(toolchains), tc.Name, tc.Runner, colors.Reset)
 		} else {
 			fmt.Printf("\n%s[%d/%d] Building toolchain: %s (%s)%s\n", colors.Cyan, i+1, len(toolchains), tc.Name, tc.Runner, colors.Reset)
@@ -117,13 +125,13 @@ func runToolchainBuild(toolchainName string, rebuild bool, executeAfterBuild boo
 		// Dispatch based on runner type
 		if tc.Runner == "native" {
 			// Native build
-			if err := runNativeBuild(tc, projectRoot, outputDir, ciConfig.Build, runTests, runBenchmarks); err != nil {
+			if err := runNativeBuild(tc, projectRoot, outputDir, ciConfig.Build, options.RunTests, options.RunBenchmarks); err != nil {
 				return fmt.Errorf("failed to build toolchain %s: %w", tc.Name, err)
 			}
 		} else {
 			// Docker build (default)
 			// Resolve Docker image based on mode
-			imageName, err := resolveDockerImage(tc, projectRoot, rebuild)
+			imageName, err := resolveDockerImage(tc, projectRoot, options.Rebuild)
 			if err != nil {
 				return fmt.Errorf("failed to resolve Docker image for %s: %w", tc.Name, err)
 			}
@@ -155,9 +163,9 @@ func runToolchainBuild(toolchainName string, rebuild bool, executeAfterBuild boo
 				MesonArgs:         ciConfig.Build.MesonArgs,
 				Jobs:              ciConfig.Build.Jobs,
 				Env:               tc.Env,
-				ExecuteAfterBuild: executeAfterBuild,
-				RunTests:          runTests,
-				RunBenchmarks:     runBenchmarks,
+				ExecuteAfterBuild: options.ExecuteAfterBuild,
+				RunTests:          options.RunTests,
+				RunBenchmarks:     options.RunBenchmarks,
 				Platform:          platform,
 				TargetName:        tc.Name,
 			}
@@ -179,14 +187,14 @@ func runToolchainBuild(toolchainName string, rebuild bool, executeAfterBuild boo
 			}
 		}
 
-		if executeAfterBuild {
+		if options.ExecuteAfterBuild {
 			fmt.Printf("%s Toolchain %s completed%s\n", colors.Green, tc.Name, colors.Reset)
 		} else {
 			fmt.Printf("%s Toolchain %s built successfully%s\n", colors.Green, tc.Name, colors.Reset)
 		}
 	}
 
-	if !executeAfterBuild {
+	if !options.ExecuteAfterBuild {
 		fmt.Printf("\n%s All toolchains built successfully!%s\n", colors.Green, colors.Reset)
 		fmt.Printf("   Artifacts are in: %s\n", outputDir)
 	}

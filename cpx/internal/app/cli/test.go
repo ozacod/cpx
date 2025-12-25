@@ -43,7 +43,13 @@ func runTest(cmd *cobra.Command, _ []string) error {
 		if filter != "" {
 			fmt.Printf("%sWarning: --filter is currently ignored when running with --toolchain%s\n", colors.Yellow, colors.Reset)
 		}
-		return runToolchainBuild(toolchain, false, false, true, false)
+		return runToolchainBuild(ToolchainBuildOptions{
+			ToolchainName:     toolchain,
+			Rebuild:           false,
+			ExecuteAfterBuild: false,
+			RunTests:          true,
+			RunBenchmarks:     false,
+		})
 	}
 
 	// Detect project type and get builder

@@ -51,7 +51,13 @@ func runRun(cmd *cobra.Command, args []string) error {
 
 	// --toolchain is for CI builds (Docker)
 	if toolchain != "" {
-		return runToolchainBuild(toolchain, false, true, false, false) // executeAfterBuild=true, runTests=false, runBenchmarks=false
+		return runToolchainBuild(ToolchainBuildOptions{
+			ToolchainName:     toolchain,
+			Rebuild:           false,
+			ExecuteAfterBuild: true,
+			RunTests:          false,
+			RunBenchmarks:     false,
+		})
 	}
 
 	// Parse sanitizer flags
