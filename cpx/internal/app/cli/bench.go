@@ -8,7 +8,6 @@ import (
 	build "github.com/ozacod/cpx/internal/pkg/build/interfaces"
 	"github.com/ozacod/cpx/internal/pkg/build/meson"
 	"github.com/ozacod/cpx/internal/pkg/build/vcpkg"
-	"github.com/ozacod/cpx/internal/pkg/utils/colors"
 	"github.com/spf13/cobra"
 )
 
