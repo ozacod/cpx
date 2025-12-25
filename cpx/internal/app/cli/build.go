@@ -40,7 +40,6 @@ func BuildCmd() *cobra.Command {
 	cmd.Flags().BoolP("clean", "c", false, "Clean build directory before building")
 	cmd.Flags().StringP("opt", "O", "", "Override optimization level: 0,1,2,3,s,fast")
 	cmd.Flags().Bool("verbose", false, "Show full build output")
-	// Sanitizer flags
 	cmd.Flags().Bool("asan", false, "Build with AddressSanitizer")
 	cmd.Flags().Bool("tsan", false, "Build with ThreadSanitizer")
 	cmd.Flags().Bool("msan", false, "Build with MemorySanitizer")
@@ -79,8 +78,6 @@ func runBuild(cmd *cobra.Command, _ []string) error {
 	optLevel, _ := cmd.Flags().GetString("opt")
 	verbose, _ := cmd.Flags().GetBool("verbose")
 
-	// --toolchain is for CI builds (Docker)
-	// Use `cpx build all --toolchain <name>` for the same behavior
 	if toolchain != "" {
 		return runToolchainBuild(ToolchainBuildOptions{
 			ToolchainName:     toolchain,
@@ -91,13 +88,11 @@ func runBuild(cmd *cobra.Command, _ []string) error {
 		})
 	}
 
-	// Parse sanitizer flags
 	asan, _ := cmd.Flags().GetBool("asan")
 	tsan, _ := cmd.Flags().GetBool("tsan")
 	msan, _ := cmd.Flags().GetBool("msan")
 	ubsan, _ := cmd.Flags().GetBool("ubsan")
 
-	// Validate only one sanitizer is used
 	sanitizer := ""
 	sanitizerCount := 0
 	if asan {
@@ -122,14 +117,10 @@ func runBuild(cmd *cobra.Command, _ []string) error {
 
 	projectType := DetectProjectType()
 
-	// Check for missing build tools and warn the user
 	WarnMissingBuildTools(projectType)
-
-	// ... sanitizer logic ...
 
 	list, _ := cmd.Flags().GetBool("list")
 
-	// Helper to handle listing targets
 	handleList := func(b build.BuildSystem) error {
 		targets, err := b.ListTargets(context.Background())
 		if err != nil {
@@ -156,15 +147,16 @@ func runBuild(cmd *cobra.Command, _ []string) error {
 		Verbose:   verbose,
 	}
 
-	// Helper to create builder based on type
 	var builder build.BuildSystem
 	switch projectType {
 	case ProjectTypeBazel:
 		builder = bazel.New()
 	case ProjectTypeMeson:
 		builder = meson.New()
-	default:
+	case ProjectTypeVcpkg:
 		builder = vcpkg.New()
+	default:
+		return fmt.Errorf("unsupported project type")
 	}
 
 	if list {

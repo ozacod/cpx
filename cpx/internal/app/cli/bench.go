@@ -38,11 +38,7 @@ func runBenchCmd(cmd *cobra.Command, args []string) error {
 	target, _ := cmd.Flags().GetString("target")
 	toolchain, _ := cmd.Flags().GetString("toolchain")
 
-	// If toolchain is specified, run benchmarks in Docker via CI
 	if toolchain != "" {
-		if target != "" {
-			fmt.Printf("%sWarning: --target is currently ignored when running with --toolchain%s\n", colors.Yellow, colors.Reset)
-		}
 		return runToolchainBuild(ToolchainBuildOptions{
 			ToolchainName:     toolchain,
 			Rebuild:           false,

@@ -38,7 +38,6 @@ func runTest(cmd *cobra.Command, _ []string) error {
 	filter, _ := cmd.Flags().GetString("filter")
 	toolchain, _ := cmd.Flags().GetString("toolchain")
 
-	// If toolchain is specified, run tests in Docker via CI
 	if toolchain != "" {
 		if filter != "" {
 			fmt.Printf("%sWarning: --filter is currently ignored when running with --toolchain%s\n", colors.Yellow, colors.Reset)
@@ -52,7 +51,6 @@ func runTest(cmd *cobra.Command, _ []string) error {
 		})
 	}
 
-	// Detect project type and get builder
 	projectType := DetectProjectType()
 
 	var builder build.BuildSystem

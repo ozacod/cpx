@@ -37,13 +37,11 @@ func runToolchainBuild(options ToolchainBuildOptions) error {
 	}
 	ciCommandExecuted = true
 
-	// Load cpx-ci.yaml configuration
 	ciConfig, err := config.LoadToolchains("cpx-ci.yaml")
 	if err != nil {
 		return fmt.Errorf("failed to load cpx-ci.yaml: %w\n  Create cpx-ci.yaml file or run 'cpx build' for local builds", err)
 	}
 
-	// Filter toolchains if specific toolchain requested
 	toolchains := ciConfig.Toolchains
 	if options.ToolchainName != "" {
 		found := false
@@ -51,7 +49,6 @@ func runToolchainBuild(options ToolchainBuildOptions) error {
 			if t.Name == options.ToolchainName {
 				toolchains = []config.Toolchain{t}
 				found = true
-				// Warn if explicitly targeting an inactive toolchain
 				if !t.IsActive() {
 					fmt.Printf("%sWarning: Toolchain '%s' is marked as inactive%s\n", colors.Yellow, options.ToolchainName, colors.Reset)
 				}
@@ -62,7 +59,6 @@ func runToolchainBuild(options ToolchainBuildOptions) error {
 			return fmt.Errorf("toolchain '%s' not found in cpx-ci.yaml", options.ToolchainName)
 		}
 	} else {
-		// Filter out inactive toolchains when building all
 		var activeToolchains []config.Toolchain
 		var skippedCount int
 		for _, t := range ciConfig.Toolchains {
@@ -82,7 +78,6 @@ func runToolchainBuild(options ToolchainBuildOptions) error {
 		return fmt.Errorf("no active toolchains defined in cpx-ci.yaml")
 	}
 
-	// Create output directory
 	outputDir := ciConfig.Output
 	if outputDir == "" {
 		outputDir = filepath.Join(".bin", "ci")
@@ -93,20 +88,17 @@ func runToolchainBuild(options ToolchainBuildOptions) error {
 
 	fmt.Printf("%s Building for %d toolchain(s)...%s\n", colors.Cyan, len(toolchains), colors.Reset)
 
-	// Get project root
 	projectRoot, err := findProjectRoot()
 	if err != nil {
 		return fmt.Errorf("failed to get project root: %w", err)
 	}
 
-	// Pre-create cache directories for all toolchains
 	cacheBaseDir := filepath.Join(projectRoot, ".cache", "ci")
 	if err := os.MkdirAll(cacheBaseDir, 0755); err != nil {
 		return fmt.Errorf("failed to create cache directory: %w", err)
 	}
 	for _, tc := range toolchains {
 		if tc.Runner == "docker" && tc.Docker != nil {
-			// Docker toolchains need vcpkg cache
 			tcCacheDir := filepath.Join(cacheBaseDir, tc.Name, ".vcpkg_cache")
 			if err := os.MkdirAll(tcCacheDir, 0755); err != nil {
 				return fmt.Errorf("failed to create toolchain cache directory: %w", err)
@@ -114,7 +106,6 @@ func runToolchainBuild(options ToolchainBuildOptions) error {
 		}
 	}
 
-	// Build and run for each toolchain
 	for i, tc := range toolchains {
 		if options.ExecuteAfterBuild {
 			fmt.Printf("\n%s[%d/%d] Building and running toolchain: %s (%s)%s\n", colors.Cyan, i+1, len(toolchains), tc.Name, tc.Runner, colors.Reset)
@@ -122,21 +113,16 @@ func runToolchainBuild(options ToolchainBuildOptions) error {
 			fmt.Printf("\n%s[%d/%d] Building toolchain: %s (%s)%s\n", colors.Cyan, i+1, len(toolchains), tc.Name, tc.Runner, colors.Reset)
 		}
 
-		// Dispatch based on runner type
 		if tc.Runner == "native" {
-			// Native build
 			if err := runNativeBuild(tc, projectRoot, outputDir, ciConfig.Build, options.RunTests, options.RunBenchmarks); err != nil {
 				return fmt.Errorf("failed to build toolchain %s: %w", tc.Name, err)
 			}
 		} else {
-			// Docker build (default)
-			// Resolve Docker image based on mode
 			imageName, err := resolveDockerImage(tc, projectRoot, options.Rebuild)
 			if err != nil {
 				return fmt.Errorf("failed to resolve Docker image for %s: %w", tc.Name, err)
 			}
 
-			// Select appropriate builder based on project type
 			var dockerBuilder build.DockerBuilder
 			if _, err := os.Stat(filepath.Join(projectRoot, "MODULE.bazel")); err == nil {
 				dockerBuilder = bazel.New()
@@ -146,7 +132,6 @@ func runToolchainBuild(options ToolchainBuildOptions) error {
 				dockerBuilder = vcpkg.New()
 			}
 
-			// Build options from config
 			platform := ""
 			if tc.Docker != nil {
 				platform = tc.Docker.Platform
@@ -170,7 +155,6 @@ func runToolchainBuild(options ToolchainBuildOptions) error {
 				TargetName:        tc.Name,
 			}
 
-			// Override with per-target config if specified
 			if len(tc.CMakeOptions) > 0 {
 				opts.CMakeArgs = tc.CMakeOptions
 			}
@@ -181,7 +165,6 @@ func runToolchainBuild(options ToolchainBuildOptions) error {
 				opts.BuildType = tc.BuildType
 			}
 
-			// Run build in Docker container using interface
 			if err := dockerBuilder.RunDockerBuild(context.Background(), opts); err != nil {
 				return fmt.Errorf("failed to build toolchain %s: %w", tc.Name, err)
 			}

@@ -34,7 +34,6 @@ Arguments after -- are passed to the binary.`,
 	cmd.Flags().String("toolchain", "", "Toolchain to run in Docker (from cpx-ci.yaml)")
 	cmd.Flags().StringP("opt", "O", "", "Override optimization level: 0,1,2,3,s,fast")
 	cmd.Flags().Bool("verbose", false, "Show full build output")
-	// Sanitizer flags
 	cmd.Flags().Bool("asan", false, "Run with AddressSanitizer")
 	cmd.Flags().Bool("tsan", false, "Run with ThreadSanitizer")
 	cmd.Flags().Bool("msan", false, "Run with MemorySanitizer")
@@ -49,7 +48,6 @@ func runRun(cmd *cobra.Command, args []string) error {
 	optLevel, _ := cmd.Flags().GetString("opt")
 	verbose, _ := cmd.Flags().GetBool("verbose")
 
-	// --toolchain is for CI builds (Docker)
 	if toolchain != "" {
 		return runToolchainBuild(ToolchainBuildOptions{
 			ToolchainName:     toolchain,
@@ -60,13 +58,11 @@ func runRun(cmd *cobra.Command, args []string) error {
 		})
 	}
 
-	// Parse sanitizer flags
 	asan, _ := cmd.Flags().GetBool("asan")
 	tsan, _ := cmd.Flags().GetBool("tsan")
 	msan, _ := cmd.Flags().GetBool("msan")
 	ubsan, _ := cmd.Flags().GetBool("ubsan")
 
-	// Validate only one sanitizer is used
 	sanitizer := ""
 	sanitizerCount := 0
 	if asan {
@@ -91,7 +87,6 @@ func runRun(cmd *cobra.Command, args []string) error {
 
 	projectType := DetectProjectType()
 
-	// Check for missing build tools and warn the user
 	WarnMissingBuildTools(projectType)
 
 	opts := build.RunOptions{
