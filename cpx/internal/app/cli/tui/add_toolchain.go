@@ -20,6 +20,7 @@ const (
 	ToolchainStepName ToolchainStep = iota
 	ToolchainStepRunner
 	ToolchainStepDockerMode
+	ToolchainStepDockerImageSelect // New: interactive image selection
 	ToolchainStepDockerImage
 	ToolchainStepCheckingImage // New: async checking step
 	ToolchainStepDockerfile    // for build mode
@@ -28,6 +29,24 @@ const (
 	ToolchainStepBuildType
 	ToolchainStepDone
 )
+
+// DockerImage represents a Docker image with its metadata
+type DockerImage struct {
+	Repository   string
+	Tag          string
+	ID           string
+	Size         string
+	Created      string
+	Architecture string
+}
+
+// FullName returns the full image name (repo:tag)
+func (d DockerImage) FullName() string {
+	if d.Tag == "" || d.Tag == "<none>" {
+		return d.Repository
+	}
+	return d.Repository + ":" + d.Tag
+}
 
 // ImageCheckResult is the result of async image checking
 type ImageCheckResult struct {
@@ -70,6 +89,13 @@ type ToolchainModel struct {
 	dockerModeOptions []string
 	platformOptions   []string
 	buildTypeOptions  []string
+
+	// Docker image selection
+	availableImages  []DockerImage
+	filteredImages   []DockerImage
+	imageFilter      string
+	imageScrollStart int
+	maxVisibleImages int
 
 	// Answered questions
 	questions       []Question
@@ -125,6 +151,7 @@ func NewToolchainModel(existingTargets []string) ToolchainModel {
 		dockerMode:        "pull",
 		buildType:         "Release",
 		buildContext:      ".",
+		maxVisibleImages:  8,
 	}
 }
 
@@ -157,16 +184,42 @@ func (m ToolchainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m.handleEnter()
 
 		case "up", "k":
-			if !m.isTextInputStep() && m.cursor > 0 {
+			if m.step == ToolchainStepDockerImageSelect {
+				if m.cursor > 0 {
+					m.cursor--
+					// Scroll up if needed
+					if m.cursor < m.imageScrollStart {
+						m.imageScrollStart = m.cursor
+					}
+				}
+			} else if !m.isTextInputStep() && m.cursor > 0 {
 				m.cursor--
 			}
 
 		case "down", "j":
-			if !m.isTextInputStep() {
+			if m.step == ToolchainStepDockerImageSelect {
+				maxCursor := len(m.filteredImages) - 1
+				if maxCursor < 0 {
+					maxCursor = 0
+				}
+				if m.cursor < maxCursor {
+					m.cursor++
+					// Scroll down if needed
+					if m.cursor >= m.imageScrollStart+m.maxVisibleImages {
+						m.imageScrollStart = m.cursor - m.maxVisibleImages + 1
+					}
+				}
+			} else if !m.isTextInputStep() {
 				maxCursor := m.getMaxCursor()
 				if m.cursor < maxCursor {
 					m.cursor++
 				}
+			}
+
+		case "tab":
+			// Tab to switch between filter input and selection in image select step
+			if m.step == ToolchainStepDockerImageSelect {
+				// Could toggle focus, but for now just keep filtering active
 			}
 		}
 
@@ -216,6 +269,17 @@ func (m ToolchainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	// Update text input if on text input steps
 	if m.isTextInputStep() {
 		m.textInput, cmd = m.textInput.Update(msg)
+
+		// Update image filter when typing in image select step
+		if m.step == ToolchainStepDockerImageSelect {
+			newFilter := m.textInput.Value()
+			if newFilter != m.imageFilter {
+				m.imageFilter = newFilter
+				m.filteredImages = filterImages(m.availableImages, m.imageFilter)
+				m.cursor = 0
+				m.imageScrollStart = 0
+			}
+		}
 	}
 
 	return m, cmd
@@ -223,7 +287,8 @@ func (m ToolchainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 func (m ToolchainModel) isTextInputStep() bool {
 	return m.step == ToolchainStepName || m.step == ToolchainStepDockerImage ||
-		m.step == ToolchainStepDockerfile || m.step == ToolchainStepBuildContext
+		m.step == ToolchainStepDockerfile || m.step == ToolchainStepBuildContext ||
+		m.step == ToolchainStepDockerImageSelect
 }
 
 // checkDockerImageExists checks if a Docker image exists locally
@@ -234,6 +299,96 @@ func checkDockerImageExists(image string) bool {
 		return false
 	}
 	return len(strings.TrimSpace(string(output))) > 0
+}
+
+// listDockerImages returns a list of available local Docker images
+func listDockerImages() []DockerImage {
+	cmd := exec.Command("docker", "images", "--format", "{{.Repository}}\t{{.Tag}}\t{{.ID}}\t{{.Size}}\t{{.CreatedSince}}")
+	output, err := cmd.Output()
+	if err != nil {
+		return nil
+	}
+
+	var images []DockerImage
+	var imageIDs []string
+	lines := strings.Split(strings.TrimSpace(string(output)), "\n")
+	for _, line := range lines {
+		if line == "" {
+			continue
+		}
+		parts := strings.Split(line, "\t")
+		if len(parts) >= 5 {
+			// Skip <none> repositories
+			if parts[0] == "<none>" {
+				continue
+			}
+			images = append(images, DockerImage{
+				Repository: parts[0],
+				Tag:        parts[1],
+				ID:         parts[2],
+				Size:       parts[3],
+				Created:    parts[4],
+			})
+			imageIDs = append(imageIDs, parts[2])
+		}
+	}
+
+	// Fetch architectures for all images in one call
+	if len(imageIDs) > 0 {
+		archMap := getImageArchitectures(imageIDs)
+		for i := range images {
+			if arch, ok := archMap[images[i].ID]; ok {
+				images[i].Architecture = arch
+			}
+		}
+	}
+
+	return images
+}
+
+// getImageArchitectures fetches architecture info for multiple images
+func getImageArchitectures(imageIDs []string) map[string]string {
+	archMap := make(map[string]string)
+
+	// Use docker inspect to get architecture for all images at once
+	args := append([]string{"inspect", "--format", "{{.Id}}\t{{.Architecture}}"}, imageIDs...)
+	cmd := exec.Command("docker", args...)
+	output, err := cmd.Output()
+	if err != nil {
+		return archMap
+	}
+
+	lines := strings.Split(strings.TrimSpace(string(output)), "\n")
+	for _, line := range lines {
+		parts := strings.Split(line, "\t")
+		if len(parts) >= 2 {
+			// Extract short ID from full ID (sha256:xxxx...)
+			fullID := parts[0]
+			shortID := fullID
+			if strings.HasPrefix(fullID, "sha256:") {
+				shortID = fullID[7:19] // Get first 12 chars after sha256:
+			}
+			archMap[shortID] = parts[1]
+		}
+	}
+
+	return archMap
+}
+
+// filterImages filters images based on a search string
+func filterImages(images []DockerImage, filter string) []DockerImage {
+	if filter == "" {
+		return images
+	}
+	filter = strings.ToLower(filter)
+	var filtered []DockerImage
+	for _, img := range images {
+		name := strings.ToLower(img.FullName())
+		if strings.Contains(name, filter) {
+			filtered = append(filtered, img)
+		}
+	}
+	return filtered
 }
 
 // checkFileExists checks if a file exists
@@ -542,18 +697,63 @@ func (m ToolchainModel) handleEnter() (tea.Model, tea.Cmd) {
 			m.textInput.Reset()
 			m.textInput.Placeholder = "Dockerfile"
 			m.textInput.Focus()
+		} else if m.dockerMode == "local" {
+			// For local mode, show interactive image selection
+			m.availableImages = listDockerImages()
+			m.filteredImages = m.availableImages
+			m.imageFilter = ""
+			m.cursor = 0
+			m.imageScrollStart = 0
+
+			if len(m.availableImages) == 0 {
+				// No local images, fall back to text input
+				m.currentQuestion = "Docker image name/tag?"
+				m.step = ToolchainStepDockerImage
+				m.textInput.Reset()
+				m.textInput.Placeholder = "my-local-image:latest"
+				m.textInput.Focus()
+				m.warnMsg = "No local Docker images found"
+			} else {
+				m.currentQuestion = "Select Docker image (type to filter):"
+				m.step = ToolchainStepDockerImageSelect
+				m.textInput.Reset()
+				m.textInput.Placeholder = "Type to filter..."
+				m.textInput.Focus()
+			}
 		} else {
+			// For pull mode, use text input
 			m.currentQuestion = "Docker image name/tag?"
 			m.step = ToolchainStepDockerImage
 
 			m.textInput.Reset()
-			if m.dockerMode == "pull" {
-				m.textInput.Placeholder = "ubuntu:22.04"
-			} else {
-				m.textInput.Placeholder = "my-local-image:latest"
-			}
+			m.textInput.Placeholder = "ubuntu:22.04"
 			m.textInput.Focus()
 		}
+
+	case ToolchainStepDockerImageSelect:
+		// User selected an image from the list
+		if len(m.filteredImages) > 0 && m.cursor < len(m.filteredImages) {
+			m.image = m.filteredImages[m.cursor].FullName()
+		} else if m.imageFilter != "" {
+			// Use the filter as a custom image name
+			m.image = m.imageFilter
+		} else {
+			m.errorMsg = "Please select an image or enter a name"
+			return m, nil
+		}
+
+		m.errorMsg = ""
+		m.questions = append(m.questions, Question{
+			Question: "Docker image?",
+			Answer:   m.image,
+			Complete: true,
+		})
+
+		// For local mode, skip platform selection and go to checking
+		m.platform = "" // Local images use their native platform
+		m.step = ToolchainStepCheckingImage
+		m.checkingStatus = ""
+		return m, tea.Batch(m.spinner.Tick, checkImageAsync(m.image, m.dockerMode, m.platform))
 
 	case ToolchainStepDockerfile:
 		dockerfile := strings.TrimSpace(m.textInput.Value())
@@ -625,13 +825,22 @@ func (m ToolchainModel) handleEnter() (tea.Model, tea.Cmd) {
 		}
 		m.image = image
 
-		// For all modes, proceed to platform selection first
 		m.errorMsg = ""
 		m.questions = append(m.questions, Question{
 			Question: m.currentQuestion,
 			Answer:   image,
 			Complete: true,
 		})
+
+		// For local mode, skip platform selection and go directly to checking
+		if m.dockerMode == "local" {
+			m.platform = ""
+			m.step = ToolchainStepCheckingImage
+			m.checkingStatus = ""
+			return m, tea.Batch(m.spinner.Tick, checkImageAsync(m.image, m.dockerMode, m.platform))
+		}
+
+		// For pull/build modes, ask about platform
 		m.currentQuestion = "Target platform?"
 		m.step = ToolchainStepPlatform
 		m.cursor = 0
@@ -774,6 +983,73 @@ func (m ToolchainModel) View() string {
 					desc = dimStyle.Render(" (use existing local image)")
 				}
 				s.WriteString(fmt.Sprintf("  %s %s%s\n", cursor, opt, desc))
+			}
+
+		case ToolchainStepDockerImageSelect:
+			// Filter input
+			s.WriteString("\n")
+			s.WriteString("  " + dimStyle.Render("Filter: ") + cyanBold.Render(m.textInput.View()) + "\n")
+
+			// Show available images count
+			totalImages := len(m.availableImages)
+			filteredCount := len(m.filteredImages)
+			if m.imageFilter != "" {
+				s.WriteString("  " + dimStyle.Render(fmt.Sprintf("Showing %d of %d images", filteredCount, totalImages)) + "\n")
+			} else {
+				s.WriteString("  " + dimStyle.Render(fmt.Sprintf("%d images available", totalImages)) + "\n")
+			}
+			s.WriteString("\n")
+
+			// Show filtered images with scrolling
+			if len(m.filteredImages) == 0 {
+				if m.imageFilter != "" {
+					s.WriteString("  " + dimStyle.Render("No images match filter. Press Enter to use '"+m.imageFilter+"' as image name.") + "\n")
+				} else {
+					s.WriteString("  " + dimStyle.Render("No images available") + "\n")
+				}
+			} else {
+				// Calculate visible range
+				start := m.imageScrollStart
+				end := start + m.maxVisibleImages
+				if end > len(m.filteredImages) {
+					end = len(m.filteredImages)
+				}
+
+				// Show scroll indicator at top
+				if start > 0 {
+					s.WriteString("  " + dimStyle.Render("  ↑ more images above") + "\n")
+				}
+
+				for i := start; i < end; i++ {
+					img := m.filteredImages[i]
+					cursor := " "
+					if m.cursor == i {
+						cursor = selectedStyle.Render("❯")
+					}
+
+					// Format: repo:tag [arch]
+					name := img.FullName()
+					arch := img.Architecture
+					if arch == "" {
+						arch = "unknown"
+					}
+					archInfo := dimStyle.Render(fmt.Sprintf(" [%s]", arch))
+
+					if m.cursor == i {
+						s.WriteString(fmt.Sprintf("  %s %s%s\n", cursor, cyanBold.Render(name), archInfo))
+					} else {
+						s.WriteString(fmt.Sprintf("  %s %s%s\n", cursor, name, archInfo))
+					}
+				}
+
+				// Show scroll indicator at bottom
+				if end < len(m.filteredImages) {
+					s.WriteString("  " + dimStyle.Render("  ↓ more images below") + "\n")
+				}
+			}
+
+			if m.errorMsg != "" {
+				s.WriteString("\n  " + errorStyle.Render("✗ "+m.errorMsg))
 			}
 
 		case ToolchainStepDockerfile:
