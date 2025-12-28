@@ -277,7 +277,8 @@ func createProjectFromTUI(config tui.ProjectConfig) error {
 		if ok {
 			vcpkgPath, err := vcpkgBuilder.GetPath()
 			if err == nil && vcpkgPath != "" {
-				_ = setupVcpkgProject(vcpkgBuilder, projectName, projectName, cfg.IsLibrary, []string{})
+				// Initialize vcpkg project structure
+				_ = setupVcpkgProject(vcpkgBuilder, projectName, []string{})
 			}
 		}
 	}
@@ -311,7 +312,7 @@ func createProjectFromTUI(config tui.ProjectConfig) error {
 	return nil
 }
 
-func setupVcpkgProject(builder *vcpkg.Builder, targetDir, _ string, _ bool, dependencies []string) error {
+func setupVcpkgProject(builder *vcpkg.Builder, targetDir string, dependencies []string) error {
 	vcpkgPath, err := builder.GetPath()
 	if err != nil {
 		return fmt.Errorf("vcpkg not configured: %w\n   Run: cpx config set-vcpkg-root <path>", err)

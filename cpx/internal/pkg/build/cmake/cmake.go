@@ -564,15 +564,15 @@ func (b *Builder) GenerateGitignore(ctx context.Context, projectPath string) err
 }
 
 func (b *Builder) GenerateBuildSrc(ctx context.Context, projectPath string, config build.InitConfig) error {
-	cmakeLists := templates.GenerateCMakeLists(
-		config.Name,
-		config.CppStandard,
-		!config.IsLibrary,
-		config.TestFramework != "" && config.TestFramework != "none",
-		config.Benchmark,
-		config.Benchmark != "" && config.Benchmark != "none",
-		config.Version,
-	)
+	cmakeLists := templates.GenerateCMakeLists(templates.CMakeOptions{
+		ProjectName:        config.Name,
+		CppStandard:        config.CppStandard,
+		IsExe:              !config.IsLibrary,
+		IncludeTests:       config.TestFramework != "" && config.TestFramework != "none",
+		BenchmarkFramework: config.Benchmark,
+		IncludeBench:       config.Benchmark != "" && config.Benchmark != "none",
+		ProjectVersion:     config.Version,
+	})
 	if err := os.WriteFile(filepath.Join(projectPath, "CMakeLists.txt"), []byte(cmakeLists), 0644); err != nil {
 		return fmt.Errorf("failed to write CMakeLists.txt: %w", err)
 	}

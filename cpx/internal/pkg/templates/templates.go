@@ -166,7 +166,25 @@ int main() {
 // CMAKE TEMPLATES
 // ============================================================================
 
-func GenerateVcpkgCMakeLists(projectName string, cppStandard int, isExe bool, includeTests bool, benchmarkFramework string, includeBench bool, projectVersion string) string {
+// CMakeOptions defines the configuration for CMake project generation
+type CMakeOptions struct {
+	ProjectName        string
+	CppStandard        int
+	IsExe              bool
+	IncludeTests       bool
+	BenchmarkFramework string
+	IncludeBench       bool
+	ProjectVersion     string
+}
+
+func GenerateVcpkgCMakeLists(opts CMakeOptions) string {
+	projectName := opts.ProjectName
+	cppStandard := opts.CppStandard
+	isExe := opts.IsExe
+	includeTests := opts.IncludeTests
+	includeBench := opts.IncludeBench
+	projectVersion := opts.ProjectVersion
+
 	var sb strings.Builder
 
 	sb.WriteString(fmt.Sprintf(`cmake_minimum_required(VERSION 3.20)
@@ -1076,7 +1094,22 @@ MIT
 // MESON TEMPLATES
 // ============================================================================
 
-func GenerateMesonBuildRoot(projectName string, isExe bool, cppStandard int, testFramework, benchmarkFramework string) string {
+// MesonRootOptions defines the configuration for Meson project generation
+type MesonRootOptions struct {
+	ProjectName        string
+	IsExe              bool
+	CppStandard        int
+	TestFramework      string
+	BenchmarkFramework string
+}
+
+func GenerateMesonBuildRoot(opts MesonRootOptions) string {
+	projectName := opts.ProjectName
+	isExe := opts.IsExe
+	cppStandard := opts.CppStandard
+	testFramework := opts.TestFramework
+	benchmarkFramework := opts.BenchmarkFramework
+
 	targetType := "executable"
 	if !isExe {
 		targetType = "library"
@@ -1368,7 +1401,14 @@ MIT
 // CMAKE-ONLY TEMPLATES (no package manager)
 // ============================================================================
 
-func GenerateCMakeLists(projectName string, cppStandard int, isExe bool, includeTests bool, benchmarkFramework string, includeBench bool, projectVersion string) string {
+func GenerateCMakeLists(opts CMakeOptions) string {
+	projectName := opts.ProjectName
+	cppStandard := opts.CppStandard
+	isExe := opts.IsExe
+	includeTests := opts.IncludeTests
+	includeBench := opts.IncludeBench
+	projectVersion := opts.ProjectVersion
+
 	var sb strings.Builder
 
 	if projectVersion == "" {

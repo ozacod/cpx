@@ -377,7 +377,13 @@ func TestGenerateMesonBuildRoot(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := GenerateMesonBuildRoot(tt.projectName, tt.isExe, tt.cppStandard, tt.testFramework, tt.benchmarkFramework)
+			result := GenerateMesonBuildRoot(MesonRootOptions{
+				ProjectName:        tt.projectName,
+				IsExe:              tt.isExe,
+				CppStandard:        tt.cppStandard,
+				TestFramework:      tt.testFramework,
+				BenchmarkFramework: tt.benchmarkFramework,
+			})
 
 			for _, s := range tt.shouldContain {
 				assert.Contains(t, result, s, "Expected to contain: %s", s)
@@ -629,7 +635,13 @@ func TestGenerateVcpkgCMakeLists(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := GenerateVcpkgCMakeLists(tt.projectName, tt.cppStandard, tt.isExe, tt.includeTests, "", false, "0.1.0")
+			result := GenerateVcpkgCMakeLists(CMakeOptions{
+				ProjectName:    tt.projectName,
+				CppStandard:    tt.cppStandard,
+				IsExe:          tt.isExe,
+				IncludeTests:   tt.includeTests,
+				ProjectVersion: "0.1.0",
+			})
 
 			for _, s := range tt.shouldContain {
 				assert.Contains(t, result, s, "Expected to contain: %s", s)

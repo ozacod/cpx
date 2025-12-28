@@ -42,5 +42,15 @@ func runFlawfinder(cmd *cobra.Command, args []string) error {
 		targets = []string{"."}
 	}
 
-	return quality.RunFlawfinder(minLevel, csv, html, output, dataflow, quiet, singleline, context, targets)
+	return quality.RunFlawfinder(quality.FlawfinderOptions{
+		MinLevel:   minLevel,
+		CSV:        csv,
+		HTML:       html,
+		Output:     output,
+		Dataflow:   dataflow,
+		Quiet:      quiet,
+		Singleline: singleline,
+		Context:    context,
+		Targets:    targets,
+	})
 }

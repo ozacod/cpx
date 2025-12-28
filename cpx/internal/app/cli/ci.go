@@ -26,6 +26,16 @@ type ToolchainBuildOptions struct {
 	Verbose           bool
 }
 
+type NativeBuildOptions struct {
+	Toolchain         config.Toolchain
+	Runner            *config.Runner
+	ProjectRoot       string
+	OutputDir         string
+	RunTests          bool
+	RunBenchmarks     bool
+	ExecuteAfterBuild bool
+}
+
 func runToolchainBuild(options ToolchainBuildOptions) error {
 	ciConfig, err := config.LoadToolchains("cpx-ci.yaml")
 	if err != nil {
@@ -118,7 +128,16 @@ func runToolchainBuild(options ToolchainBuildOptions) error {
 		}
 
 		if runner == nil || runner.IsNative() {
-			if err := runNativeBuildNew(tc, runner, projectRoot, outputDir, options.RunTests, options.RunBenchmarks, options.ExecuteAfterBuild); err != nil {
+			opts := NativeBuildOptions{
+				Toolchain:         tc,
+				Runner:            runner,
+				ProjectRoot:       projectRoot,
+				OutputDir:         outputDir,
+				RunTests:          options.RunTests,
+				RunBenchmarks:     options.RunBenchmarks,
+				ExecuteAfterBuild: options.ExecuteAfterBuild,
+			}
+			if err := runNativeBuildNew(opts); err != nil {
 				return fmt.Errorf("failed to build '%s': %w", tc.Name, err)
 			}
 		} else if runner.IsDocker() {
@@ -227,7 +246,14 @@ func resolveDockerImageNew(runner *config.Runner) (string, error) {
 }
 
 // runNativeBuildNew runs a native CMake build with new config structure
-func runNativeBuildNew(tc config.Toolchain, runner *config.Runner, projectRoot, outputDir string, runTests bool, runBenchmarks bool, executeAfterBuild bool) error {
+func runNativeBuildNew(opts NativeBuildOptions) error {
+	tc := opts.Toolchain
+	projectRoot := opts.ProjectRoot
+	outputDir := opts.OutputDir
+	runTests := opts.RunTests
+	runBenchmarks := opts.RunBenchmarks
+	executeAfterBuild := opts.ExecuteAfterBuild
+
 	projectType := DetectProjectType()
 	missing := WarnMissingBuildTools(projectType)
 	if len(missing) > 0 {

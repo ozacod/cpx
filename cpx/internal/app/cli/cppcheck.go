@@ -44,5 +44,16 @@ func runCppcheck(cmd *cobra.Command, args []string) error {
 		targets = []string{"."}
 	}
 
-	return quality.RunCppcheck(enable, output, xml, csv, quiet, force, inlineSuppr, platform, std, targets)
+	return quality.RunCppcheck(quality.CppcheckOptions{
+		Enable:      enable,
+		Output:      output,
+		XML:         xml,
+		CSV:         csv,
+		Quiet:       quiet,
+		Force:       force,
+		InlineSuppr: inlineSuppr,
+		Platform:    platform,
+		Std:         std,
+		Targets:     targets,
+	})
 }

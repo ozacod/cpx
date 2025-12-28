@@ -154,7 +154,15 @@ func (b *Builder) GenerateBuildSrc(ctx context.Context, projectPath string, conf
 	hasBench := config.Benchmark != "" && config.Benchmark != "none"
 
 	// Generate CMakeLists.txt
-	cmakeLists := templates.GenerateVcpkgCMakeLists(config.Name, config.CppStandard, !config.IsLibrary, hasTest, config.Benchmark, hasBench, config.Version)
+	cmakeLists := templates.GenerateVcpkgCMakeLists(templates.CMakeOptions{
+		ProjectName:        config.Name,
+		CppStandard:        config.CppStandard,
+		IsExe:              !config.IsLibrary,
+		IncludeTests:       hasTest,
+		BenchmarkFramework: config.Benchmark,
+		IncludeBench:       hasBench,
+		ProjectVersion:     config.Version,
+	})
 	if err := os.WriteFile(filepath.Join(projectPath, "CMakeLists.txt"), []byte(cmakeLists), 0644); err != nil {
 		return fmt.Errorf("failed to write CMakeLists.txt: %w", err)
 	}

@@ -487,7 +487,13 @@ func (b *Builder) GenerateGitignore(ctx context.Context, projectPath string) err
 
 func (b *Builder) GenerateBuildSrc(ctx context.Context, projectPath string, config build.InitConfig) error {
 	// Generate meson.build (root)
-	mesonBuild := templates.GenerateMesonBuildRoot(config.Name, !config.IsLibrary, config.CppStandard, config.TestFramework, config.Benchmark)
+	mesonBuild := templates.GenerateMesonBuildRoot(templates.MesonRootOptions{
+		ProjectName:        config.Name,
+		IsExe:              !config.IsLibrary,
+		CppStandard:        config.CppStandard,
+		TestFramework:      config.TestFramework,
+		BenchmarkFramework: config.Benchmark,
+	})
 	if err := os.WriteFile(filepath.Join(projectPath, "meson.build"), []byte(mesonBuild), 0644); err != nil {
 		return fmt.Errorf("failed to write meson.build: %w", err)
 	}

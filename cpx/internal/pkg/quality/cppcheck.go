@@ -9,7 +9,21 @@ import (
 	"github.com/ozacod/cpx/internal/pkg/utils/git"
 )
 
-func RunCppcheck(enable, output string, xml, csv, quiet, force, inlineSuppr bool, platform, std string, targets []string) error {
+// CppcheckOptions defines the configuration for RunCppcheck
+type CppcheckOptions struct {
+	Enable      string
+	Output      string
+	XML         bool
+	CSV         bool
+	Quiet       bool
+	Force       bool
+	InlineSuppr bool
+	Platform    string
+	Std         string
+	Targets     []string
+}
+
+func RunCppcheck(opts CppcheckOptions) error {
 	// Check if cppcheck is available
 	if _, err := exec.LookPath("cppcheck"); err != nil {
 		return fmt.Errorf("cppcheck not found. Please install it first:\n  brew install cppcheck\n  or\n  apt-get install cppcheck (Debian/Ubuntu)\n  or\n  Download from https://cppcheck.sourcecpx.io/")
@@ -18,11 +32,11 @@ func RunCppcheck(enable, output string, xml, csv, quiet, force, inlineSuppr bool
 	fmt.Printf("%s Running Cppcheck analysis...%s\n", colors.Cyan, colors.Reset)
 
 	// Filter targets to only include git-tracked files (respect .gitignore)
-	filteredTargets, err := git.FilterGitTrackedFiles(targets)
+	filteredTargets, err := git.FilterGitTrackedFiles(opts.Targets)
 	if err != nil {
 		// If git is not available or not in a git repo, use original targets
 		fmt.Printf("%s Warning: Not in a git repository or git not available. Scanning all files.%s\n", colors.Yellow, colors.Reset)
-		filteredTargets = targets
+		filteredTargets = opts.Targets
 	} else if len(filteredTargets) == 0 {
 		return fmt.Errorf("no git-tracked C/C++ files found to scan")
 	}
@@ -31,47 +45,47 @@ func RunCppcheck(enable, output string, xml, csv, quiet, force, inlineSuppr bool
 	var cppcheckArgs []string
 
 	// Enable checks
-	if enable != "" {
-		cppcheckArgs = append(cppcheckArgs, "--enable="+enable)
+	if opts.Enable != "" {
+		cppcheckArgs = append(cppcheckArgs, "--enable="+opts.Enable)
 	}
 
 	// Output format
-	if xml {
+	if opts.XML {
 		cppcheckArgs = append(cppcheckArgs, "--xml")
-	} else if csv {
+	} else if opts.CSV {
 		// Cppcheck uses --template for CSV format, not --csv
 		cppcheckArgs = append(cppcheckArgs, "--template={file},{line},{severity},{id},{message}")
 	}
 
 	// Output file
-	if output != "" {
-		cppcheckArgs = append(cppcheckArgs, "--output-file="+output)
-		fmt.Printf("%s Writing output to: %s%s\n", colors.Cyan, output, colors.Reset)
+	if opts.Output != "" {
+		cppcheckArgs = append(cppcheckArgs, "--output-file="+opts.Output)
+		fmt.Printf("%s Writing output to: %s%s\n", colors.Cyan, opts.Output, colors.Reset)
 	}
 
 	// Quiet mode
-	if quiet {
+	if opts.Quiet {
 		cppcheckArgs = append(cppcheckArgs, "--quiet")
 	}
 
 	// Force checking all configurations
-	if force {
+	if opts.Force {
 		cppcheckArgs = append(cppcheckArgs, "--force")
 	}
 
 	// Inline suppressions
-	if inlineSuppr {
+	if opts.InlineSuppr {
 		cppcheckArgs = append(cppcheckArgs, "--inline-suppr")
 	}
 
 	// Platform
-	if platform != "" {
-		cppcheckArgs = append(cppcheckArgs, "--platform="+platform)
+	if opts.Platform != "" {
+		cppcheckArgs = append(cppcheckArgs, "--platform="+opts.Platform)
 	}
 
 	// C/C++ standard
-	if std != "" {
-		cppcheckArgs = append(cppcheckArgs, "--std="+std)
+	if opts.Std != "" {
+		cppcheckArgs = append(cppcheckArgs, "--std="+opts.Std)
 	}
 
 	// Add exclusions for build system directories and external dependencies
@@ -105,16 +119,16 @@ func RunCppcheck(enable, output string, xml, csv, quiet, force, inlineSuppr bool
 
 	if err := cmd.Run(); err != nil {
 		// Cppcheck returns non-zero on findings, which is normal
-		if output != "" {
-			fmt.Printf("%s  Cppcheck found potential issues (saved to %s)%s\n", colors.Yellow, output, colors.Reset)
+		if opts.Output != "" {
+			fmt.Printf("%s  Cppcheck found potential issues (saved to %s)%s\n", colors.Yellow, opts.Output, colors.Reset)
 		} else {
 			fmt.Printf("%s  Cppcheck found potential issues%s\n", colors.Yellow, colors.Reset)
 		}
 		return nil
 	}
 
-	if output != "" {
-		fmt.Printf("%s Analysis complete! Report saved to: %s%s\n", colors.Green, output, colors.Reset)
+	if opts.Output != "" {
+		fmt.Printf("%s Analysis complete! Report saved to: %s%s\n", colors.Green, opts.Output, colors.Reset)
 	} else {
 		fmt.Printf("%s No issues found!%s\n", colors.Green, colors.Reset)
 	}
