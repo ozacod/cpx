@@ -53,11 +53,9 @@ func BuildCmd() *cobra.Command {
 		Short: "Build all toolchains using Docker",
 		Long:  "Build for all toolchains defined in cpx-ci.yaml using Docker containers.",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			rebuild, _ := cmd.Flags().GetBool("rebuild")
 			toolchainName, _ := cmd.Flags().GetString("toolchain")
 			return runToolchainBuild(ToolchainBuildOptions{
 				ToolchainName:     toolchainName,
-				Rebuild:           rebuild,
 				ExecuteAfterBuild: false,
 				RunTests:          false,
 				RunBenchmarks:     false,
@@ -66,7 +64,6 @@ func BuildCmd() *cobra.Command {
 		},
 	}
 	allCmd.Flags().StringP("toolchain", "t", "", "Build only specific toolchain (default: all)")
-	allCmd.Flags().Bool("rebuild", false, "Rebuild Docker images even if they exist")
 	cmd.AddCommand(allCmd)
 
 	return cmd
@@ -83,7 +80,6 @@ func runBuild(cmd *cobra.Command, _ []string) error {
 	if toolchain != "" {
 		return runToolchainBuild(ToolchainBuildOptions{
 			ToolchainName:     toolchain,
-			Rebuild:           false,
 			ExecuteAfterBuild: false,
 			RunTests:          false,
 			RunBenchmarks:     false,

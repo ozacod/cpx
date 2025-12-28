@@ -45,7 +45,6 @@ func runTest(cmd *cobra.Command, _ []string) error {
 		}
 		return runToolchainBuild(ToolchainBuildOptions{
 			ToolchainName:     toolchain,
-			Rebuild:           false,
 			ExecuteAfterBuild: false,
 			RunTests:          true,
 			RunBenchmarks:     false,

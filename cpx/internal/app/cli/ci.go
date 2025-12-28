@@ -19,7 +19,6 @@ import (
 
 type ToolchainBuildOptions struct {
 	ToolchainName     string
-	Rebuild           bool
 	ExecuteAfterBuild bool
 	RunTests          bool
 	RunBenchmarks     bool

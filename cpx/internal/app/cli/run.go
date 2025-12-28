@@ -52,7 +52,6 @@ func runRun(cmd *cobra.Command, args []string) error {
 	if toolchain != "" {
 		return runToolchainBuild(ToolchainBuildOptions{
 			ToolchainName:     toolchain,
-			Rebuild:           false,
 			ExecuteAfterBuild: true,
 			RunTests:          false,
 			RunBenchmarks:     false,
