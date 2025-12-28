@@ -66,7 +66,38 @@ Use the interactive TUI to generate a modern project structure:
 ```bash
 cpx new
 ```
-Select your build system (CMake, Bazel, Meson), project type (App/Lib), and test framework.
+
+The wizard guides you through:
+- **Project name**: Your project's name
+- **Project mode**: Use Template or Custom Project
+- **Project type**: Executable or Library
+- **Build system**: vcpkg (default), Bazel, Meson, or CMake (standalone)
+- **C++ standard**: 11, 14, 17, 20, 23
+- **Test framework**: GoogleTest, Catch2, doctest, or None
+- **Benchmark framework**: Google Benchmark, nanobench, Catch2 benchmark, or None
+- **Code formatting**: Clang-format style (Google, LLVM, Chromium, Mozilla, WebKit)
+- **Git repository**: Initialize git (Yes/No)
+- **Pre-commit hooks**: format, lint, cppcheck, test (multi-select)
+- **Pre-push hooks**: test, cppcheck (multi-select)
+
+#### Available Templates
+When using **Template** mode, choose from pre-configured project starters:
+
+| Template | Description |
+|----------|-------------|
+| SDL2 | Game/multimedia application with SDL2 |
+| ImGui | Immediate mode GUI application |
+| Qt | Cross-platform Qt application |
+| Raylib | Simple game development with Raylib |
+| SFML | Multimedia/game application with SFML |
+| Vulkan | Graphics application with Vulkan API |
+| OpenCV | Computer vision application |
+| gRPC | High-performance RPC services |
+| REST API | RESTful web service |
+| CLI | Command-line application with argument parsing |
+| Audio | Audio processing application |
+| Game Engine | Basic game engine starter |
+| WebAssembly | Browser-based C++ with Emscripten |
 
 ### Common Commands
 All commands auto-detect the project type (`vcpkg.json`, `MODULE.bazel`, or `meson.build`).
