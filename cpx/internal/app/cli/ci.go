@@ -88,7 +88,6 @@ func runToolchainBuild(options ToolchainBuildOptions) error {
 			return fmt.Errorf("runner '%s' not found for toolchain '%s'", tc.Runner, tc.Name)
 		}
 
-		// Determine runner type
 		runnerType := "native"
 		if runner != nil && runner.Type != "" {
 			runnerType = runner.Type
@@ -121,7 +120,7 @@ func runToolchainBuild(options ToolchainBuildOptions) error {
 		}
 
 		if runner == nil || runner.IsNative() {
-			if err := runNativeBuildNew(tc, runner, projectRoot, outputDir, options.RunTests, options.RunBenchmarks); err != nil {
+			if err := runNativeBuildNew(tc, runner, projectRoot, outputDir, options.RunTests, options.RunBenchmarks, options.ExecuteAfterBuild); err != nil {
 				return fmt.Errorf("failed to build '%s': %w", tc.Name, err)
 			}
 		} else if runner.IsDocker() {
@@ -230,7 +229,7 @@ func resolveDockerImageNew(runner *config.Runner) (string, error) {
 }
 
 // runNativeBuildNew runs a native CMake build with new config structure
-func runNativeBuildNew(tc config.Toolchain, runner *config.Runner, projectRoot, outputDir string, runTests bool, runBenchmarks bool) error {
+func runNativeBuildNew(tc config.Toolchain, runner *config.Runner, projectRoot, outputDir string, runTests bool, runBenchmarks bool, executeAfterBuild bool) error {
 	projectType := DetectProjectType()
 	missing := WarnMissingBuildTools(projectType)
 	if len(missing) > 0 {
@@ -342,27 +341,136 @@ func runNativeBuildNew(tc config.Toolchain, runner *config.Runner, projectRoot, 
 	// Copy outputs
 	fmt.Printf("  %s Copying artifacts...%s\n", colors.Yellow, colors.Reset)
 
-	// Find executable
-	entries, err := os.ReadDir(absBuildDir)
+	// Find and copy executables recursively
+	err = filepath.WalkDir(absBuildDir, func(path string, d os.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if d.IsDir() {
+			if d.Name() == "CMakeFiles" || d.Name() == "_deps" || d.Name() == ".git" {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+
+		info, err := d.Info()
+		if err != nil {
+			return nil
+		}
+
+		// Check if file is executable (unix) or .exe (windows)
+		// Skip files with known extensions that are not binaries we want
+		name := d.Name()
+		if strings.HasSuffix(name, ".cmake") || strings.HasSuffix(name, ".json") || strings.HasSuffix(name, ".txt") || strings.HasSuffix(name, ".ninja") {
+			return nil
+		}
+
+		if info.Mode()&0111 != 0 || strings.HasSuffix(name, ".exe") {
+			dst := filepath.Join(absOutputDir, name)
+			// Only copy if it doesn't exist or is newer? For now just overwrite.
+			if err := copyFile(path, dst); err != nil {
+				fmt.Printf("  %sWarning: failed to copy %s: %v%s\n", colors.Yellow, name, err, colors.Reset)
+			}
+		}
+		return nil
+	})
 	if err != nil {
-		return fmt.Errorf("failed to read build directory: %w", err)
+		fmt.Printf("  %sWarning: error walking build directory: %v%s\n", colors.Yellow, err, colors.Reset)
 	}
 
-	for _, entry := range entries {
-		if entry.IsDir() {
-			continue
+	// Execute tests if requested
+	if runTests {
+		fmt.Printf("  %s Running tests...%s\n", colors.Green, colors.Reset)
+		ctestCmd := exec.Command("ctest", "--output-on-failure")
+		ctestCmd.Dir = absBuildDir
+		ctestCmd.Stdout = os.Stdout
+		ctestCmd.Stderr = os.Stderr
+		ctestCmd.Env = env
+		if err := ctestCmd.Run(); err != nil {
+			return fmt.Errorf("tests failed: %w", err)
 		}
-		info, err := entry.Info()
-		if err != nil {
-			continue
+	}
+
+	// Execute benchmarks if requested
+	if runBenchmarks {
+		fmt.Printf("  %s Running benchmarks...%s\n", colors.Green, colors.Reset)
+		projectName := common.GetProjectNameFromCMakeLists()
+		if projectName == "" {
+			projectName = filepath.Base(projectRoot)
 		}
-		// Check if file is executable (unix) or .exe (windows)
-		if info.Mode()&0111 != 0 || strings.HasSuffix(entry.Name(), ".exe") {
-			src := filepath.Join(absBuildDir, entry.Name())
-			dst := filepath.Join(absOutputDir, entry.Name())
-			if err := copyFile(src, dst); err != nil {
-				fmt.Printf("  %sWarning: failed to copy %s: %v%s\n", colors.Yellow, entry.Name(), err, colors.Reset)
+
+		benchName := projectName + "_bench"
+		benchPath := filepath.Join(absOutputDir, benchName)
+
+		// Check for executable existence
+		found := false
+		if _, err := os.Stat(benchPath); err == nil {
+			found = true
+		} else if _, err := os.Stat(benchPath + ".exe"); err == nil {
+			benchPath += ".exe"
+			found = true
+		}
+
+		if !found {
+			return fmt.Errorf("benchmark executable '%s' not found", benchName)
+		}
+
+		fmt.Printf("   %sExecuting: %s%s\n", colors.Gray, benchPath, colors.Reset)
+		benchCmd := exec.Command(benchPath)
+		benchCmd.Stdout = os.Stdout
+		benchCmd.Stderr = os.Stderr
+		benchCmd.Stdin = os.Stdin
+		// Pass filter args if any? Current impl doesn't pass filter from cpx bench --toolchain
+		if err := benchCmd.Run(); err != nil {
+			return fmt.Errorf("benchmarks failed: %w", err)
+		}
+	}
+
+	// Execute binary if requested
+	if executeAfterBuild {
+		fmt.Printf("  %s Running executable...%s\n", colors.Green, colors.Reset)
+		projectName := common.GetProjectNameFromCMakeLists()
+		if projectName == "" {
+			projectName = filepath.Base(projectRoot)
+		}
+
+		exePath := filepath.Join(absOutputDir, projectName)
+		// Check standard unix path first
+		if _, err := os.Stat(exePath); err != nil {
+			// Check windows exe
+			if _, err := os.Stat(exePath + ".exe"); err == nil {
+				exePath += ".exe"
+			} else {
+				// Try finding any executable if exact name match failed
+				found := false
+				entries, _ := os.ReadDir(absOutputDir)
+				for _, entry := range entries {
+					if !entry.IsDir() {
+						info, _ := entry.Info()
+						if info.Mode()&0111 != 0 || strings.HasSuffix(entry.Name(), ".exe") {
+							// Avoid running tests/benchmarks by accident if possible
+							name := entry.Name()
+							if !strings.Contains(name, "test") && !strings.Contains(name, "bench") && !strings.HasSuffix(name, ".cmake") {
+								exePath = filepath.Join(absOutputDir, name)
+								found = true
+								break
+							}
+						}
+					}
+				}
+				if !found {
+					return fmt.Errorf("could not find executable to run")
+				}
 			}
+		}
+
+		fmt.Printf("   %sExecuting: %s%s\n", colors.Gray, exePath, colors.Reset)
+		runCmd := exec.Command(exePath)
+		runCmd.Stdout = os.Stdout
+		runCmd.Stderr = os.Stderr
+		runCmd.Stdin = os.Stdin
+		if err := runCmd.Run(); err != nil {
+			return fmt.Errorf("execution failed: %w", err)
 		}
 	}
 
