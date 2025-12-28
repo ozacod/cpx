@@ -30,10 +30,10 @@ Arguments after -- are passed to the binary.`,
 		},
 	}
 
-	cmd.Flags().Bool("release", false, "Build in release mode (-O2). Default is debug")
-	cmd.Flags().String("toolchain", "", "Toolchain to run in Docker (from cpx-ci.yaml)")
+	cmd.Flags().BoolP("release", "r", false, "Build in release mode (-O2). Default is debug")
+	cmd.Flags().StringP("toolchain", "t", "", "Toolchain to run in Docker (from cpx-ci.yaml)")
 	cmd.Flags().StringP("opt", "O", "", "Override optimization level: 0,1,2,3,s,fast")
-	cmd.Flags().Bool("verbose", false, "Show full build output")
+	cmd.Flags().BoolP("verbose", "v", false, "Show full build output")
 	cmd.Flags().Bool("asan", false, "Run with AddressSanitizer")
 	cmd.Flags().Bool("tsan", false, "Run with ThreadSanitizer")
 	cmd.Flags().Bool("msan", false, "Run with MemorySanitizer")

@@ -27,7 +27,7 @@ func BenchCmd() *cobra.Command {
 
 	cmd.Flags().BoolP("verbose", "v", false, "Show verbose build output")
 	cmd.Flags().String("target", "", "Specific benchmark target to run (Bazel projects)")
-	cmd.Flags().String("toolchain", "", "Toolchain to run benchmarks in (from cpx-ci.yaml)")
+	cmd.Flags().StringP("toolchain", "t", "", "Toolchain to run benchmarks in (from cpx-ci.yaml)")
 
 	return cmd
 }

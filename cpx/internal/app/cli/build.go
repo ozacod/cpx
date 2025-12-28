@@ -36,10 +36,10 @@ func BuildCmd() *cobra.Command {
 	cmd.Flags().BoolP("release", "r", false, "Release build (-O2). Default is debug")
 	cmd.Flags().Bool("debug", false, "Debug build (-O0). Default; kept for compatibility")
 	cmd.Flags().IntP("jobs", "j", 0, "Parallel jobs for build (0 = auto)")
-	cmd.Flags().String("toolchain", "", "Toolchain to build (from cpx-ci.yaml)")
+	cmd.Flags().StringP("toolchain", "t", "", "Toolchain to build (from cpx-ci.yaml)")
 	cmd.Flags().BoolP("clean", "c", false, "Clean build directory before building")
 	cmd.Flags().StringP("opt", "O", "", "Override optimization level: 0,1,2,3,s,fast")
-	cmd.Flags().Bool("verbose", false, "Show full build output")
+	cmd.Flags().BoolP("verbose", "v", false, "Show full build output")
 	cmd.Flags().Bool("asan", false, "Build with AddressSanitizer")
 	cmd.Flags().Bool("tsan", false, "Build with ThreadSanitizer")
 	cmd.Flags().Bool("msan", false, "Build with MemorySanitizer")
@@ -64,7 +64,7 @@ func BuildCmd() *cobra.Command {
 			})
 		},
 	}
-	allCmd.Flags().String("toolchain", "", "Build only specific toolchain (default: all)")
+	allCmd.Flags().StringP("toolchain", "t", "", "Build only specific toolchain (default: all)")
 	allCmd.Flags().Bool("rebuild", false, "Rebuild Docker images even if they exist")
 	cmd.AddCommand(allCmd)
 

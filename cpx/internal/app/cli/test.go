@@ -27,8 +27,8 @@ func TestCmd() *cobra.Command {
 	}
 
 	cmd.Flags().BoolP("verbose", "v", false, "Show verbose test output")
-	cmd.Flags().String("filter", "", "Filter tests by name (ctest regex or bazel target)")
-	cmd.Flags().String("toolchain", "", "Toolchain to run tests in (from cpx-ci.yaml)")
+	cmd.Flags().StringP("filter", "f", "", "Filter tests by name (ctest regex or bazel target)")
+	cmd.Flags().StringP("toolchain", "t", "", "Toolchain to run tests in (from cpx-ci.yaml)")
 
 	return cmd
 }
