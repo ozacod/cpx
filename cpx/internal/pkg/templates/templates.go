@@ -529,81 +529,83 @@ IndentCaseLabels: true
 }
 
 func GenerateCpxCI() string {
-	return `# cpx-ci.yaml - Toolchain configuration
-# This file defines toolchains for building your project
+	return `# cpx-ci.yaml - CI/CD Toolchain Configuration
+#
+# This file defines runners (execution environments) and toolchains (build configurations).
+# Use 'cpx build all' to build for all active toolchains.
+# Use 'cpx build --toolchain <name>' to build for a specific toolchain.
+
+# ============================================================================
+# RUNNERS
+# ============================================================================
+# Runners define WHERE your code is built (Docker, SSH, or native host).
+#
+# Runner fields:
+#   name   - Unique identifier referenced by toolchains
+#   type   - "docker", "ssh", or omit for "native"
+#   image  - Docker image (required for type: docker)
+#   host   - SSH host (required for type: ssh)
+#   user   - SSH user (required for type: ssh)
+
+runners:
+  - name: ubuntu20-docker
+    type: docker
+    image: ubuntu:20.04
+
+  - name: debian
+    type: docker
+    image: debian:trixie
+
+  # Uncomment for SSH-based builds:
+  # - name: build-server
+  #   type: ssh
+  #   host: build.example.com
+  #   user: builder
+
+# ============================================================================
+# TOOLCHAINS
+# ============================================================================
+# Toolchains define HOW your code is built (compilers, flags, options).
+#
+# Toolchain fields:
+#   name         - Unique identifier (used with --toolchain flag)
+#   runner       - References a runner name above (or "native" for host builds)
+#   active       - true/false to enable/disable (default: true)
+#   cc           - C compiler (e.g., gcc, clang)
+#   cxx          - C++ compiler (e.g., g++, clang++)
+#   build_type   - Debug, Release, RelWithDebInfo, MinSizeRel (default: Release)
+#   optimization - 0, 1, 2, 3, s, fast (default: 2)
+#   jobs         - Parallel build jobs, 0 = auto (default: 0)
+#   cmake_options      - Additional CMake arguments
+#   build_options      - Additional build arguments
+#   cmake_toolchain_file - Path to CMake toolchain file
+#   env          - Environment variables
 
 toolchains:
-  # Example: Pull a pre-built image from registry
-  # - name: "alpine-gcc"
-  #   active: true                 # Set to false to skip this toolchain (default: true)
-  #   runner: "docker"
-  #   docker:
-  #     mode: "pull"              # pull, local, or build
-  #     image: "alpine:latest"
-  #     platform: "linux/amd64"
-  #     pullPolicy: "ifNotPresent" # always, never, ifNotPresent
-  #   # Per-toolchain build configuration (overrides global defaults)
-  #   build_type: "Release"       # Debug, Release, RelWithDebInfo, MinSizeRel
-  #   cmake_options: []           # Additional CMake arguments
-  #   build_options: []           # Additional build arguments (cmake --build args)
-  #   env:                        # Environment variables
-  #     CC: "gcc"
-  #     CXX: "g++"
+  - name: linux-amd64
+    runner: ubuntu20-docker
+    cc: gcc
+    cxx: g++
+    build_type: Release
+    optimization: "2"
+    active: true
+    # cmake_options:
+    #   - -DENABLE_TESTING=ON
+    # env:
+    #   CFLAGS: "-march=native"
 
-  # Example: Use a local image (no network)
-  # - name: "my-toolchain"
-  #   runner: "docker"
-  #   docker:
-  #     mode: "local"
-  #     image: "my-toolchain:latest"
-  #   build_type: "Debug"
+  - name: linux-clang
+    runner: debian
+    cc: clang
+    cxx: clang++
+    build_type: Release
+    optimization: "3"
 
-  # Example: Build from Dockerfile (with content-based caching)
-  # - name: "custom-toolchain"
-  #   runner: "docker"
-  #   docker:
-  #     mode: "build"
-  #     image: "cpx-dev"          # tag for the built image
-  #     platform: "linux/arm64"
-  #     build:
-  #       context: "."
-  #       dockerfile: "Dockerfile"
-  #       args:
-  #         GCC_VER: "13"
-  #   build_type: "RelWithDebInfo"
-  #   cmake_options:
-  #     - "-DENABLE_TESTS=ON"
-
-  # Example: Native build (runs on host, CMake only)
-  # - name: "local-debug"
-  #   runner: "native"
-  #   build_type: "Debug"
-  #   cmake_options:
-  #     - "-DCMAKE_EXPORT_COMPILE_COMMANDS=ON"
-  #   env:
-  #     CC: "clang"
-  #     CXX: "clang++"
-
-# Global build configuration (used as defaults if not specified per-toolchain)
-build:
-  # CMake build type (Debug, Release, RelWithDebInfo, MinSizeRel)
-  # Note: Per-toolchain build_type overrides this
-  type: Release
-
-  # Optimization level (0, 1, 2, 3, s, fast)
-  optimization: 2
-
-  # Number of parallel jobs (0 = auto)
-  jobs: 0
-
-  # Additional CMake arguments (per-toolchain cmake_options overrides this)
-  cmake_args: []
-
-  # Additional build arguments (per-toolchain build_options overrides this)
-  build_args: []
-
-# Output directory for artifacts
-output: .bin/ci
+  # Native build (runs on your host machine):
+  # - name: native
+  #   runner: native
+  #   cc: clang
+  #   cxx: clang++
 `
 }
 
