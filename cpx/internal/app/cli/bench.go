@@ -14,9 +14,10 @@ import (
 
 func BenchCmd() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "bench",
-		Short: "Build and run benchmarks",
-		Long:  "Build the project benchmarks and run them. Detects vcpkg/CMake or Bazel projects automatically.",
+		Use:     "bench",
+		Aliases: []string{"be"},
+		Short:   "Build and run benchmarks",
+		Long:    "Build the project benchmarks and run them. Detects vcpkg/CMake or Bazel projects automatically.",
 		Example: `  cpx bench            # Build + run all benchmarks
   cpx bench --verbose  # Show verbose output
   cpx bench --target //bench:myapp_bench  # Run specific benchmark (Bazel)`,

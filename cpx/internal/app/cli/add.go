@@ -24,8 +24,9 @@ func AddCmd() *cobra.Command {
 	})
 
 	cmd := &cobra.Command{
-		Use:   "add [package]",
-		Short: "Add a dependency",
+		Use:     "add [package]",
+		Aliases: []string{"a"},
+		Short:   "Add a dependency",
 		Long: `Add a dependency to your project.
 
 For vcpkg projects: passes through to 'vcpkg add port' and prints usage info.

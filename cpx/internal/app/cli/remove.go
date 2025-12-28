@@ -16,7 +16,7 @@ import (
 
 func RemoveCmd() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:     "remove",
+		Use:     "remove [package]",
 		Short:   "Remove a dependency",
 		Long:    "Remove a dependency from your project.",
 		Aliases: []string{"rm"},

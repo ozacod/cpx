@@ -31,13 +31,13 @@ Read the full docs at [cpx-dev.vercel.app/docs](https://cpx-dev.vercel.app/docs)
 - **Dependency Management**:
   - `cpx add <pkg>` installs packages seamlessly:
     - **vcpkg** for CMake projects
-    - **WrapDB** for Meson projects (via `meson wrap install`)
-    - **Bazel Central Registry** for Bazel projects (via `MODULE.bazel`)
+    - **WrapDB** for Meson projects
+    - **Bazel Central Registry** for Bazel projects 
 - **Unified Workflow**: `cpx build`, `cpx run`, `cpx test`, `cpx bench` work consistently across all project types.
 - **Code Quality**: Built-in support for `clang-format`, `clang-tidy`, `cppcheck`, and `flawfinder`.
   - `cpx analyze` runs a comprehensive static analysis report.
 - **Sanitizers**: Easy flags for ASan, TSan, MSan, UBSan.
-- **Cross-Compilation**: Generate Docker-based toolchains (Linux/Windows/Alpine) with `cpx add-toolchain`.
+- **Cross-Compilation**: Generate Docker-based toolchains with `cpx add-toolchain`.
 - **Smart Tool Detection**: Automatically validates environment and warns about missing build tools.
 
 ## Install
@@ -95,8 +95,10 @@ cpx lint             # Run linter
 
 ### CMake + vcpkg (Default)
 The gold standard for modern C++. `cpx` generates `CMakePresets.json` and manages `vcpkg.json` for you.
-- **Add deps**: `cpx add nlohmann-json` updates `vcpkg.json`.
-- **Build**: Uses CMake Presets (`debug`, `release`).
+- **Add deps**: `cpx add nlohmann-json` updates `vcpkg.json`.- **Build**: Uses CMake Presets (`debug`, `release`).
+
+#### Standalone CMake
+`cpx` also supports standard CMake projects without vcpkg. If `vcpkg.json` is missing but `CMakeLists.txt` is present, `cpx` will treat it as a standalone CMake project.
 
 ### Meson
 Fast and user-friendly. `cpx` wraps `meson setup`, `compile`, and dependency management via WrapDB.
@@ -121,7 +123,9 @@ Google's multi-language build system. `cpx` manages `MODULE.bazel` (Bzlmod).
 | `run` | Build and run executable (`--asan`, `--tsan`, `--msan`, `--ubsan`) |
 | `run --toolchain <name>` | Build and run in Docker toolchain |
 | `test` | Run tests (`--filter`) |
+| `test --toolchain <name>` | Run tests in Docker toolchain |
 | `bench` | Run benchmarks |
+| `bench --toolchain <name>` | Run benchmarks in Docker toolchain |
 | `fmt` | Format code using `clang-format` |
 | `lint` | Lint code using `clang-tidy` |
 | `analyze` | Run static analysis (cppcheck, flawfinder) & report |
@@ -148,6 +152,8 @@ Manage Docker-based build toolchains defined in `cpx-ci.yaml`. `cpx` provides a 
 | `rm-runner [name...]` | Remove runner(s) from cpx-ci.yaml |
 | `build --toolchain <name>` | Build using Docker (`--verbose` for full output) |
 | `run --toolchain <name>` | Build and run in Docker (quiet build by default) |
+| `test --toolchain <name>` | Run tests in Docker |
+| `bench --toolchain <name>` | Run benchmarks in Docker |
 
 #### `cpx-ci.yaml` Configuration
 
@@ -159,9 +165,6 @@ runners:
   - name: ubuntu-22.04
     type: docker           # docker, native, ssh
     image: cpx-linux:latest
-    cc: gcc-13             # optional compiler overrides
-    cxx: g++-13
-    cmake_toolchain_file: /opt/toolchain.cmake
 
 # build configurations
 toolchains:
@@ -170,6 +173,9 @@ toolchains:
     optimization: "3"       # 0, 1, 2, 3, s, fast (default: 2)
     jobs: 8                 # Number of parallel jobs (default: auto)
     build_type: "Release"   # Debug, Release, RelWithDebInfo
+    cc: gcc-13              # Compiler overrides
+    cxx: g++-13
+    cmake_toolchain_file: /opt/toolchain.cmake
 ```
 
 **Runners** decouple the build environment from the build configuration, allowing you to reuse the same Docker image or SSH target for multiple toolchains (e.g., Debug vs Release builds on the same runner).
@@ -186,6 +192,31 @@ toolchains:
 |---------|-------------|
 | `upgrade` | Self-update cpx to the latest version |
 | `upgrade vcpkg` | Update vcpkg via git pull + bootstrap |
+
+## Shortcuts Cheat Sheet
+
+| Command | Flag | Shorthand |
+| :--- | :--- | :--- |
+| `build` | | `b` |
+| `run` | | `r` |
+| `test` | | `t` |
+| `bench` | | `be` |
+| `add` | | `a` |
+| `remove` | | `rm` |
+| `clean` | | `cl`, `cls` |
+| `build`, `run`, `test`, `bench` | `--toolchain` | `-t` |
+| `build`, `run` | `--verbose` | `-v` |
+| `run` | `--release` | `-r` |
+| `test` | `--filter` | `-f` |
+| `analyze` | `--output` | `-o` |
+| `fmt` | `--check` | `-c` |
+| `lint` | `--fix` | `-f` |
+
+## Roadmap
+- SSH support for remote builds
+- Multi target configuration
+- CMake hierarchy detection with the help of tree-sitter
+- ccache integration
 
 ## Contributing
 Issues and PRs are welcome!

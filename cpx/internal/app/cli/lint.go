@@ -16,7 +16,7 @@ func LintCmd() *cobra.Command {
 		},
 	}
 
-	cmd.Flags().Bool("fix", false, "Automatically fix issues")
+	cmd.Flags().BoolP("fix", "f", false, "Automatically fix issues")
 
 	return cmd
 }

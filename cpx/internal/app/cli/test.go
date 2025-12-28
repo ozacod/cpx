@@ -15,9 +15,10 @@ import (
 
 func TestCmd() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "test",
-		Short: "Build and run tests",
-		Long:  "Build the project tests and run them. Detects vcpkg/CMake or Bazel projects automatically.",
+		Use:     "test",
+		Aliases: []string{"t"},
+		Short:   "Build and run tests",
+		Long:    "Build the project tests and run them. Detects vcpkg/CMake or Bazel projects automatically.",
 		Example: `  cpx test                 # Build + run all tests
   cpx test --verbose       # Show verbose output
   cpx test --filter MySuite.*`,

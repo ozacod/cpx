@@ -14,8 +14,9 @@ import (
 
 func RunCmd() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "run",
-		Short: "Build and run the project",
+		Use:     "run",
+		Aliases: []string{"r"},
+		Short:   "Build and run the project",
 		Long: `Build the project and run the executable. Automatically detects project type:
   - vcpkg/CMake projects: Builds with CMake and runs the binary
   - Bazel projects: Uses bazel run

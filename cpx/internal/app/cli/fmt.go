@@ -14,7 +14,7 @@ func FmtCmd() *cobra.Command {
 		RunE:    runFmt,
 	}
 
-	cmd.Flags().Bool("check", false, "Check formatting without modifying files")
+	cmd.Flags().BoolP("check", "c", false, "Check formatting without modifying files")
 
 	return cmd
 }

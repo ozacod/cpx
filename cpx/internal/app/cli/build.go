@@ -15,8 +15,9 @@ import (
 
 func BuildCmd() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "build",
-		Short: "Compile the project",
+		Use:     "build",
+		Aliases: []string{"b"},
+		Short:   "Compile the project",
 		Long: `Compile the project. Automatically detects project type:
   - vcpkg/CMake projects: Uses CMake with vcpkg toolchain
   - Bazel projects: Uses bazel build`,

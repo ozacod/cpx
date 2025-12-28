@@ -17,7 +17,7 @@ func AnalyzeCmd() *cobra.Command {
 		Args: cobra.ArbitraryArgs,
 	}
 
-	cmd.Flags().String("output", "analyze.html", "Output HTML file path")
+	cmd.Flags().StringP("output", "o", "analyze.html", "Output HTML file path")
 	cmd.Flags().Bool("skip-cppcheck", false, "Skip Cppcheck analysis")
 	cmd.Flags().Bool("skip-lint", false, "Skip clang-tidy analysis")
 	cmd.Flags().Bool("skip-flawfinder", false, "Skip Flawfinder analysis")

@@ -14,8 +14,9 @@ import (
 
 func CleanCmd() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "clean",
-		Short: "Remove build artifacts",
+		Use:     "clean",
+		Aliases: []string{"cl", "cls"},
+		Short:   "Remove build artifacts",
 		Long: `Remove build artifacts. Automatically detects project type:
   - Bazel: runs 'bazel clean' and removes symlinks (.bin, .out, bazel-*)
   - Meson: removes builddir/
