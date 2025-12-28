@@ -2,6 +2,7 @@ package cli
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/ozacod/cpx/internal/app/cli/tui"
 	"github.com/ozacod/cpx/internal/pkg/utils/colors"
@@ -27,7 +28,6 @@ func AddRunnerCmd() *cobra.Command {
 	return cmd
 }
 
-// RmToolchainCmd creates the rm-toolchain command
 func RmToolchainCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "rm-toolchain [name...]",
@@ -37,7 +37,6 @@ func RmToolchainCmd() *cobra.Command {
 	return cmd
 }
 
-// RmRunnerCmd creates the rm-runner command
 func RmRunnerCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "rm-runner [name...]",
@@ -53,13 +52,10 @@ func runAddToolchainCmd(_ *cobra.Command, _ []string) error {
 		return err
 	}
 
-	// Get existing toolchain names
 	var existingNames []string
 	for _, t := range ciConfig.Toolchains {
 		existingNames = append(existingNames, t.Name)
 	}
-
-	// Get runner names
 	var runnerNames []string
 	for _, r := range ciConfig.Runners {
 		runnerNames = append(runnerNames, r.Name)
@@ -74,9 +70,11 @@ func runAddToolchainCmd(_ *cobra.Command, _ []string) error {
 		return nil // Cancelled
 	}
 
+	runnerName := result.Runner
+
 	toolchain := config.Toolchain{
 		Name:      result.Name,
-		Runner:    result.Runner,
+		Runner:    runnerName,
 		BuildType: result.BuildType,
 	}
 
@@ -239,4 +237,11 @@ func loadOrCreateConfig() (*config.ToolchainConfig, error) {
 		ciConfig = &config.ToolchainConfig{}
 	}
 	return ciConfig, nil
+}
+
+func utilsSanitizeRunnerName(name string) string {
+	name = strings.ReplaceAll(name, ":", "-")
+	name = strings.ReplaceAll(name, "/", "-")
+	name = strings.ToLower(name)
+	return name
 }

@@ -10,233 +10,6 @@ import (
 )
 
 // =========================================
-// Add Toolchain TUI (creates build configuration)
-// =========================================
-
-type AddToolchainStep int
-
-const (
-	addToolchainStepName AddToolchainStep = iota
-	addToolchainStepRunner
-	addToolchainStepBuildType
-	addToolchainStepDone
-)
-
-type AddToolchainModel struct {
-	step          AddToolchainStep
-	textInput     textinput.Model
-	cursor        int
-	quitting      bool
-	cancelled     bool
-	errorMsg      string
-	existingNames map[string]bool
-	runnerNames   []string
-	buildTypes    []string
-	name          string
-	runner        string
-	buildType     string
-}
-
-type AddToolchainResult struct {
-	Name      string
-	Runner    string
-	BuildType string
-}
-
-func NewAddToolchainModel(existingNames []string, runnerNames []string) AddToolchainModel {
-	ti := textinput.New()
-	ti.Placeholder = "linux-release"
-	ti.Focus()
-	ti.CharLimit = 64
-	ti.Width = 40
-	ti.TextStyle = inputTextStyle
-
-	existing := make(map[string]bool)
-	for _, n := range existingNames {
-		existing[n] = true
-	}
-
-	// Add "(local)" option to runner names
-	runners := []string{"(local)"}
-	runners = append(runners, runnerNames...)
-
-	return AddToolchainModel{
-		step:          addToolchainStepName,
-		textInput:     ti,
-		existingNames: existing,
-		runnerNames:   runners,
-		buildTypes:    []string{"Release", "Debug", "RelWithDebInfo", "MinSizeRel"},
-	}
-}
-
-func (m AddToolchainModel) Init() tea.Cmd {
-	return textinput.Blink
-}
-
-func (m AddToolchainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
-	switch msg := msg.(type) {
-	case tea.KeyMsg:
-		switch msg.String() {
-		case "ctrl+c", "esc":
-			m.quitting = true
-			m.cancelled = true
-			return m, tea.Quit
-		case "enter":
-			return m.handleEnter()
-		case "up", "k":
-			if m.step == addToolchainStepRunner || m.step == addToolchainStepBuildType {
-				m.cursor--
-				if m.cursor < 0 {
-					if m.step == addToolchainStepRunner {
-						m.cursor = len(m.runnerNames) - 1
-					} else {
-						m.cursor = len(m.buildTypes) - 1
-					}
-				}
-				return m, nil
-			}
-		case "down", "j":
-			if m.step == addToolchainStepRunner || m.step == addToolchainStepBuildType {
-				m.cursor++
-				if m.step == addToolchainStepRunner && m.cursor >= len(m.runnerNames) {
-					m.cursor = 0
-				} else if m.step == addToolchainStepBuildType && m.cursor >= len(m.buildTypes) {
-					m.cursor = 0
-				}
-				return m, nil
-			}
-		}
-	}
-
-	if m.step == addToolchainStepName {
-		var cmd tea.Cmd
-		m.textInput, cmd = m.textInput.Update(msg)
-		return m, cmd
-	}
-	return m, nil
-}
-
-func (m AddToolchainModel) handleEnter() (tea.Model, tea.Cmd) {
-	m.errorMsg = ""
-	value := strings.TrimSpace(m.textInput.Value())
-
-	switch m.step {
-	case addToolchainStepName:
-		if value == "" {
-			m.errorMsg = "Name is required"
-			return m, nil
-		}
-		if m.existingNames[value] {
-			m.errorMsg = fmt.Sprintf("Toolchain '%s' already exists", value)
-			return m, nil
-		}
-		m.name = value
-		m.step = addToolchainStepRunner
-		m.cursor = 0
-
-	case addToolchainStepRunner:
-		selected := m.runnerNames[m.cursor]
-		if selected == "(local)" {
-			m.runner = ""
-		} else {
-			m.runner = selected
-		}
-		m.step = addToolchainStepBuildType
-		m.cursor = 0
-
-	case addToolchainStepBuildType:
-		m.buildType = m.buildTypes[m.cursor]
-		m.step = addToolchainStepDone
-		m.quitting = true
-		return m, tea.Quit
-	}
-
-	return m, nil
-}
-
-func (m AddToolchainModel) View() string {
-	if m.quitting && m.cancelled {
-		return "\n  " + dimStyle.Render("Cancelled.") + "\n\n"
-	}
-	if m.step == addToolchainStepDone {
-		return ""
-	}
-
-	var s strings.Builder
-	s.WriteString("\n")
-
-	// Show answered questions
-	if m.name != "" {
-		s.WriteString("  " + successStyle.Render("✓") + " Toolchain name: " + m.name + "\n")
-	}
-	if m.step > addToolchainStepRunner {
-		r := m.runner
-		if r == "" {
-			r = "(local)"
-		}
-		s.WriteString("  " + successStyle.Render("✓") + " Runner: " + r + "\n")
-	}
-
-	switch m.step {
-	case addToolchainStepName:
-		s.WriteString("\n  " + questionStyle.Render("? Toolchain name") + "\n")
-		s.WriteString("  " + m.textInput.View() + "\n")
-
-	case addToolchainStepRunner:
-		s.WriteString("\n  " + questionStyle.Render("? Runner") + " " + dimStyle.Render("(execution environment)") + "\n")
-		for i, opt := range m.runnerNames {
-			cursor := "  "
-			if m.cursor == i {
-				cursor = selectedStyle.Render("❯ ")
-				s.WriteString("  " + cursor + selectedStyle.Render(opt) + "\n")
-			} else {
-				s.WriteString("  " + cursor + dimStyle.Render(opt) + "\n")
-			}
-		}
-
-	case addToolchainStepBuildType:
-		s.WriteString("\n  " + questionStyle.Render("? Build type") + "\n")
-		for i, opt := range m.buildTypes {
-			cursor := "  "
-			if m.cursor == i {
-				cursor = selectedStyle.Render("❯ ")
-				s.WriteString("  " + cursor + selectedStyle.Render(opt) + "\n")
-			} else {
-				s.WriteString("  " + cursor + dimStyle.Render(opt) + "\n")
-			}
-		}
-	}
-
-	if m.errorMsg != "" {
-		s.WriteString("  " + errorStyle.Render("✗ "+m.errorMsg) + "\n")
-	}
-
-	s.WriteString("\n  " + dimStyle.Render("Enter to confirm • ↑↓ to select • Esc to cancel") + "\n")
-	return s.String()
-}
-
-func (m AddToolchainModel) GetResult() *AddToolchainResult {
-	if m.cancelled {
-		return nil
-	}
-	return &AddToolchainResult{
-		Name:      m.name,
-		Runner:    m.runner,
-		BuildType: m.buildType,
-	}
-}
-
-func RunAddToolchainTUI(existingNames []string, runnerNames []string) (*AddToolchainResult, error) {
-	m := NewAddToolchainModel(existingNames, runnerNames)
-	p := tea.NewProgram(m)
-	final, err := p.Run()
-	if err != nil {
-		return nil, err
-	}
-	return final.(AddToolchainModel).GetResult(), nil
-}
-
-// =========================================
 // Add Runner TUI (execution environment + optional compiler settings)
 // =========================================
 
@@ -254,6 +27,12 @@ const (
 	RunnerStepSSHUser
 	RunnerStepDone
 )
+
+type ImagesLoadedMsg []DockerImage
+
+func loadImagesCmd() tea.Msg {
+	return ImagesLoadedMsg(listDockerImages())
+}
 
 type AddRunnerModel struct {
 	step             AddRunnerStep
@@ -305,8 +84,6 @@ func NewAddRunnerModel(existingNames []string) AddRunnerModel {
 		existing[n] = true
 	}
 
-	images := listDockerImages()
-
 	s := spinner.New()
 	s.Spinner = spinner.Dot
 	s.Style = spinnerStyle
@@ -317,14 +94,16 @@ func NewAddRunnerModel(existingNames []string) AddRunnerModel {
 		spinner:          s,
 		existingNames:    existing,
 		typeOptions:      []string{"docker", "ssh"},
-		availableImages:  images,
-		filteredImages:   images,
+		availableImages:  nil, // Loaded async
+		filteredImages:   nil,
 		maxVisibleImages: 6,
 	}
 }
 
 func (m AddRunnerModel) Init() tea.Cmd {
-	return tea.Batch(textinput.Blink, m.spinner.Tick)
+	return tea.Batch(textinput.Blink, m.spinner.Tick, func() tea.Msg {
+		return ImagesLoadedMsg(listDockerImages())
+	})
 }
 
 func (m AddRunnerModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -361,6 +140,10 @@ func (m AddRunnerModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	}
 
 	switch msg := msg.(type) {
+	case ImagesLoadedMsg:
+		m.availableImages = msg
+		m.filteredImages = msg
+		return m, nil
 	case tea.KeyMsg:
 		switch msg.String() {
 		case "ctrl+c", "esc":
