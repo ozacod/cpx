@@ -11,6 +11,7 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/ozacod/cpx/internal/pkg/build/common"
 	build "github.com/ozacod/cpx/internal/pkg/build/interfaces"
 	"github.com/ozacod/cpx/internal/pkg/templates"
 	"github.com/ozacod/cpx/internal/pkg/utils/colors"
@@ -269,12 +270,7 @@ func (b *Builder) Build(ctx context.Context, opts build.BuildOptions) error {
 	}
 
 	// Determine output directory based on config
-	outDirName := "debug"
-	if opts.OptLevel != "" {
-		outDirName = "O" + opts.OptLevel
-	} else if opts.Release {
-		outDirName = "release"
-	}
+	outDirName := build.GetOutputDir(opts.Release, opts.OptLevel, opts.Sanitizer)
 	outputDir := filepath.Join(".bin", "native", outDirName)
 
 	// Copy artifacts to build/<config>/ directory
@@ -564,7 +560,7 @@ func (b *Builder) Clean(ctx context.Context, opts build.CleanOptions) error {
 	}
 
 	// Remove common build output directory
-	removeDir("build")
+	common.RemoveDir("build")
 
 	// Remove Bazel symlinks
 	// We want to remove .bin, .out, .testlogs which are custom symlinks we might have created
@@ -578,21 +574,12 @@ func (b *Builder) Clean(ctx context.Context, opts build.CleanOptions) error {
 	}
 
 	// Remove bazel-* symlinks (bazel-bin, bazel-out, bazel-testlogs, bazel-<project>)
-	entries, err := os.ReadDir(".")
-	if err == nil {
-		for _, entry := range entries {
-			matched, _ := filepath.Match("bazel-*", entry.Name())
-			if matched {
-				fmt.Printf("%s  Removing %s...%s\n", colors.Cyan, entry.Name(), colors.Reset)
-				os.RemoveAll(entry.Name())
-			}
-		}
-	}
+	common.RemoveDirsMatchingPattern("bazel-*", false)
 
 	if opts.All {
 		// Remove additional Bazel artifacts
-		removeDir(".bazel")
-		removeDir("external")
+		common.RemoveDir(".bazel")
+		common.RemoveDir("external")
 	}
 
 	fmt.Printf("%s✓ Bazel project cleaned%s\n", colors.Green, colors.Reset)
@@ -795,15 +782,6 @@ func (b *Builder) ListTargets(ctx context.Context) ([]string, error) {
 	}
 
 	return targets, nil
-}
-
-func removeDir(path string) {
-	if _, err := os.Stat(path); err == nil {
-		fmt.Printf("%s  Removing %s...%s\n", colors.Cyan, path, colors.Reset)
-		if err := os.RemoveAll(path); err != nil {
-			fmt.Printf("%s⚠ Failed to remove %s: %v%s\n", colors.Yellow, path, err, colors.Reset)
-		}
-	}
 }
 
 // GenerateGitignore generates the .gitignore file.

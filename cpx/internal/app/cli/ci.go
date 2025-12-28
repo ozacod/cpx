@@ -9,7 +9,7 @@ import (
 	"strings"
 
 	"github.com/ozacod/cpx/internal/pkg/build/bazel"
-	"github.com/ozacod/cpx/internal/pkg/build/cmake"
+	"github.com/ozacod/cpx/internal/pkg/build/common"
 	build "github.com/ozacod/cpx/internal/pkg/build/interfaces"
 	"github.com/ozacod/cpx/internal/pkg/build/meson"
 	"github.com/ozacod/cpx/internal/pkg/build/vcpkg"
@@ -324,7 +324,7 @@ func runNativeBuildNew(tc config.Toolchain, runner *config.Runner, projectRoot, 
 	buildArgs = append(buildArgs, tc.BuildOptions...)
 
 	if runBenchmarks {
-		projectName := cmake.GetProjectNameFromCMakeLists()
+		projectName := common.GetProjectNameFromCMakeLists()
 		if projectName == "" {
 			projectName = filepath.Base(projectRoot)
 		}

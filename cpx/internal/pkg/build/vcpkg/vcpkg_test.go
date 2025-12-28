@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/ozacod/cpx/internal/pkg/build/common"
 	build "github.com/ozacod/cpx/internal/pkg/build/interfaces"
 	"github.com/ozacod/cpx/pkg/config"
 	"github.com/stretchr/testify/assert"
@@ -96,10 +97,16 @@ func setupTestConfig(t *testing.T, tmpDir string) *Builder {
 
 func TestBuild(t *testing.T) {
 	oldExecCommand := execCommand
-	defer func() { execCommand = oldExecCommand }()
+	oldCommonExecCommand := common.ExecCommand
+	defer func() {
+		execCommand = oldExecCommand
+		common.ExecCommand = oldCommonExecCommand
+	}()
 
 	var capturedArgs [][]string
-	execCommand = mockExecCommand(&capturedArgs)
+	mockCmd := mockExecCommand(&capturedArgs)
+	execCommand = mockCmd
+	common.ExecCommand = mockCmd
 
 	tmpDir := t.TempDir()
 	oldWd, _ := os.Getwd()
@@ -138,10 +145,16 @@ func TestBuild(t *testing.T) {
 
 func TestTest(t *testing.T) {
 	oldExecCommand := execCommand
-	defer func() { execCommand = oldExecCommand }()
+	oldCommonExecCommand := common.ExecCommand
+	defer func() {
+		execCommand = oldExecCommand
+		common.ExecCommand = oldCommonExecCommand
+	}()
 
 	var capturedArgs [][]string
-	execCommand = mockExecCommand(&capturedArgs)
+	mockCmd := mockExecCommand(&capturedArgs)
+	execCommand = mockCmd
+	common.ExecCommand = mockCmd
 
 	tmpDir := t.TempDir()
 	oldWd, _ := os.Getwd()
@@ -177,10 +190,16 @@ func TestTest(t *testing.T) {
 
 func TestRun(t *testing.T) {
 	oldExecCommand := execCommand
-	defer func() { execCommand = oldExecCommand }()
+	oldCommonExecCommand := common.ExecCommand
+	defer func() {
+		execCommand = oldExecCommand
+		common.ExecCommand = oldCommonExecCommand
+	}()
 
 	var capturedArgs [][]string
-	execCommand = mockExecCommand(&capturedArgs)
+	mockCmd := mockExecCommand(&capturedArgs)
+	execCommand = mockCmd
+	common.ExecCommand = mockCmd
 
 	tmpDir := t.TempDir()
 	oldWd, _ := os.Getwd()
@@ -220,10 +239,16 @@ func TestRun(t *testing.T) {
 
 func TestAddDependency(t *testing.T) {
 	oldExecCommand := execCommand
-	defer func() { execCommand = oldExecCommand }()
+	oldCommonExecCommand := common.ExecCommand
+	defer func() {
+		execCommand = oldExecCommand
+		common.ExecCommand = oldCommonExecCommand
+	}()
 
 	var capturedArgs [][]string
-	execCommand = mockExecCommand(&capturedArgs)
+	mockCmd := mockExecCommand(&capturedArgs)
+	execCommand = mockCmd
+	common.ExecCommand = mockCmd
 
 	tmpDir := t.TempDir()
 	oldWd, _ := os.Getwd()

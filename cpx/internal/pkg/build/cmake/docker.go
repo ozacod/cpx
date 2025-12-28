@@ -1,5 +1,5 @@
-// Package vcpkg provides vcpkg/CMake build system Docker integration.
-package vcpkg
+// Package cmake provides CMake-only build system Docker integration.
+package cmake
 
 import (
 	"context"
@@ -14,7 +14,7 @@ import (
 	"github.com/ozacod/cpx/internal/pkg/utils/colors"
 )
 
-// RunDockerBuild implements the DockerBuilder interface for CMake/vcpkg builds.
+// RunDockerBuild implements the DockerBuilder interface for CMake-only builds.
 func (b *Builder) RunDockerBuild(ctx context.Context, opts build.DockerBuildOptions) error {
 	// Create target-specific output directory
 	targetOutputDir := filepath.Join(opts.OutputDir, opts.TargetName)
@@ -23,7 +23,7 @@ func (b *Builder) RunDockerBuild(ctx context.Context, opts build.DockerBuildOpti
 	}
 
 	// Detect project type (executable or library)
-	isExe, err := detectProjectType(opts.ProjectRoot)
+	isExe, err := detectCMakeProjectType(opts.ProjectRoot)
 	if err != nil {
 		isExe = true // default to executable
 	}
@@ -58,7 +58,7 @@ func (b *Builder) RunDockerBuild(ctx context.Context, opts build.DockerBuildOpti
 		"-B", containerBuildDir,
 		"-S", "/workspace",
 		"-DCMAKE_BUILD_TYPE=" + buildType,
-		"-DCMAKE_TOOLCHAIN_FILE=/opt/vcpkg/scripts/buildsystems/vcpkg.cmake",
+		"-DCMAKE_EXPORT_COMPILE_COMMANDS=ON",
 	}
 
 	if opts.RunTests {
@@ -70,7 +70,6 @@ func (b *Builder) RunDockerBuild(ctx context.Context, opts build.DockerBuildOpti
 	}
 
 	cmakeArgs = append(cmakeArgs, "-DCMAKE_CXX_FLAGS=-O"+optLevel)
-	cmakeArgs = append(cmakeArgs, "-DVCPKG_DISABLE_REGISTRY_UPDATE=ON")
 	cmakeArgs = append(cmakeArgs, opts.CMakeArgs...)
 
 	// Build command arguments
@@ -99,21 +98,9 @@ find %s -maxdepth 2 -type f \( -name "lib*.a" -o -name "lib*.so" -o -name "lib*.
 		copyCommand = fmt.Sprintf(`find %s -maxdepth 2 -type f \( -name "lib*.a" -o -name "lib*.so" -o -name "lib*.dylib" \) ! -path "*/CMakeFiles/*" -exec cp {} /output/%s/ \; 2>/dev/null || true`, containerBuildDir, opts.TargetName)
 	}
 
-	// Setup vcpkg cache directories
-	vcpkgCacheDir := filepath.Join(absBuildDir, ".vcpkg_cache")
-	for _, subdir := range []string{"installed", "downloads", "buildtrees", "binary"} {
-		if err := os.MkdirAll(filepath.Join(vcpkgCacheDir, subdir), 0755); err != nil {
-			return fmt.Errorf("failed to create vcpkg cache directory: %w", err)
-		}
-	}
-
 	absOutputDir, err := filepath.Abs(filepath.Join(opts.ProjectRoot, opts.OutputDir))
 	if err != nil {
 		return fmt.Errorf("failed to get absolute path for output directory: %w", err)
-	}
-	absVcpkgCacheDir, err := filepath.Abs(vcpkgCacheDir)
-	if err != nil {
-		return fmt.Errorf("failed to get absolute path for vcpkg cache directory: %w", err)
 	}
 
 	// Environment exports
@@ -124,12 +111,6 @@ find %s -maxdepth 2 -type f \( -name "lib*.a" -o -name "lib*.so" -o -name "lib*.
 			envExports += fmt.Sprintf("export %s=\"%s\"\n", k, v)
 		}
 	}
-
-	// Build script
-	vcpkgInstalledPath := "/tmp/.vcpkg_cache/installed"
-	vcpkgDownloadsPath := "/tmp/.vcpkg_cache/downloads"
-	vcpkgBuildtreesPath := "/tmp/.vcpkg_cache/buildtrees"
-	binaryCachePath := "/tmp/.vcpkg_cache/binary"
 
 	testSection := ""
 	if opts.RunTests {
@@ -208,29 +189,16 @@ echo " Build complete!"`, opts.TargetName, copyCommand)
 
 	buildScript := fmt.Sprintf(`#!/bin/bash
 set -e
-%sexport VCPKG_ROOT=/opt/vcpkg
-export PATH="${VCPKG_ROOT}:${PATH}"
-export VCPKG_FEATURE_FLAGS=manifests
-export X_VCPKG_REGISTRIES_CACHE=/tmp/.vcpkg_cache/registries
-export VCPKG_DISABLE_REGISTRY_UPDATE=1
-export VCPKG_KEEP_ENV_VARS="VCPKG_DISABLE_REGISTRY_UPDATE;VCPKG_FEATURE_FLAGS;VCPKG_INSTALLED_DIR;VCPKG_DOWNLOADS;VCPKG_BUILDTREES_ROOT;VCPKG_BINARY_SOURCES"
-export VCPKG_INSTALLED_DIR=%s
-export VCPKG_DOWNLOADS=%s
-export VCPKG_BUILDTREES_ROOT=%s
-export VCPKG_BINARY_SOURCES="files,%s,readwrite"
-export VCPKG_DISABLE_METRICS=1
-mkdir -p /tmp/.vcpkg_cache
-mkdir -p "$VCPKG_INSTALLED_DIR" "$VCPKG_DOWNLOADS" "$VCPKG_BUILDTREES_ROOT" "%s" "$X_VCPKG_REGISTRIES_CACHE"
-mkdir -p %s
+%smkdir -p %s
 %s
 cmake %s%s
 %s
 cmake %s%s
 %s%s%s
-`, envExports, vcpkgInstalledPath, vcpkgDownloadsPath, vcpkgBuildtreesPath, binaryCachePath, binaryCachePath, containerBuildDir, configEcho, strings.Join(cmakeArgs, " "), cmakeQuiet, buildEcho, strings.Join(buildArgs, " "), cmakeQuiet, testSection, benchSection, finalSteps)
+`, envExports, containerBuildDir, configEcho, strings.Join(cmakeArgs, " "), cmakeQuiet, buildEcho, strings.Join(buildArgs, " "), cmakeQuiet, testSection, benchSection, finalSteps)
 
 	// Run Docker container
-	fmt.Printf("  %s Running build in Docker container...%s\n", colors.Cyan, colors.Reset)
+	fmt.Printf("  %s Running CMake build in Docker container...%s\n", colors.Cyan, colors.Reset)
 
 	dockerArgs := []string{"run", "--rm"}
 	if opts.Platform != "" {
@@ -246,7 +214,6 @@ cmake %s%s
 		"-v", absProjectRoot+":/workspace:ro",
 		"-v", absBuildDir+":/tmp/build",
 		"-v", absOutputDir+":/output",
-		"-v", absVcpkgCacheDir+":/tmp/.vcpkg_cache",
 		"-w", "/workspace",
 		opts.ImageName,
 		"bash", "-c", buildScript)
@@ -256,14 +223,14 @@ cmake %s%s
 	cmd.Stderr = os.Stderr
 
 	if err := cmd.Run(); err != nil {
-		return fmt.Errorf("docker run failed: %w", err)
+		return fmt.Errorf("docker cmake build failed: %w", err)
 	}
 
 	return nil
 }
 
-// detectProjectType detects if the project is an executable or library
-func detectProjectType(projectRoot string) (bool, error) {
+// detectCMakeProjectType detects if the project is an executable or library
+func detectCMakeProjectType(projectRoot string) (bool, error) {
 	cmakeListsPath := filepath.Join(projectRoot, "CMakeLists.txt")
 	data, err := os.ReadFile(cmakeListsPath)
 	if err != nil {

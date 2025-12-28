@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/ozacod/cpx/internal/pkg/build/bazel"
+	"github.com/ozacod/cpx/internal/pkg/build/cmake"
 	build "github.com/ozacod/cpx/internal/pkg/build/interfaces"
 	"github.com/ozacod/cpx/internal/pkg/build/meson"
 	"github.com/ozacod/cpx/internal/pkg/build/vcpkg"
@@ -45,6 +46,9 @@ func runClean(cmd *cobra.Command, _ []string) error {
 		return builder.Clean(context.Background(), opts)
 	case ProjectTypeMeson:
 		builder := meson.New()
+		return builder.Clean(context.Background(), opts)
+	case ProjectTypeCMake:
+		builder := cmake.New()
 		return builder.Clean(context.Background(), opts)
 	case ProjectTypeVcpkg:
 		builder := vcpkg.New()

@@ -1393,6 +1393,278 @@ MIT
 }
 
 // ============================================================================
+// CMAKE-ONLY TEMPLATES (no package manager)
+// ============================================================================
+
+// GenerateCMakeLists generates CMakeLists.txt for CMake-only projects
+func GenerateCMakeLists(projectName string, cppStandard int, isExe bool, includeTests bool, benchmarkFramework string, includeBench bool, projectVersion string) string {
+	var sb strings.Builder
+
+	if projectVersion == "" {
+		projectVersion = "0.1.0"
+	}
+
+	sb.WriteString(fmt.Sprintf(`cmake_minimum_required(VERSION 3.20)
+project(%s VERSION %s LANGUAGES CXX)
+
+# Set C++ standard
+set(CMAKE_CXX_STANDARD %d)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_EXTENSIONS OFF)
+
+# Export compile commands for IDE support
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+
+`, projectName, projectVersion, cppStandard))
+
+	// Add options for tests and benchmarks if they are included
+	if includeTests || includeBench {
+		sb.WriteString("# Build options\n")
+		if includeTests {
+			sb.WriteString("option(ENABLE_TESTING \"Build tests\" OFF)\n")
+		}
+		if includeBench {
+			sb.WriteString("option(ENABLE_BENCHMARKS \"Build benchmarks\" OFF)\n")
+		}
+		sb.WriteString("\n")
+	}
+
+	if isExe {
+		sb.WriteString(fmt.Sprintf(`# Executable
+add_executable(%s
+    src/main.cpp
+    src/%s.cpp
+)
+
+target_include_directories(%s
+    PRIVATE
+        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+)
+
+`, projectName, projectName, projectName))
+	} else {
+		sb.WriteString(fmt.Sprintf(`# Library (static by default)
+add_library(%s STATIC
+    src/%s.cpp
+)
+
+target_include_directories(%s
+    PUBLIC
+        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+        $<INSTALL_INTERFACE:include>
+)
+
+`, projectName, projectName, projectName))
+	}
+
+	if includeTests {
+		sb.WriteString(`# Testing
+if(ENABLE_TESTING)
+    enable_testing()
+    add_subdirectory(tests)
+endif()
+`)
+	}
+
+	if includeBench {
+		sb.WriteString(`
+# Benchmarks
+if(ENABLE_BENCHMARKS)
+    add_subdirectory(bench)
+endif()
+`)
+	}
+
+	return sb.String()
+}
+
+// GenerateCMakeGitignore generates .gitignore for CMake-only projects
+func GenerateCMakeGitignore() string {
+	return `# Build directories
+build/
+.bin/
+.cache/
+build-*/
+out/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# Compiled files
+*.o
+*.obj
+*.a
+*.lib
+*.so
+*.dylib
+*.dll
+
+# CMake
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+Makefile
+compile_commands.json
+
+# Testing
+Testing/
+test_results/
+
+# Package
+*.zip
+*.tar.gz
+`
+}
+
+// GenerateCMakeReadme generates README with CMake-only instructions
+func GenerateCMakeReadme(projectName string, cppStandard int, isLib bool) string {
+	codeBlock := "```"
+	if isLib {
+		return fmt.Sprintf(`# %s
+
+A C++ library using CMake for builds.
+
+## Requirements
+
+- CMake 3.20 or higher
+- C++%d compatible compiler
+
+## Building
+
+%sbash
+# Using cpx
+cpx build
+
+# Or manually with CMake
+cmake -B build
+cmake --build build
+%s
+
+## Installation
+
+%sbash
+cd build
+cmake --install . --prefix /usr/local
+%s
+
+## Usage
+
+%scmake
+find_package(%s REQUIRED)
+target_link_libraries(your_target PRIVATE %s)
+%s
+
+## Testing
+
+%sbash
+cpx test
+
+# Or manually
+cmake -B build -DENABLE_TESTING=ON
+cmake --build build
+ctest --test-dir build
+%s
+
+## Adding Dependencies
+
+CMake-only projects use FetchContent for dependencies.
+Add this to your CMakeLists.txt:
+
+%scmake
+include(FetchContent)
+FetchContent_Declare(
+    <package_name>
+    GIT_REPOSITORY https://github.com/.../<package>.git
+    GIT_TAG <version>
+)
+FetchContent_MakeAvailable(<package_name>)
+%s
+
+Alternatively, consider using vcpkg, Meson, or Bazel for
+integrated dependency management:
+%sbash
+cpx new  # Select a package manager option
+%s
+
+## License
+
+MIT
+`, projectName, cppStandard, codeBlock, codeBlock, codeBlock, codeBlock, codeBlock, projectName, projectName, codeBlock, codeBlock, codeBlock, codeBlock, codeBlock, codeBlock, codeBlock)
+	}
+
+	// Executable project
+	return fmt.Sprintf(`# %s
+
+A C++ project using CMake for builds.
+
+## Requirements
+
+- CMake 3.20 or higher
+- C++%d compatible compiler
+
+## Building
+
+%sbash
+# Using cpx
+cpx build
+
+# Or manually with CMake
+cmake -B build
+cmake --build build
+%s
+
+## Running
+
+%sbash
+cpx run
+
+# Or manually
+./build/%s
+%s
+
+## Testing
+
+%sbash
+cpx test
+
+# Or manually
+cmake -B build -DENABLE_TESTING=ON
+cmake --build build
+ctest --test-dir build
+%s
+
+## Adding Dependencies
+
+CMake-only projects use FetchContent for dependencies.
+Add this to your CMakeLists.txt:
+
+%scmake
+include(FetchContent)
+FetchContent_Declare(
+    <package_name>
+    GIT_REPOSITORY https://github.com/.../<package>.git
+    GIT_TAG <version>
+)
+FetchContent_MakeAvailable(<package_name>)
+%s
+
+Alternatively, consider using vcpkg, Meson, or Bazel for
+integrated dependency management:
+%sbash
+cpx new  # Select a package manager option
+%s
+
+## License
+
+MIT
+`, projectName, cppStandard, codeBlock, codeBlock, codeBlock, projectName, codeBlock, codeBlock, codeBlock, codeBlock, codeBlock, codeBlock, codeBlock)
+}
+
+// ============================================================================
 // Benchmark Source Templates
 // ============================================================================
 

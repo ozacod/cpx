@@ -1,0 +1,58 @@
+package cmake
+
+import (
+	"context"
+	"os"
+	"path/filepath"
+	"testing"
+
+	build "github.com/ozacod/cpx/internal/pkg/build/interfaces"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+)
+
+func TestGenerate(t *testing.T) {
+	// Use temp dir
+	tmpDir := t.TempDir()
+	oldWd, err := os.Getwd()
+	require.NoError(t, err)
+	defer func() { _ = os.Chdir(oldWd) }()
+	require.NoError(t, os.Chdir(tmpDir))
+
+	builder := New()
+	ctx := context.Background()
+	projectName := "test-project"
+
+	// Create project directory
+	require.NoError(t, os.MkdirAll(projectName, 0755))
+	projectPath := filepath.Join(tmpDir, projectName)
+
+	initConfig := build.InitConfig{
+		Name:          projectName,
+		Version:       "0.1.0",
+		IsLibrary:     false,
+		CppStandard:   20,
+		TestFramework: "googletest",
+		Benchmark:     "google-benchmark",
+	}
+
+	// Test GenerateGitignore
+	err = builder.GenerateGitignore(ctx, projectPath)
+	assert.NoError(t, err)
+	assert.FileExists(t, filepath.Join(projectPath, ".gitignore"))
+
+	// Test GenerateBuildSrc
+	err = builder.GenerateBuildSrc(ctx, projectPath, initConfig)
+	assert.NoError(t, err)
+	assert.FileExists(t, filepath.Join(projectPath, "CMakeLists.txt"))
+
+	// Test GenerateBuildTest
+	err = builder.GenerateBuildTest(ctx, projectPath, initConfig)
+	assert.NoError(t, err)
+	assert.FileExists(t, filepath.Join(projectPath, "tests", "CMakeLists.txt"))
+
+	// Test GenerateBuildBench
+	err = builder.GenerateBuildBench(ctx, projectPath, initConfig)
+	assert.NoError(t, err)
+	assert.FileExists(t, filepath.Join(projectPath, "bench", "CMakeLists.txt"))
+}

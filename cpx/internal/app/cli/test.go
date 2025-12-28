@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/ozacod/cpx/internal/pkg/build/bazel"
+	"github.com/ozacod/cpx/internal/pkg/build/cmake"
 	build "github.com/ozacod/cpx/internal/pkg/build/interfaces"
 	"github.com/ozacod/cpx/internal/pkg/build/meson"
 	"github.com/ozacod/cpx/internal/pkg/build/vcpkg"
@@ -60,10 +61,12 @@ func runTest(cmd *cobra.Command, _ []string) error {
 		builder = bazel.New()
 	case ProjectTypeMeson:
 		builder = meson.New()
+	case ProjectTypeCMake:
+		builder = cmake.New()
 	case ProjectTypeVcpkg:
 		builder = vcpkg.New()
 	default:
-		return fmt.Errorf("could not detect project type (no MODULE.bazel, meson.build, or vcpkg.json found)")
+		return fmt.Errorf("could not detect project type (no MODULE.bazel, meson.build, CMakeLists.txt, or vcpkg.json found)")
 	}
 
 	opts := build.TestOptions{

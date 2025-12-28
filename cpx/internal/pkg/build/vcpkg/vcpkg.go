@@ -2,8 +2,6 @@
 package vcpkg
 
 import (
-	"bufio"
-	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -11,17 +9,12 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
-	"os/signal"
 	"path/filepath"
-	"regexp"
 	"runtime"
-	"sort"
 	"strings"
-	"syscall"
 	"time"
 
-	"github.com/schollz/progressbar/v3"
-
+	"github.com/ozacod/cpx/internal/pkg/build/common"
 	build "github.com/ozacod/cpx/internal/pkg/build/interfaces"
 	"github.com/ozacod/cpx/internal/pkg/templates"
 	"github.com/ozacod/cpx/internal/pkg/utils/colors"
@@ -225,7 +218,7 @@ func (b *Builder) Build(ctx context.Context, opts build.BuildOptions) error {
 	}
 
 	// Get project name from CMakeLists.txt (optional, for display only)
-	projectName := getProjectNameFromCMakeLists()
+	projectName := common.GetProjectNameFromCMakeLists()
 	if projectName == "" {
 		projectName = "project"
 	}
@@ -253,10 +246,10 @@ func (b *Builder) Build(ctx context.Context, opts build.BuildOptions) error {
 	}
 
 	// Determine build type and optimization
-	buildType, cxxFlags := determineBuildType(opts.Release, opts.OptLevel)
+	buildType, cxxFlags := common.DetermineBuildType(opts.Release, opts.OptLevel)
 
 	// Add sanitizer flags
-	sanCFlags, sanLFlags := getSanitizerFlags(opts.Sanitizer)
+	sanCFlags, sanLFlags := common.GetSanitizerFlags(opts.Sanitizer)
 	cxxFlags += sanCFlags
 	linkerFlags := sanLFlags
 
@@ -313,9 +306,9 @@ func (b *Builder) Build(ctx context.Context, opts build.BuildOptions) error {
 			if linkerFlags != "" {
 				cmdArgs = append(cmdArgs, "-DCMAKE_EXE_LINKER_FLAGS="+linkerFlags, "-DCMAKE_SHARED_LINKER_FLAGS="+linkerFlags)
 			}
-			cmd := exec.Command("cmake", cmdArgs...)
+			cmd := execCommand("cmake", cmdArgs...)
 			cmd.Env = os.Environ()
-			if err := runCMakeConfigure(cmd, opts.Verbose); err != nil {
+			if err := common.RunCMakeConfigure(cmd, opts.Verbose); err != nil {
 				fmt.Println()
 				return fmt.Errorf("cmake configure failed (preset 'default'): %w", err)
 			}
@@ -328,9 +321,9 @@ func (b *Builder) Build(ctx context.Context, opts build.BuildOptions) error {
 			if linkerFlags != "" {
 				cmdArgs = append(cmdArgs, "-DCMAKE_EXE_LINKER_FLAGS="+linkerFlags, "-DCMAKE_SHARED_LINKER_FLAGS="+linkerFlags)
 			}
-			cmd := exec.Command("cmake", cmdArgs...)
+			cmd := execCommand("cmake", cmdArgs...)
 			cmd.Env = os.Environ()
-			if err := runCMakeConfigure(cmd, opts.Verbose); err != nil {
+			if err := common.RunCMakeConfigure(cmd, opts.Verbose); err != nil {
 				fmt.Println()
 				return fmt.Errorf("cmake configure failed: %w", err)
 			}
@@ -363,7 +356,7 @@ func (b *Builder) Build(ctx context.Context, opts build.BuildOptions) error {
 	}
 
 	currentStep++
-	if err := runCMakeBuild(buildArgs, opts.Verbose, currentStep, totalSteps); err != nil {
+	if err := common.RunCMakeBuild(buildArgs, opts.Verbose, currentStep, totalSteps); err != nil {
 		return fmt.Errorf("build failed: %w", err)
 	}
 
@@ -372,11 +365,11 @@ func (b *Builder) Build(ctx context.Context, opts build.BuildOptions) error {
 		return fmt.Errorf("failed to create final build dir: %w", err)
 	}
 
-	executables, err := findExecutables(cacheBuildDir)
+	executables, err := common.FindExecutables(cacheBuildDir)
 	if err == nil {
 		for _, exe := range executables {
 			dest := filepath.Join(finalBuildDir, filepath.Base(exe))
-			_ = copyAndSign(exe, dest)
+			_ = common.CopyAndSign(exe, dest)
 		}
 	}
 
@@ -392,7 +385,7 @@ func (b *Builder) Test(ctx context.Context, opts build.TestOptions) error {
 		return err
 	}
 
-	projectName := getProjectNameFromCMakeLists()
+	projectName := common.GetProjectNameFromCMakeLists()
 	if projectName == "" {
 		return fmt.Errorf("failed to get project name from CMakeLists.txt")
 	}
@@ -437,14 +430,14 @@ func (b *Builder) Test(ctx context.Context, opts build.TestOptions) error {
 			// Use "default" preset (VCPKG_ROOT is now set from config)
 			cmd := execCommand("cmake", "--preset=default", "-B", buildDir, vcpkgInstallArg, enableTestingArg)
 			cmd.Env = os.Environ()
-			if err := runCMakeConfigure(cmd, opts.Verbose); err != nil {
+			if err := common.RunCMakeConfigure(cmd, opts.Verbose); err != nil {
 				fmt.Println()
 				return fmt.Errorf("cmake configure failed (preset 'default'): %w", err)
 			}
 		} else {
 			// Fallback to traditional cmake configure
 			cmd := execCommand("cmake", "-B", buildDir, vcpkgInstallArg, enableTestingArg)
-			if err := runCMakeConfigure(cmd, opts.Verbose); err != nil {
+			if err := common.RunCMakeConfigure(cmd, opts.Verbose); err != nil {
 				fmt.Println()
 				return fmt.Errorf("cmake configure failed: %w", err)
 			}
@@ -458,7 +451,7 @@ func (b *Builder) Test(ctx context.Context, opts build.TestOptions) error {
 	// Build tests
 	currentStep++
 	buildArgs := []string{"--build", buildDir, "--target", projectName + "_tests"}
-	if err := runCMakeBuild(buildArgs, opts.Verbose, currentStep, totalSteps); err != nil {
+	if err := common.RunCMakeBuild(buildArgs, opts.Verbose, currentStep, totalSteps); err != nil {
 		return fmt.Errorf("failed to build tests: %w", err)
 	}
 
@@ -502,15 +495,15 @@ func (b *Builder) Run(ctx context.Context, opts build.RunOptions) error {
 	}
 
 	// Get project name from CMakeLists.txt (optional, for display only)
-	projectName := getProjectNameFromCMakeLists()
+	projectName := common.GetProjectNameFromCMakeLists()
 	if projectName == "" {
 		projectName = "project"
 	}
 
-	buildType, cxxFlags := determineBuildType(opts.Release, opts.OptLevel)
+	buildType, cxxFlags := common.DetermineBuildType(opts.Release, opts.OptLevel)
 
 	// Add sanitizer flags
-	sanCFlags, sanLFlags := getSanitizerFlags(opts.Sanitizer)
+	sanCFlags, sanLFlags := common.GetSanitizerFlags(opts.Sanitizer)
 	cxxFlags += sanCFlags
 	linkerFlags := sanLFlags
 
@@ -568,9 +561,9 @@ func (b *Builder) Run(ctx context.Context, opts build.RunOptions) error {
 			if linkerFlags != "" {
 				cmdArgs = append(cmdArgs, "-DCMAKE_EXE_LINKER_FLAGS="+linkerFlags, "-DCMAKE_SHARED_LINKER_FLAGS="+linkerFlags)
 			}
-			cmd := exec.Command("cmake", cmdArgs...)
+			cmd := execCommand("cmake", cmdArgs...)
 			cmd.Env = os.Environ()
-			if err := runCMakeConfigure(cmd, opts.Verbose); err != nil {
+			if err := common.RunCMakeConfigure(cmd, opts.Verbose); err != nil {
 				fmt.Println()
 				return fmt.Errorf("cmake configure failed (preset 'default'): %w", err)
 			}
@@ -584,7 +577,7 @@ func (b *Builder) Run(ctx context.Context, opts build.RunOptions) error {
 				cmdArgs = append(cmdArgs, "-DCMAKE_EXE_LINKER_FLAGS="+linkerFlags, "-DCMAKE_SHARED_LINKER_FLAGS="+linkerFlags)
 			}
 			cmd := execCommand("cmake", cmdArgs...)
-			if err := runCMakeConfigure(cmd, opts.Verbose); err != nil {
+			if err := common.RunCMakeConfigure(cmd, opts.Verbose); err != nil {
 				fmt.Println()
 				return fmt.Errorf("cmake configure failed: %w", err)
 			}
@@ -604,7 +597,7 @@ func (b *Builder) Run(ctx context.Context, opts build.RunOptions) error {
 	}
 
 	currentStep++
-	if err := runCMakeBuild(buildArgs, opts.Verbose, currentStep, totalSteps); err != nil {
+	if err := common.RunCMakeBuild(buildArgs, opts.Verbose, currentStep, totalSteps); err != nil {
 		return fmt.Errorf("build failed: %w", err)
 	}
 
@@ -613,11 +606,11 @@ func (b *Builder) Run(ctx context.Context, opts build.RunOptions) error {
 		return fmt.Errorf("failed to create final build dir: %w", err)
 	}
 
-	executables, err := findExecutables(cacheBuildDir)
+	executables, err := common.FindExecutables(cacheBuildDir)
 	if err == nil {
 		for _, exe := range executables {
 			dest := filepath.Join(finalBuildDir, filepath.Base(exe))
-			_ = copyAndSign(exe, dest)
+			_ = common.CopyAndSign(exe, dest)
 		}
 	}
 
@@ -644,7 +637,7 @@ func (b *Builder) Run(ctx context.Context, opts build.RunOptions) error {
 		execPath = filepath.Join(finalBuildDir, execName)
 		if _, err := os.Stat(execPath); os.IsNotExist(err) {
 			// Find all executables
-			executables, err := findExecutables(finalBuildDir)
+			executables, err := common.FindExecutables(finalBuildDir)
 			if err != nil {
 				return err
 			}
@@ -687,7 +680,7 @@ func (b *Builder) Bench(ctx context.Context, opts build.BenchOptions) error {
 		return err
 	}
 
-	projectName := getProjectNameFromCMakeLists()
+	projectName := common.GetProjectNameFromCMakeLists()
 	if projectName == "" {
 		return fmt.Errorf("failed to get project name from CMakeLists.txt")
 	}
@@ -736,13 +729,13 @@ func (b *Builder) Bench(ctx context.Context, opts build.BenchOptions) error {
 		if _, err := os.Stat("CMakePresets.json"); err == nil {
 			cmd := execCommand("cmake", "--preset=default", "-B", buildDir, vcpkgInstallArg, enableBenchArg, buildTypeArg)
 			cmd.Env = os.Environ()
-			if err := runCMakeConfigure(cmd, opts.Verbose); err != nil {
+			if err := common.RunCMakeConfigure(cmd, opts.Verbose); err != nil {
 				fmt.Println()
 				return fmt.Errorf("cmake configure failed (preset 'default'): %w", err)
 			}
 		} else {
 			cmd := execCommand("cmake", "-B", buildDir, vcpkgInstallArg, enableBenchArg, buildTypeArg)
-			if err := runCMakeConfigure(cmd, opts.Verbose); err != nil {
+			if err := common.RunCMakeConfigure(cmd, opts.Verbose); err != nil {
 				fmt.Println()
 				return fmt.Errorf("cmake configure failed: %w", err)
 			}
@@ -756,7 +749,7 @@ func (b *Builder) Bench(ctx context.Context, opts build.BenchOptions) error {
 	// Build benchmarks
 	currentStep++
 	buildArgs := []string{"--build", buildDir, "--target", benchTarget}
-	if err := runCMakeBuild(buildArgs, opts.Verbose, currentStep, totalSteps); err != nil {
+	if err := common.RunCMakeBuild(buildArgs, opts.Verbose, currentStep, totalSteps); err != nil {
 		return fmt.Errorf("failed to build benchmarks: %w", err)
 	}
 
@@ -805,13 +798,13 @@ func (b *Builder) Clean(ctx context.Context, opts build.CleanOptions) error {
 	fmt.Printf("%sCleaning CMake/vcpkg project...%s\n", colors.Cyan, colors.Reset)
 
 	// Remove bin directory (artifacts)
-	removeDir(filepath.Join(".bin", "native"))
+	common.RemoveDir(filepath.Join(".bin", "native"))
 
 	// Remove intermediate build directories (keep vcpkg_installed unless --all)
 	// We iterate common variants instead of blowing away .cache/native
 	variants := []string{"debug", "release", "O0", "O1", "O2", "O3", "Os", "Ofast", "test", "bench"}
 	for _, v := range variants {
-		removeDir(filepath.Join(".cache", "native", v))
+		common.RemoveDir(filepath.Join(".cache", "native", v))
 	}
 
 	if opts.All {
@@ -825,35 +818,15 @@ func (b *Builder) Clean(ctx context.Context, opts build.CleanOptions) error {
 			"cmake-build-release",
 		}
 		for _, dir := range dirsToRemove {
-			removeDir(dir)
+			common.RemoveDir(dir)
 		}
 
 		// Remove build-* directories
-		entries, err := os.ReadDir(".")
-		if err == nil {
-			for _, entry := range entries {
-				if entry.IsDir() {
-					matched, _ := filepath.Match("build-*", entry.Name())
-					if matched {
-						fmt.Printf("%s  Removing %s...%s\n", colors.Cyan, entry.Name(), colors.Reset)
-						os.RemoveAll(entry.Name())
-					}
-				}
-			}
-		}
+		common.RemoveDirsMatchingPattern("build-*", true)
 	}
 
 	fmt.Printf("%s✓ CMake project cleaned%s\n", colors.Green, colors.Reset)
 	return nil
-}
-
-func removeDir(path string) {
-	if _, err := os.Stat(path); err == nil {
-		fmt.Printf("%s  Removing %s...%s\n", colors.Cyan, path, colors.Reset)
-		if err := os.RemoveAll(path); err != nil {
-			fmt.Printf("%s⚠ Failed to remove %s: %v%s\n", colors.Yellow, path, err, colors.Reset)
-		}
-	}
 }
 
 // AddDependency adds a dependency to the project.
@@ -1184,279 +1157,6 @@ func (b *Builder) DependencyInfo(ctx context.Context, name string) (*build.Depen
 
 // Compile-time check that Builder implements build.BuildSystem.
 var _ build.BuildSystem = (*Builder)(nil)
-
-// FindExecutables finds all executables in the build directory
-func findExecutables(buildDir string) ([]string, error) {
-	var executables []string
-
-	entries, err := os.ReadDir(buildDir)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read build directory: %w", err)
-	}
-
-	for _, entry := range entries {
-		if entry.IsDir() {
-			continue
-		}
-
-		info, err := entry.Info()
-		if err != nil {
-			continue
-		}
-
-		name := entry.Name()
-
-		// Skip test executables and common non-executable files
-		if strings.Contains(name, "_test") || strings.Contains(name, "_tests") ||
-			strings.HasSuffix(name, ".a") || strings.HasSuffix(name, ".so") ||
-			strings.HasSuffix(name, ".dylib") || strings.HasSuffix(name, ".dll") ||
-			strings.HasSuffix(name, ".lib") || strings.HasSuffix(name, ".o") ||
-			strings.HasSuffix(name, ".cmake") || strings.HasSuffix(name, ".ninja") ||
-			strings.HasSuffix(name, ".make") || strings.HasSuffix(name, ".txt") {
-			continue
-		}
-
-		// Check if it's executable
-		if runtime.GOOS == "windows" {
-			if strings.HasSuffix(name, ".exe") {
-				executables = append(executables, filepath.Join(buildDir, name))
-			}
-		} else {
-			if info.Mode()&0111 != 0 {
-				executables = append(executables, filepath.Join(buildDir, name))
-			}
-		}
-	}
-
-	// Sort by name for consistent ordering
-	sort.Strings(executables)
-
-	return executables, nil
-}
-
-var progressRe = regexp.MustCompile(`^\[\s*\d+%]`)
-
-// runCMakeBuild runs "cmake --build" with optional verbose output.
-// If verbose is false, it streams only progress lines like "[ 93%]" and errors.
-func runCMakeBuild(buildArgs []string, verbose bool, currentStep, totalSteps int) error {
-	cmd := execCommand("cmake", buildArgs...)
-
-	if verbose {
-		cmd.Stdout = os.Stdout
-		cmd.Stderr = os.Stderr
-		return cmd.Run()
-	}
-
-	// Create a progress bar for the build percentage
-	bar := progressbar.NewOptions(100,
-		progressbar.OptionSetWriter(os.Stderr),
-		progressbar.OptionEnableColorCodes(true),
-		progressbar.OptionSetWidth(20),
-		progressbar.OptionSetDescription(fmt.Sprintf("[cyan][%d/%d][reset] Compiling", currentStep, totalSteps)),
-		progressbar.OptionSetTheme(progressbar.Theme{
-			Saucer:        "[cyan]█[reset]",
-			SaucerHead:    "[cyan]▸[reset]",
-			SaucerPadding: "░",
-			BarStart:      "[",
-			BarEnd:        "]",
-		}),
-		progressbar.OptionClearOnFinish(),
-	)
-
-	// Ensure cursor is restored on interrupt
-	sigCh := make(chan os.Signal, 1)
-	signal.Notify(sigCh, os.Interrupt, syscall.SIGTERM)
-	defer signal.Stop(sigCh)
-	go func() {
-		<-sigCh
-		_ = bar.Clear()
-		fmt.Print("\033[?25h") // Show cursor
-		os.Exit(1)
-	}()
-
-	pr, pw := io.Pipe()
-	cmd.Stdout = pw
-	cmd.Stderr = pw
-
-	if err := cmd.Start(); err != nil {
-		return err
-	}
-
-	var nonProgress bytes.Buffer
-	lastPercent := -1
-
-	waitCh := make(chan error, 1)
-	go func() {
-		waitCh <- cmd.Wait()
-		pw.Close()
-	}()
-
-	sc := bufio.NewScanner(pr)
-	sc.Buffer(make([]byte, 0, 64*1024), 512*1024)
-	for sc.Scan() {
-		line := sc.Text()
-		if match := progressRe.FindString(line); match != "" {
-			pct := extractPercent(match)
-			if pct >= 0 && pct != lastPercent {
-				_ = bar.Set(pct)
-				lastPercent = pct
-			}
-			continue
-		}
-		nonProgress.WriteString(line)
-		nonProgress.WriteByte('\n')
-	}
-
-	err := <-waitCh
-
-	// Complete the progress bar
-	_ = bar.Set(100)
-	_ = bar.Clear()
-
-	if err != nil {
-		if nonProgress.Len() > 0 {
-			fmt.Fprintln(os.Stderr, nonProgress.String())
-		}
-		return err
-	}
-
-	return nil
-}
-
-func extractPercent(line string) int {
-	// line format: [ 93%] ...
-	start := strings.Index(line, "[")
-	end := strings.Index(line, "%")
-	if start == -1 || end == -1 || end <= start {
-		return -1
-	}
-	var pct int
-	if _, err := fmt.Sscanf(line[start+1:end], "%d", &pct); err != nil {
-		return -1
-	}
-	return pct
-}
-
-// runCMakeConfigure runs cmake configure quietly unless verbose is true.
-func runCMakeConfigure(cmd *exec.Cmd, verbose bool) error {
-	if verbose {
-		cmd.Stdout = os.Stdout
-		cmd.Stderr = os.Stderr
-		return cmd.Run()
-	}
-
-	var buf bytes.Buffer
-	cmd.Stdout = &buf
-	cmd.Stderr = &buf
-
-	if err := cmd.Run(); err != nil {
-		return fmt.Errorf("%v\n%s", err, buf.String())
-	}
-	return nil
-}
-
-// copyAndSign copies a file and signs it on macOS to prevent signal: killed
-func copyAndSign(src, dest string) error {
-	// Remove destination to ensure clean copy
-	os.Remove(dest)
-
-	// Simple copy for Windows
-	if runtime.GOOS == "windows" {
-		input, err := os.ReadFile(src)
-		if err != nil {
-			return err
-		}
-		return os.WriteFile(dest, input, 0755)
-	}
-
-	// Use cp -f on unix-like systems to preserve attributes
-	cmd := execCommand("cp", "-f", src, dest)
-	if err := cmd.Run(); err != nil {
-		return fmt.Errorf("failed to copy binary: %w", err)
-	}
-
-	// On macOS/Darwin, force ad-hoc codesign
-	if runtime.GOOS == "darwin" {
-		cmd := execCommand("codesign", "-s", "-", "--force", dest)
-		// We ignore error here because codesign might not be available or needed
-		// , but it fixes the ASan issue most of the time
-		_ = cmd.Run()
-	}
-	return nil
-}
-
-// GetProjectNameFromCMakeLists extracts project name from CMakeLists.txt in current directory
-func getProjectNameFromCMakeLists() string {
-	cmakeListsPath := "CMakeLists.txt"
-	data, err := os.ReadFile(cmakeListsPath)
-	if err != nil {
-		return ""
-	}
-
-	// Look for: project(PROJECT_NAME ...)
-	re := regexp.MustCompile(`project\s*\(\s*([^\s\)]+)`)
-	matches := re.FindStringSubmatch(string(data))
-	if len(matches) > 1 {
-		return matches[1]
-	}
-
-	return ""
-}
-
-// DetermineBuildType determines the CMake build type and CXX flags based on release flag and optimization level.
-// Returns (buildType, cxxFlags)
-func determineBuildType(release bool, optLevel string) (string, string) {
-	buildType := "Debug"
-	cxxFlags := ""
-
-	if release {
-		buildType = "Release"
-	}
-
-	// Handle optimization level
-	switch optLevel {
-	case "0":
-		cxxFlags = "-O0"
-		buildType = "Debug"
-	case "1":
-		cxxFlags = "-O1"
-		buildType = "RelWithDebInfo"
-	case "2":
-		cxxFlags = "-O2"
-		buildType = "Release"
-	case "3":
-		cxxFlags = "-O3"
-		buildType = "Release"
-	case "s":
-		cxxFlags = "-Os"
-		buildType = "MinSizeRel"
-	case "fast":
-		cxxFlags = "-Ofast"
-		buildType = "Release"
-	}
-
-	return buildType, cxxFlags
-}
-
-// GetSanitizerFlags returns the CXX flags and linker flags for the given sanitizer
-func getSanitizerFlags(sanitizer string) (string, string) {
-	cxxFlags := ""
-	linkerFlags := ""
-	switch sanitizer {
-	case "asan":
-		cxxFlags = " -fsanitize=address -fno-omit-frame-pointer"
-		linkerFlags = "-fsanitize=address"
-	case "tsan":
-		cxxFlags = " -fsanitize=thread"
-		linkerFlags = "-fsanitize=thread"
-	case "msan":
-		cxxFlags = " -fsanitize=memory -fno-omit-frame-pointer"
-		linkerFlags = "-fsanitize=memory"
-	case "ubsan":
-		cxxFlags = " -fsanitize=undefined"
-	}
-	return cxxFlags, linkerFlags
-}
 
 // ListTargets returns the list of build targets.
 func (b *Builder) ListTargets(ctx context.Context) ([]string, error) {

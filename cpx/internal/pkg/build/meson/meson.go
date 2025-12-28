@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/ozacod/cpx/internal/pkg/build/common"
 	build "github.com/ozacod/cpx/internal/pkg/build/interfaces"
 	"github.com/ozacod/cpx/internal/pkg/templates"
 	"github.com/ozacod/cpx/internal/pkg/utils/colors"
@@ -133,12 +134,7 @@ func (b *Builder) Build(ctx context.Context, opts build.BuildOptions) error {
 	}
 
 	// Determine output directory based on config
-	outDirName := "debug"
-	if opts.OptLevel != "" {
-		outDirName = "O" + opts.OptLevel
-	} else if opts.Release {
-		outDirName = "release"
-	}
+	outDirName := build.GetOutputDir(opts.Release, opts.OptLevel, opts.Sanitizer)
 	outputDir := filepath.Join(".bin", "native", outDirName)
 
 	// Copy artifacts to output directory
@@ -348,28 +344,17 @@ func (b *Builder) Clean(ctx context.Context, opts build.CleanOptions) error {
 	fmt.Printf("%sCleaning Meson project...%s\n", colors.Cyan, colors.Reset)
 
 	// Remove builddir
-	removeDir("builddir")
+	common.RemoveDir("builddir")
 
 	// Remove common build output directory
-	removeDir("build")
+	common.RemoveDir("build")
 
 	if opts.All {
 		// Remove additional Meson artifacts
-		removeDir("subprojects/packagecache")
+		common.RemoveDir("subprojects/packagecache")
 
 		// Remove build-* directories
-		entries, err := os.ReadDir(".")
-		if err == nil {
-			for _, entry := range entries {
-				if entry.IsDir() {
-					matched, _ := filepath.Match("build-*", entry.Name())
-					if matched {
-						fmt.Printf("%s  Removing %s...%s\n", colors.Cyan, entry.Name(), colors.Reset)
-						os.RemoveAll(entry.Name())
-					}
-				}
-			}
-		}
+		common.RemoveDirsMatchingPattern("build-*", true)
 	}
 
 	fmt.Printf("%s✓ Meson project cleaned%s\n", colors.Green, colors.Reset)
@@ -631,12 +616,3 @@ func (b *Builder) downloadWrap(projectPath, wrapName string) error {
 }
 
 var _ build.BuildSystem = (*Builder)(nil)
-
-func removeDir(path string) {
-	if _, err := os.Stat(path); err == nil {
-		fmt.Printf("%s  Removing %s...%s\n", colors.Cyan, path, colors.Reset)
-		if err := os.RemoveAll(path); err != nil {
-			fmt.Printf("%s⚠ Failed to remove %s: %v%s\n", colors.Yellow, path, err, colors.Reset)
-		}
-	}
-}

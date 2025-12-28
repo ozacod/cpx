@@ -12,6 +12,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/ozacod/cpx/internal/app/cli/tui"
 	"github.com/ozacod/cpx/internal/pkg/build/bazel"
+	"github.com/ozacod/cpx/internal/pkg/build/cmake"
 	build "github.com/ozacod/cpx/internal/pkg/build/interfaces"
 	"github.com/ozacod/cpx/internal/pkg/build/meson"
 	"github.com/ozacod/cpx/internal/pkg/build/vcpkg"
@@ -181,6 +182,8 @@ func createProjectFromTUI(config tui.ProjectConfig) error {
 		builder = bazel.New()
 	case "meson":
 		builder = meson.New()
+	case "cmake":
+		builder = cmake.New()
 	default:
 		builder = vcpkg.New()
 	}
@@ -245,6 +248,8 @@ func createProjectFromTUI(config tui.ProjectConfig) error {
 		readme = templates.GenerateBazelReadme(projectName, cppStandard, cfg.IsLibrary)
 	case "meson":
 		readme = templates.GenerateMesonReadme(projectName, cppStandard, cfg.IsLibrary)
+	case "cmake":
+		readme = templates.GenerateCMakeReadme(projectName, cppStandard, cfg.IsLibrary)
 	case "vcpkg":
 		readme = templates.GenerateVcpkgReadme(projectName, cppStandard, cfg.IsLibrary)
 	default:

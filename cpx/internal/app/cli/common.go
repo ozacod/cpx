@@ -47,11 +47,13 @@ const (
 	ProjectTypeVcpkg   ProjectType = "vcpkg"
 	ProjectTypeBazel   ProjectType = "bazel"
 	ProjectTypeMeson   ProjectType = "meson"
+	ProjectTypeCMake   ProjectType = "cmake"
 	ProjectTypeUnknown ProjectType = "unknown"
 )
 
-// DetectProjectType determines if current directory is vcpkg, bazel, meson, or unknown
+// DetectProjectType determines if current directory is vcpkg, bazel, meson, cmake, or unknown
 func DetectProjectType() ProjectType {
+	// Check vcpkg first (has both vcpkg.json and CMakeLists.txt)
 	if _, err := os.Stat("vcpkg.json"); err == nil {
 		return ProjectTypeVcpkg
 	}
@@ -61,14 +63,18 @@ func DetectProjectType() ProjectType {
 	if _, err := os.Stat("meson.build"); err == nil {
 		return ProjectTypeMeson
 	}
+	// CMake-only: has CMakeLists.txt but no vcpkg.json
+	if _, err := os.Stat("CMakeLists.txt"); err == nil {
+		return ProjectTypeCMake
+	}
 	return ProjectTypeUnknown
 }
 
-// RequireProject ensures the current directory is a cpx project (vcpkg, bazel, or meson)
+// RequireProject ensures the current directory is a cpx project (vcpkg, bazel, meson, or cmake)
 func RequireProject(cmdName string) (ProjectType, error) {
 	pt := DetectProjectType()
 	if pt == ProjectTypeUnknown {
-		return pt, fmt.Errorf("%s requires a cpx project (vcpkg.json, MODULE.bazel, or meson.build not found)\n  hint: create one with cpx new", cmdName)
+		return pt, fmt.Errorf("%s requires a cpx project (vcpkg.json, MODULE.bazel, meson.build, or CMakeLists.txt not found)\n  hint: create one with cpx new", cmdName)
 	}
 	return pt, nil
 }
@@ -170,6 +176,22 @@ func CheckBuildToolsForProject(projectType ProjectType) []string {
 		}
 		if !CheckCommandExists("ninja") {
 			missing = append(missing, "ninja")
+		}
+		hasCC := CheckCommandExists("gcc") || CheckCommandExists("clang") || CheckCommandExists("cc")
+		hasCXX := CheckCommandExists("g++") || CheckCommandExists("clang++") || CheckCommandExists("c++")
+		if !hasCC {
+			missing = append(missing, "C compiler (gcc, clang, or cc)")
+		}
+		if !hasCXX {
+			missing = append(missing, "C++ compiler (g++, clang++, or c++)")
+		}
+	case ProjectTypeCMake:
+		// CMake-only projects need cmake, make/ninja, and compilers
+		if !CheckCommandExists("cmake") {
+			missing = append(missing, "cmake")
+		}
+		if !CheckCommandExists("make") && !CheckCommandExists("ninja") {
+			missing = append(missing, "make or ninja")
 		}
 		hasCC := CheckCommandExists("gcc") || CheckCommandExists("clang") || CheckCommandExists("cc")
 		hasCXX := CheckCommandExists("g++") || CheckCommandExists("clang++") || CheckCommandExists("c++")

@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/ozacod/cpx/internal/pkg/build/bazel"
+	"github.com/ozacod/cpx/internal/pkg/build/cmake"
 	build "github.com/ozacod/cpx/internal/pkg/build/interfaces"
 	"github.com/ozacod/cpx/internal/pkg/build/meson"
 	"github.com/ozacod/cpx/internal/pkg/build/vcpkg"
@@ -61,6 +62,8 @@ func runInfo(cmd *cobra.Command, args []string) error {
 		builder = bazel.New()
 	case ProjectTypeMeson:
 		builder = meson.New()
+	case ProjectTypeCMake:
+		builder = cmake.New()
 	case ProjectTypeVcpkg:
 		builder = vcpkg.New()
 	default:
