@@ -20,9 +20,6 @@ const (
 	RunnerStepType
 	RunnerStepDockerImage
 	RunnerStepCheckingImage
-	RunnerStepCompilerCC
-	RunnerStepCompilerCXX
-	RunnerStepCMakeToolchain
 	RunnerStepSSHHost
 	RunnerStepSSHUser
 	RunnerStepDone
@@ -35,40 +32,41 @@ func loadImagesCmd() tea.Msg {
 }
 
 type AddRunnerModel struct {
-	step             AddRunnerStep
-	textInput        textinput.Model
-	spinner          spinner.Model
-	cursor           int
-	quitting         bool
-	cancelled        bool
-	errorMsg         string
-	checkingStatus   string
-	existingNames    map[string]bool
-	name             string
-	runnerType       string
-	image            string
-	host             string
-	user             string
-	cc               string
-	cxx              string
-	cmakeToolchain   string
-	typeOptions      []string
+	step      AddRunnerStep
+	textInput textinput.Model
+	spinner   spinner.Model
+	cursor    int
+	err       error
+	errorMsg  string // Displayed error message
+	cancelled bool
+
+	// Data
+	name       string
+	runnerType string
+	image      string
+	sshHost    string
+	sshUser    string
+
+	// Options
+	existingNames map[string]bool
+	typeOptions   []string // docker, ssh
+
+	// Docker specific
 	availableImages  []DockerImage
 	filteredImages   []DockerImage
-	imageCursor      int
+	imageFilter      string
 	imageScrollStart int
 	maxVisibleImages int
+
+	currentQuestion string
 }
 
 type AddRunnerResult struct {
-	Name           string
-	Type           string
-	Image          string
-	Host           string
-	User           string
-	CC             string
-	CXX            string
-	CMakeToolchain string
+	Name    string
+	Type    string
+	Image   string
+	SSHHost string
+	SSHUser string
 }
 
 func NewAddRunnerModel(existingNames []string) AddRunnerModel {
@@ -107,38 +105,6 @@ func (m AddRunnerModel) Init() tea.Cmd {
 }
 
 func (m AddRunnerModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
-	// Handle spinner tick during checking
-	if m.step == RunnerStepCheckingImage {
-		switch msg := msg.(type) {
-		case tea.KeyMsg:
-			if msg.String() == "ctrl+c" || msg.String() == "esc" {
-				m.quitting = true
-				m.cancelled = true
-				return m, tea.Quit
-			}
-			return m, nil
-		case spinner.TickMsg:
-			var cmd tea.Cmd
-			m.spinner, cmd = m.spinner.Update(msg)
-			return m, cmd
-		case ImageCheckResult:
-			if msg.Success {
-				// Proceed to compiler settings
-				m.step = RunnerStepCompilerCC
-				m.textInput.Reset()
-				m.textInput.Placeholder = "(optional, e.g. gcc-13)"
-				m.textInput.Focus()
-				return m, nil
-			} else {
-				m.errorMsg = msg.Error
-				m.step = RunnerStepDockerImage
-				m.textInput.Focus()
-				return m, nil
-			}
-		}
-		return m, nil
-	}
-
 	switch msg := msg.(type) {
 	case ImagesLoadedMsg:
 		m.availableImages = msg
@@ -147,298 +113,234 @@ func (m AddRunnerModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.KeyMsg:
 		switch msg.String() {
 		case "ctrl+c", "esc":
-			m.quitting = true
 			m.cancelled = true
 			return m, tea.Quit
 		case "enter":
 			return m.handleEnter()
-		case "up", "k":
-			if m.step == RunnerStepType {
-				m.cursor--
-				if m.cursor < 0 {
-					m.cursor = len(m.typeOptions) - 1
-				}
+		case "up", "down":
+			if m.step == RunnerStepDockerImage {
+				m.handleImageListNav(msg.String())
 				return m, nil
-			} else if m.step == RunnerStepDockerImage && len(m.filteredImages) > 0 {
-				if m.imageCursor > 0 {
-					m.imageCursor--
-					if m.imageCursor < m.imageScrollStart {
-						m.imageScrollStart = m.imageCursor
-					}
+			} else if m.step == RunnerStepType {
+				if msg.String() == "up" && m.cursor > 0 {
+					m.cursor--
+				} else if msg.String() == "down" && m.cursor < len(m.typeOptions)-1 {
+					m.cursor++
 				}
-				return m, nil
-			}
-		case "down", "j":
-			if m.step == RunnerStepType {
-				m.cursor++
-				if m.cursor >= len(m.typeOptions) {
-					m.cursor = 0
-				}
-				return m, nil
-			} else if m.step == RunnerStepDockerImage && len(m.filteredImages) > 0 {
-				maxCursor := len(m.filteredImages) - 1
-				if m.imageCursor < maxCursor {
-					m.imageCursor++
-					if m.imageCursor >= m.imageScrollStart+m.maxVisibleImages {
-						m.imageScrollStart = m.imageCursor - m.maxVisibleImages + 1
-					}
-				}
-				return m, nil
-			}
-		case "tab":
-			if m.step == RunnerStepDockerImage && len(m.filteredImages) > 0 && m.imageCursor < len(m.filteredImages) {
-				m.textInput.SetValue(m.filteredImages[m.imageCursor].FullName())
 				return m, nil
 			}
 		}
+	case ImageCheckResult:
+		if msg.Success {
+			// Proceed to Done directly
+			m.step = RunnerStepDone
+			return m, tea.Quit
+		} else {
+			m.errorMsg = msg.Error
+			m.step = RunnerStepDockerImage
+			m.textInput.Focus()
+			return m, nil
+		}
 	}
 
-	// Update text input and filter images
-	if m.step == RunnerStepDockerImage || m.step == RunnerStepName || m.step == RunnerStepSSHHost || m.step == RunnerStepSSHUser || m.step == RunnerStepCompilerCC || m.step == RunnerStepCompilerCXX || m.step == RunnerStepCMakeToolchain {
-		var cmd tea.Cmd
-		oldValue := m.textInput.Value()
+	var cmd tea.Cmd
+	// Only update text input if not in selection modes (except for filtering images)
+	if m.step == RunnerStepName || m.step == RunnerStepDockerImage || m.step == RunnerStepSSHHost || m.step == RunnerStepSSHUser {
 		m.textInput, cmd = m.textInput.Update(msg)
 
-		if m.step == RunnerStepDockerImage && m.textInput.Value() != oldValue {
-			filter := strings.ToLower(m.textInput.Value())
-			m.filteredImages = nil
-			for _, img := range m.availableImages {
-				if filter == "" || strings.Contains(strings.ToLower(img.FullName()), filter) {
-					m.filteredImages = append(m.filteredImages, img)
-				}
-			}
-			m.imageCursor = 0
-			m.imageScrollStart = 0
+		if m.step == RunnerStepDockerImage {
+			m.imageFilter = m.textInput.Value()
+			m.filterImages()
 		}
-		return m, cmd
 	}
-	return m, nil
+
+	// Spinner tick
+	var sCmd tea.Cmd
+	if m.step == RunnerStepCheckingImage {
+		m.spinner, sCmd = m.spinner.Update(msg)
+	}
+
+	return m, tea.Batch(cmd, sCmd)
 }
 
 func (m AddRunnerModel) handleEnter() (tea.Model, tea.Cmd) {
-	m.errorMsg = ""
-	value := strings.TrimSpace(m.textInput.Value())
+	val := strings.TrimSpace(m.textInput.Value())
 
 	switch m.step {
 	case RunnerStepName:
-		if value == "" {
-			m.errorMsg = "Name is required"
+		if val == "" {
+			m.errorMsg = "Name cannot be empty"
 			return m, nil
 		}
-		if m.existingNames[value] {
-			m.errorMsg = fmt.Sprintf("Runner '%s' already exists", value)
+		if m.existingNames[val] {
+			m.errorMsg = "Runner with this name already exists"
 			return m, nil
 		}
-		m.name = value
+		m.name = val
 		m.step = RunnerStepType
-		m.cursor = 0
+		m.textInput.Reset()
+		m.errorMsg = ""
+		return m, nil
 
 	case RunnerStepType:
 		m.runnerType = m.typeOptions[m.cursor]
-		switch m.runnerType {
-		case "docker":
+		if m.runnerType == "docker" {
 			m.step = RunnerStepDockerImage
 			m.textInput.Reset()
-			m.textInput.Placeholder = "gcc:13"
-			m.textInput.Focus()
-		case "ssh":
+			m.textInput.Placeholder = "Filter images..."
+			m.errorMsg = ""
+			m.filterImages()
+		} else {
 			m.step = RunnerStepSSHHost
 			m.textInput.Reset()
-			m.textInput.Placeholder = "build-server.local"
+			m.textInput.Placeholder = "user@hostname or hostname"
 			m.textInput.Focus()
 		}
+		return m, nil
 
 	case RunnerStepDockerImage:
-		if len(m.filteredImages) > 0 && m.imageCursor < len(m.filteredImages) {
-			m.image = m.filteredImages[m.imageCursor].FullName()
-		} else if value != "" {
-			m.image = value
-		} else {
-			m.errorMsg = "Docker image is required"
-			return m, nil
+		// User selected an image from list or typed one?
+		if len(m.filteredImages) > 0 {
+			m.image = m.filteredImages[m.cursor].Repository + ":" + m.filteredImages[m.cursor].Tag
+			m.step = RunnerStepCheckingImage
+			return m, checkImageToolsCmd(m.image)
 		}
-		m.step = RunnerStepCheckingImage
-		m.checkingStatus = "Checking build tools..."
-		return m, tea.Batch(m.spinner.Tick, checkImageToolsCmd(m.image))
-
-	case RunnerStepCompilerCC:
-		m.cc = value // Can be empty
-		m.step = RunnerStepCompilerCXX
-		m.textInput.Reset()
-		if m.cc != "" {
-			defaultCxx := strings.Replace(m.cc, "gcc", "g++", 1)
-			defaultCxx = strings.Replace(defaultCxx, "clang", "clang++", 1)
-			m.textInput.Placeholder = defaultCxx
-		} else {
-			m.textInput.Placeholder = "(optional, e.g. g++-13)"
+		if val != "" {
+			m.image = val
+			m.step = RunnerStepCheckingImage
+			return m, checkImageToolsCmd(m.image)
 		}
-		m.textInput.Focus()
-
-	case RunnerStepCompilerCXX:
-		m.cxx = value // Can be empty
-		m.step = RunnerStepCMakeToolchain
-		m.textInput.Reset()
-		m.textInput.Placeholder = "(optional)"
-		m.textInput.Focus()
-
-	case RunnerStepCMakeToolchain:
-		m.cmakeToolchain = value
-		m.step = RunnerStepDone
-		m.quitting = true
-		return m, tea.Quit
+		return m, nil
 
 	case RunnerStepSSHHost:
-		if value == "" {
-			m.errorMsg = "SSH host is required"
+		if val == "" {
+			m.errorMsg = "Host cannot be empty"
 			return m, nil
 		}
-		m.host = value
+		m.sshHost = val
 		m.step = RunnerStepSSHUser
 		m.textInput.Reset()
-		m.textInput.Placeholder = "(optional)"
-		m.textInput.Focus()
+		m.textInput.Placeholder = "username"
+		return m, nil
 
 	case RunnerStepSSHUser:
-		m.user = value
-		// SSH runners also go to compiler settings
-		m.step = RunnerStepCompilerCC
-		m.textInput.Reset()
-		m.textInput.Placeholder = "(optional, e.g. gcc-13)"
-		m.textInput.Focus()
+		m.sshUser = val
+		m.step = RunnerStepDone
+		return m, tea.Quit
 	}
 
 	return m, nil
 }
 
-func (m AddRunnerModel) View() string {
-	if m.quitting && m.cancelled {
-		return "\n  " + dimStyle.Render("Cancelled.") + "\n\n"
+func (m *AddRunnerModel) filterImages() {
+	if m.imageFilter == "" {
+		m.filteredImages = m.availableImages
+		return
 	}
+
+	var filtered []DockerImage
+	for _, img := range m.availableImages {
+		full := img.Repository + ":" + img.Tag
+		if strings.Contains(strings.ToLower(full), strings.ToLower(m.imageFilter)) {
+			filtered = append(filtered, img)
+		}
+	}
+	m.filteredImages = filtered
+	if m.cursor >= len(m.filteredImages) {
+		m.cursor = 0
+	}
+}
+
+func (m *AddRunnerModel) handleImageListNav(key string) {
+	if len(m.filteredImages) == 0 {
+		return
+	}
+	if key == "up" {
+		if m.cursor > 0 {
+			m.cursor--
+		}
+		if m.cursor < m.imageScrollStart {
+			m.imageScrollStart--
+		}
+	} else if key == "down" {
+		if m.cursor < len(m.filteredImages)-1 {
+			m.cursor++
+		}
+		if m.cursor >= m.imageScrollStart+m.maxVisibleImages {
+			m.imageScrollStart++
+		}
+	}
+}
+
+func (m AddRunnerModel) View() string {
+	var s strings.Builder
+
+	// Header - removed as per user request to remove purple header and whitespace
+	// s.WriteString(titleStyle.Render("Add New Runner") + "\n\n")
+
 	if m.step == RunnerStepDone {
 		return ""
 	}
 
-	var s strings.Builder
-	s.WriteString("\n")
-
-	// Show answered questions
-	if m.name != "" {
-		s.WriteString("  " + successStyle.Render("✓") + " Runner name: " + m.name + "\n")
-	}
-	if m.runnerType != "" {
-		s.WriteString("  " + successStyle.Render("✓") + " Runner type: " + m.runnerType + "\n")
-	}
-	if m.image != "" {
-		s.WriteString("  " + successStyle.Render("✓") + " Docker image: " + m.image + "\n")
-	}
-	if m.host != "" {
-		s.WriteString("  " + successStyle.Render("✓") + " SSH host: " + m.host + "\n")
-	}
-	if m.user != "" {
-		s.WriteString("  " + successStyle.Render("✓") + " SSH user: " + m.user + "\n")
+	if m.errorMsg != "" {
+		s.WriteString(errorStyle.Render("Error: "+m.errorMsg) + "\n\n")
 	}
 
 	switch m.step {
 	case RunnerStepName:
 		s.WriteString("\n  " + questionStyle.Render("? Runner name") + "\n")
 		s.WriteString("  " + m.textInput.View() + "\n")
+		s.WriteString("\n" + helpStyle.Render("Enter a unique name for this runner"))
 
 	case RunnerStepType:
-		s.WriteString("\n  " + questionStyle.Render("? Runner type") + "\n")
+		s.WriteString("\n  " + questionStyle.Render("? Runner type") + "\n\n")
 		for i, opt := range m.typeOptions {
-			cursor := "  "
+			cursor := " "
+			style := textStyle
 			if m.cursor == i {
-				cursor = selectedStyle.Render("❯ ")
+				cursor = ">"
+				style = selectedStyle
 			}
-			desc := ""
-			if opt == "docker" {
-				desc = dimStyle.Render(" - build in container")
-			} else if opt == "ssh" {
-				desc = dimStyle.Render(" - build on remote server")
-			}
-			s.WriteString("  " + cursor + opt + desc + "\n")
+			s.WriteString(fmt.Sprintf("  %s %s\n", cursor, style.Render(opt)))
 		}
 
 	case RunnerStepDockerImage:
-		s.WriteString("\n  " + questionStyle.Render("? Docker image") + " " + dimStyle.Render("(type to filter, ↑↓ to select, Tab to complete)") + "\n")
-		s.WriteString("  " + m.textInput.View() + "\n")
+		s.WriteString("\n  " + questionStyle.Render("? Select Docker image") + "\n")
+		s.WriteString("  " + m.textInput.View() + "\n\n")
 
-		if len(m.filteredImages) > 0 {
-			s.WriteString("\n")
-			endIdx := m.imageScrollStart + m.maxVisibleImages
-			if endIdx > len(m.filteredImages) {
-				endIdx = len(m.filteredImages)
+		if len(m.filteredImages) == 0 {
+			s.WriteString("  " + helpStyle.Render("No images found matching filter") + "\n")
+		} else {
+			end := m.imageScrollStart + m.maxVisibleImages
+			if end > len(m.filteredImages) {
+				end = len(m.filteredImages)
 			}
 
-			for i := m.imageScrollStart; i < endIdx; i++ {
+			for i := m.imageScrollStart; i < end; i++ {
 				img := m.filteredImages[i]
-				display := img.FullName()
-				if img.Architecture != "" {
-					display += " " + dimStyle.Render("("+img.Architecture+")")
+				cursor := " "
+				style := textStyle
+				if m.cursor == i {
+					cursor = ">"
+					style = selectedStyle
 				}
-
-				cursor := "  "
-				if m.imageCursor == i {
-					cursor = selectedStyle.Render("❯ ")
-					s.WriteString("  " + cursor + selectedStyle.Render(img.FullName()))
-					if img.Architecture != "" {
-						s.WriteString(" " + dimStyle.Render("("+img.Architecture+")"))
-					}
-					s.WriteString("\n")
-				} else {
-					s.WriteString("  " + cursor + dimStyle.Render(display) + "\n")
-				}
+				s.WriteString(fmt.Sprintf("  %s %s (%s)\n", cursor, style.Render(img.Repository+":"+img.Tag), img.Size))
 			}
-
-			if len(m.filteredImages) > m.maxVisibleImages {
-				shown := fmt.Sprintf("(%d of %d)", endIdx-m.imageScrollStart, len(m.filteredImages))
-				s.WriteString("  " + dimStyle.Render(shown) + "\n")
-			}
-		} else if len(m.availableImages) > 0 {
-			s.WriteString("  " + dimStyle.Render("No matching images found") + "\n")
 		}
 
 	case RunnerStepCheckingImage:
-		s.WriteString("\n  " + m.spinner.View() + " " + m.checkingStatus + "\n")
+		s.WriteString(fmt.Sprintf("\n  %s Checking image tools...\n", m.spinner.View()))
 
 	case RunnerStepSSHHost:
-		s.WriteString("\n  " + questionStyle.Render("? SSH host") + "\n")
+		s.WriteString("\n  " + questionStyle.Render("? SSH Host") + "\n")
 		s.WriteString("  " + m.textInput.View() + "\n")
 
 	case RunnerStepSSHUser:
-		s.WriteString("\n  " + questionStyle.Render("? SSH user (optional)") + "\n")
-		s.WriteString("  " + m.textInput.View() + "\n")
-
-	case RunnerStepCompilerCC:
-		s.WriteString("\n  " + questionStyle.Render("? C compiler") + " " + dimStyle.Render("(optional, leave blank for image default)") + "\n")
-		s.WriteString("  " + m.textInput.View() + "\n")
-
-	case RunnerStepCompilerCXX:
-		if m.cc != "" {
-			s.WriteString("  " + successStyle.Render("✓") + " C compiler: " + m.cc + "\n")
-		}
-		s.WriteString("\n  " + questionStyle.Render("? C++ compiler") + " " + dimStyle.Render("(optional)") + "\n")
-		s.WriteString("  " + m.textInput.View() + "\n")
-
-	case RunnerStepCMakeToolchain:
-		if m.cc != "" {
-			s.WriteString("  " + successStyle.Render("✓") + " C compiler: " + m.cc + "\n")
-		}
-		if m.cxx != "" {
-			s.WriteString("  " + successStyle.Render("✓") + " C++ compiler: " + m.cxx + "\n")
-		}
-		s.WriteString("\n  " + questionStyle.Render("? CMake toolchain file") + " " + dimStyle.Render("(optional)") + "\n")
+		s.WriteString("\n  " + questionStyle.Render("? SSH User") + "\n")
 		s.WriteString("  " + m.textInput.View() + "\n")
 	}
 
-	if m.errorMsg != "" {
-		wrapped := errorStyle.Width(70).Render("✗ " + m.errorMsg)
-		s.WriteString("  " + wrapped + "\n")
-	}
-
-	if m.step != RunnerStepCheckingImage {
-		s.WriteString("\n  " + dimStyle.Render("Enter to confirm • ↑↓ to select • Esc to cancel") + "\n")
-	}
+	s.WriteString("\n\n" + helpStyle.Render("Press Esc to cancel, Enter to confirm"))
 	return s.String()
 }
 
@@ -447,14 +349,11 @@ func (m AddRunnerModel) GetResult() *AddRunnerResult {
 		return nil
 	}
 	return &AddRunnerResult{
-		Name:           m.name,
-		Type:           m.runnerType,
-		Image:          m.image,
-		Host:           m.host,
-		User:           m.user,
-		CC:             m.cc,
-		CXX:            m.cxx,
-		CMakeToolchain: m.cmakeToolchain,
+		Name:    m.name,
+		Type:    m.runnerType,
+		Image:   m.image,
+		SSHHost: m.sshHost,
+		SSHUser: m.sshUser,
 	}
 }
 

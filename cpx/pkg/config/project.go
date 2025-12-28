@@ -23,10 +23,6 @@ type Runner struct {
 	Image string `yaml:"image,omitempty"` // for docker
 	Host  string `yaml:"host,omitempty"`  // for ssh
 	User  string `yaml:"user,omitempty"`  // for ssh
-	// Compiler settings (optional, can be set in runner)
-	CC                 string `yaml:"cc,omitempty"`
-	CXX                string `yaml:"cxx,omitempty"`
-	CMakeToolchainFile string `yaml:"cmake_toolchain_file,omitempty"`
 }
 
 func (r *Runner) IsNative() bool {
@@ -43,10 +39,15 @@ func (r *Runner) IsSSH() bool {
 
 // Toolchain defines a build configuration (renamed from BuildConfig)
 type Toolchain struct {
-	Name         string            `yaml:"name"`
-	Runner       string            `yaml:"runner,omitempty"` // references Runner.Name
-	Active       *bool             `yaml:"active,omitempty"` // true (default) or false to disable
-	BuildType    string            `yaml:"build_type,omitempty"`
+	Name      string `yaml:"name"`
+	Runner    string `yaml:"runner,omitempty"` // references Runner.Name
+	Active    *bool  `yaml:"active,omitempty"` // true (default) or false to disable
+	BuildType string `yaml:"build_type,omitempty"`
+	// Compiler settings
+	CC                 string `yaml:"cc,omitempty"`
+	CXX                string `yaml:"cxx,omitempty"`
+	CMakeToolchainFile string `yaml:"cmake_toolchain_file,omitempty"`
+	// Other options
 	CMakeOptions []string          `yaml:"cmake_options,omitempty"`
 	BuildOptions []string          `yaml:"build_options,omitempty"`
 	Env          map[string]string `yaml:"env,omitempty"`

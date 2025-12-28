@@ -73,9 +73,12 @@ func runAddToolchainCmd(_ *cobra.Command, _ []string) error {
 	runnerName := result.Runner
 
 	toolchain := config.Toolchain{
-		Name:      result.Name,
-		Runner:    runnerName,
-		BuildType: result.BuildType,
+		Name:               result.Name,
+		Runner:             runnerName,
+		BuildType:          result.BuildType,
+		CC:                 result.CC,
+		CXX:                result.CXX,
+		CMakeToolchainFile: result.CMakeToolchainFile,
 	}
 
 	ciConfig.Toolchains = append(ciConfig.Toolchains, toolchain)
@@ -108,14 +111,11 @@ func runAddRunnerCmd(_ *cobra.Command, _ []string) error {
 	}
 
 	runner := config.Runner{
-		Name:               result.Name,
-		Type:               result.Type,
-		Image:              result.Image,
-		Host:               result.Host,
-		User:               result.User,
-		CC:                 result.CC,
-		CXX:                result.CXX,
-		CMakeToolchainFile: result.CMakeToolchain,
+		Name:  result.Name,
+		Type:  result.Type,
+		Image: result.Image,
+		Host:  result.SSHHost,
+		User:  result.SSHUser,
 	}
 
 	ciConfig.Runners = append(ciConfig.Runners, runner)

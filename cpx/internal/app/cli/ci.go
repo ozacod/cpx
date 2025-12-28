@@ -99,24 +99,22 @@ func runToolchainBuild(options ToolchainBuildOptions) error {
 			fmt.Printf("\n%s[%d/%d] Building: %s (%s)%s\n", colors.Cyan, i+1, len(toolchains), tc.Name, runnerType, colors.Reset)
 		}
 
-		// Build environment with compiler settings from runner
+		// Build environment with compiler settings from toolchain
 		env := tc.Env
 		if env == nil {
 			env = make(map[string]string)
 		}
-		if runner != nil {
-			if runner.CC != "" {
-				env["CC"] = runner.CC
-			}
-			if runner.CXX != "" {
-				env["CXX"] = runner.CXX
-			}
+		if tc.CC != "" {
+			env["CC"] = tc.CC
+		}
+		if tc.CXX != "" {
+			env["CXX"] = tc.CXX
 		}
 
-		// Get CMake toolchain file if specified in runner
+		// Get CMake toolchain file from toolchain config
 		cmakeToolchainFile := ""
-		if runner != nil && runner.CMakeToolchainFile != "" {
-			cmakeToolchainFile = runner.CMakeToolchainFile
+		if tc.CMakeToolchainFile != "" {
+			cmakeToolchainFile = tc.CMakeToolchainFile
 		}
 
 		if runner == nil || runner.IsNative() {
@@ -277,9 +275,9 @@ func runNativeBuildNew(tc config.Toolchain, runner *config.Runner, projectRoot, 
 		"-DCMAKE_CXX_FLAGS=-O" + optLevel,
 	}
 
-	// Add toolchain file if specified in runner
-	if runner != nil && runner.CMakeToolchainFile != "" {
-		cmakeArgs = append(cmakeArgs, "-DCMAKE_TOOLCHAIN_FILE="+runner.CMakeToolchainFile)
+	// Add toolchain file if specified in toolchain
+	if tc.CMakeToolchainFile != "" {
+		cmakeArgs = append(cmakeArgs, "-DCMAKE_TOOLCHAIN_FILE="+tc.CMakeToolchainFile)
 	}
 
 	if runTests {
@@ -294,13 +292,11 @@ func runNativeBuildNew(tc config.Toolchain, runner *config.Runner, projectRoot, 
 
 	// Set environment variables
 	env := os.Environ()
-	if runner != nil {
-		if runner.CC != "" {
-			env = append(env, "CC="+runner.CC)
-		}
-		if runner.CXX != "" {
-			env = append(env, "CXX="+runner.CXX)
-		}
+	if tc.CC != "" {
+		env = append(env, "CC="+tc.CC)
+	}
+	if tc.CXX != "" {
+		env = append(env, "CXX="+tc.CXX)
 	}
 	for k, v := range tc.Env {
 		env = append(env, fmt.Sprintf("%s=%s", k, v))

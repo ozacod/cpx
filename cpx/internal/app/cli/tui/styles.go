@@ -52,6 +52,12 @@ var (
 
 	spinnerStyle = lipgloss.NewStyle().
 			Foreground(cyan)
+
+	textStyle = lipgloss.NewStyle().
+			Foreground(white)
+
+	helpStyle = lipgloss.NewStyle().
+			Foreground(dimGray)
 )
 
 func (m Model) renderCursor(pos int) string {
