@@ -23,7 +23,6 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// NewCmd creates the new command with interactive TUI
 func NewCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "new",
@@ -48,33 +47,27 @@ func runNew(_ *cobra.Command, _ []string) error {
 		return fmt.Errorf("failed to run TUI: %w", err)
 	}
 
-	// Get the final model
 	finalModel, ok := m.(tui.Model)
 	if !ok {
 		return fmt.Errorf("unexpected model type")
 	}
 
-	// Check if canceled
 	if finalModel.IsCancelled() {
 		return nil
 	}
 
-	// Get the configuration
 	config := finalModel.GetConfig()
 
-	// Create the project with the configuration
 	return createProjectFromTUI(config)
 }
 
 func createProjectFromTUI(config tui.ProjectConfig) error {
 	projectName := config.Name
 
-	// Check if directory already exists
 	if _, err := os.Stat(projectName); err == nil {
 		return fmt.Errorf("directory '%s' already exists", projectName)
 	}
 
-	// If using a template, delegate to the template's Generate function
 	if config.UseTemplate {
 		template, ok := project_templates.GetTemplateByName(config.TemplateName)
 		if !ok {
@@ -96,7 +89,6 @@ func createProjectFromTUI(config tui.ProjectConfig) error {
 	}
 
 	// Custom project creation flow
-	// Create the new directory
 	if err := os.MkdirAll(projectName, 0755); err != nil {
 		return fmt.Errorf("failed to create directory '%s': %w", projectName, err)
 	}
@@ -117,7 +109,6 @@ func createProjectFromTUI(config tui.ProjectConfig) error {
 		Benchmark:      config.Benchmark,
 	}
 
-	// Set hooks
 	if len(config.GitHooks) > 0 {
 		for _, hook := range config.GitHooks {
 			if hook == "fmt" || hook == "lint" {
@@ -154,10 +145,8 @@ func createProjectFromTUI(config tui.ProjectConfig) error {
 
 	projectVersion := "0.1.0"
 
-	// Generate benchmark artifacts if enabled
 	benchSources, _ := templates.GenerateBenchmarkSources(projectName, cfg.Benchmark)
 
-	// Create directory structure
 	dirs := []string{
 		"include/" + projectName,
 		"src",
@@ -188,7 +177,6 @@ func createProjectFromTUI(config tui.ProjectConfig) error {
 		builder = vcpkg.New()
 	}
 
-	// Create InitConfig
 	initConfig := build.InitConfig{
 		Name:          projectName,
 		Version:       projectVersion,
@@ -198,24 +186,19 @@ func createProjectFromTUI(config tui.ProjectConfig) error {
 		Benchmark:     cfg.Benchmark,
 	}
 
-	// Generate build system files
 	if err := builder.GenerateBuildSrc(context.Background(), projectName, initConfig); err != nil {
 		return fmt.Errorf("failed to generate build source files: %w", err)
 	}
 
-	// Generate version.hpp
 	versionHpp := templates.GenerateVersionHpp(projectName, projectVersion)
 	if err := os.WriteFile(filepath.Join(projectName, "include/"+projectName+"/version.hpp"), []byte(versionHpp), 0644); err != nil {
 		return fmt.Errorf("failed to write version.hpp: %w", err)
 	}
 
-	// Generate header file
 	libHeader := templates.GenerateLibHeader(projectName)
 	if err := os.WriteFile(filepath.Join(projectName, "include/"+projectName+"/"+projectName+".hpp"), []byte(libHeader), 0644); err != nil {
 		return fmt.Errorf("failed to write header: %w", err)
 	}
-
-	// Generate main.cpp for executables
 	if !cfg.IsLibrary {
 		mainCpp := templates.GenerateMainCpp(projectName)
 		if err := os.WriteFile(filepath.Join(projectName, "src/main.cpp"), []byte(mainCpp), 0644); err != nil {
@@ -223,13 +206,11 @@ func createProjectFromTUI(config tui.ProjectConfig) error {
 		}
 	}
 
-	// Generate library source file
 	libSource := templates.GenerateLibSource(projectName)
 	if err := os.WriteFile(filepath.Join(projectName, "src/"+projectName+".cpp"), []byte(libSource), 0644); err != nil {
 		return fmt.Errorf("failed to write source: %w", err)
 	}
 
-	// Generate benchmark files if enabled
 	if benchSources != nil {
 		benchPath := filepath.Join(projectName, "bench", "bench_main.cpp")
 		if err := os.WriteFile(benchPath, []byte(benchSources.Main), 0644); err != nil {
@@ -241,7 +222,6 @@ func createProjectFromTUI(config tui.ProjectConfig) error {
 		}
 	}
 
-	// Generate README based on package manager
 	var readme string
 	switch cfg.PackageManager {
 	case "bazel":
@@ -259,14 +239,12 @@ func createProjectFromTUI(config tui.ProjectConfig) error {
 		return fmt.Errorf("failed to write README: %w", err)
 	}
 
-	// Generate .gitignore only if VCS is git
 	if cfg.VCS == "" || cfg.VCS == "git" {
 		if err := builder.GenerateGitignore(context.Background(), projectName); err != nil {
 			return fmt.Errorf("failed to generate .gitignore: %w", err)
 		}
 	}
 
-	// Generate .clang-format
 	clangFormatStyle := cfg.ClangFormat
 	if clangFormatStyle == "" {
 		clangFormatStyle = "Google"
@@ -276,7 +254,6 @@ func createProjectFromTUI(config tui.ProjectConfig) error {
 		return fmt.Errorf("failed to write .clang-format: %w", err)
 	}
 
-	// Generate test files if test framework is selected
 	if cfg.TestFramework != "" && cfg.TestFramework != "none" {
 		if err := builder.GenerateBuildTest(context.Background(), projectName, initConfig); err != nil {
 			return fmt.Errorf("failed to generate test build files: %w", err)
@@ -288,7 +265,6 @@ func createProjectFromTUI(config tui.ProjectConfig) error {
 		}
 	}
 
-	// Generate cpx-ci.yaml file
 	cpxCI := templates.GenerateCpxCI()
 	if err := os.WriteFile(filepath.Join(projectName, "cpx-ci.yaml"), []byte(cpxCI), 0644); err != nil {
 		return fmt.Errorf("failed to write cpx-ci.yaml: %w", err)
@@ -329,31 +305,9 @@ func createProjectFromTUI(config tui.ProjectConfig) error {
 		}
 	}
 
-	// Show success message
 	fmt.Printf("\n%s✓ Project '%s' created successfully!%s\n\n", colors.Green, projectName, colors.Reset)
 	fmt.Printf("  cd %s && cpx build && cpx run\n\n", projectName)
 
-	return nil
-}
-
-// downloadMesonWrap installs a wrap file using 'meson wrap installation'
-func downloadMesonWrap(projectName, wrapName string) error {
-	// Ensure meson is available
-	if _, err := execLookPath("meson"); err != nil {
-		return fmt.Errorf("meson not found in PATH: %w", err)
-	}
-
-	// We need to run this command inside the project directory
-	cmd := execCommand("meson", "wrap", "install", wrapName)
-	cmd.Dir = projectName
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-
-	if err := cmd.Run(); err != nil {
-		return fmt.Errorf("meson wrap install failed for %s: %w", wrapName, err)
-	}
-
-	fmt.Printf("  Installed %s.wrap\n", wrapName)
 	return nil
 }
 

@@ -17,7 +17,6 @@ type ToolchainConfig struct {
 	Toolchains []Toolchain `yaml:"toolchains,omitempty"`
 }
 
-// Runner defines an execution environment with optional compiler settings
 type Runner struct {
 	Name  string `yaml:"name"`
 	Type  string `yaml:"type,omitempty"`  // docker, ssh (native/local if omitted)
@@ -30,17 +29,14 @@ type Runner struct {
 	CMakeToolchainFile string `yaml:"cmake_toolchain_file,omitempty"`
 }
 
-// IsNative returns true if the runner type is native/local (or unspecified)
 func (r *Runner) IsNative() bool {
 	return r.Type == "" || r.Type == "native" || r.Type == "local"
 }
 
-// IsDocker returns true if the runner type is docker
 func (r *Runner) IsDocker() bool {
 	return r.Type == "docker"
 }
 
-// IsSSH returns true if the runner type is ssh
 func (r *Runner) IsSSH() bool {
 	return r.Type == "ssh"
 }
@@ -58,7 +54,6 @@ type Toolchain struct {
 	Jobs         int               `yaml:"jobs,omitempty"`         // number of parallel jobs
 }
 
-// IsActive returns whether the toolchain is active (defaults to true if not specified)
 func (t *Toolchain) IsActive() bool {
 	if t.Active == nil {
 		return true
@@ -66,7 +61,6 @@ func (t *Toolchain) IsActive() bool {
 	return *t.Active
 }
 
-// LoadToolchains loads the toolchain configuration from cpx-ci.yaml
 func LoadToolchains(path string) (*ToolchainConfig, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
@@ -88,7 +82,6 @@ func LoadToolchains(path string) (*ToolchainConfig, error) {
 	return &config, nil
 }
 
-// FindRunner finds a runner by name
 func (c *ToolchainConfig) FindRunner(name string) *Runner {
 	for i := range c.Runners {
 		if c.Runners[i].Name == name {
@@ -98,7 +91,6 @@ func (c *ToolchainConfig) FindRunner(name string) *Runner {
 	return nil
 }
 
-// FindToolchain finds a toolchain by name
 func (c *ToolchainConfig) FindToolchain(name string) *Toolchain {
 	for i := range c.Toolchains {
 		if c.Toolchains[i].Name == name {
@@ -108,19 +100,16 @@ func (c *ToolchainConfig) FindToolchain(name string) *Toolchain {
 	return nil
 }
 
-// GetOutputDir returns the output directory (always .bin/ci)
 func (c *ToolchainConfig) GetOutputDir() string {
 	return filepath.Join(".bin", "ci")
 }
 
-// SaveToolchains saves the toolchain configuration to cpx-ci.yaml
 func SaveToolchains(config *ToolchainConfig, path string) error {
 	data, err := yaml.Marshal(config)
 	if err != nil {
 		return fmt.Errorf("failed to marshal cpx-ci.yaml: %w", err)
 	}
 
-	// Add header comment
 	header := "# cpx-ci.yaml - CI toolchain configuration\n# runners: execution environments (docker/ssh) with optional compiler settings\n# toolchains: named build configurations\n\n"
 	content := header + string(data)
 

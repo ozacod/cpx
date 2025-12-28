@@ -12,7 +12,6 @@ import (
 	"github.com/ozacod/cpx/internal/pkg/utils/colors"
 )
 
-// RunDockerBuild implements the DockerBuilder interface for Bazel builds.
 func (b *Builder) RunDockerBuild(ctx context.Context, opts build.DockerBuildOptions) error {
 	absProjectRoot, err := filepath.Abs(opts.ProjectRoot)
 	if err != nil {
@@ -164,5 +163,4 @@ find "$BAZEL_OUTPUT_BASE" -path "*/bin/*" -type f \( -name "lib*.a" -o -name "li
 	return nil
 }
 
-// Compile-time check that Builder implements DockerBuilder
 var _ build.DockerBuilder = (*Builder)(nil)

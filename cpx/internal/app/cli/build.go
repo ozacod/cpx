@@ -13,7 +13,6 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// BuildCmd creates the build command
 func BuildCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "build",

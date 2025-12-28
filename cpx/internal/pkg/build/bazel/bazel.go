@@ -24,30 +24,25 @@ type Builder struct {
 	bcrPath string // BCR path for lazy initialization
 }
 
-// BCRPathFunc is a function that returns the BCR path
 type BCRPathFunc func() string
 
 // bcrPathProvider is set by CLI to provide BCR path
 var bcrPathProvider BCRPathFunc
 
-// SetBCRPathProvider sets the global function to get BCR path
 func SetBCRPathProvider(fn BCRPathFunc) {
 	bcrPathProvider = fn
 }
 
-// New creates a new Bazel Builder.
 func New() *Builder {
 	return &Builder{}
 }
 
-// NewWithBCR creates a new Bazel Builder with BCR support.
 func NewWithBCR(bcrPath string) *Builder {
 	return &Builder{
 		bcrPath: bcrPath,
 	}
 }
 
-// Module represents a BCR module
 type Module struct {
 	Name        string   `json:"name"`
 	Versions    []string `json:"versions"`
@@ -55,7 +50,6 @@ type Module struct {
 	Maintainers []string `json:"maintainers"`
 }
 
-// ModuleMetadata represents the metadata.json structure in BCR
 type ModuleMetadata struct {
 	Homepage    string `json:"homepage"`
 	Maintainers []struct {
@@ -67,12 +61,10 @@ type ModuleMetadata struct {
 	YankedVersions map[string]string `json:"yanked_versions"`
 }
 
-// SetBCRPath configures the BCR path for dependency management.
 func (b *Builder) SetBCRPath(bcrPath string) {
 	b.bcrPath = bcrPath
 }
 
-// ensureBCRPath initializes the BCR path if needed
 func (b *Builder) ensureBCRPath() error {
 	if b.bcrPath != "" {
 		return nil
@@ -90,12 +82,10 @@ func (b *Builder) ensureBCRPath() error {
 	return fmt.Errorf("bazel Central Registry not configured\n  hint: run 'cpx config set-bcr-root <path>' or reinstall cpx")
 }
 
-// getModulesDir returns the path to the modules directory
 func (b *Builder) getModulesDir() string {
 	return filepath.Join(b.bcrPath, "modules")
 }
 
-// listModules returns all available module names
 func (b *Builder) listModules() ([]string, error) {
 	modulesDir := b.getModulesDir()
 	entries, err := os.ReadDir(modulesDir)
@@ -112,7 +102,6 @@ func (b *Builder) listModules() ([]string, error) {
 	return modules, nil
 }
 
-// searchModules searches for modules by name pattern
 func (b *Builder) searchModules(query string) ([]Module, error) {
 	allModules, err := b.listModules()
 	if err != nil {
@@ -135,7 +124,6 @@ func (b *Builder) searchModules(query string) ([]Module, error) {
 	return results, nil
 }
 
-// getModule fetches metadata for a specific module
 func (b *Builder) getModule(moduleName string) (*Module, error) {
 	metadataPath := filepath.Join(b.getModulesDir(), moduleName, "metadata.json")
 
@@ -166,7 +154,6 @@ func (b *Builder) getModule(moduleName string) (*Module, error) {
 	return module, nil
 }
 
-// getLatestVersion returns the latest version of a module
 func (b *Builder) getLatestVersion(moduleName string) (string, error) {
 	module, err := b.getModule(moduleName)
 	if err != nil {
@@ -181,7 +168,6 @@ func (b *Builder) getLatestVersion(moduleName string) (string, error) {
 	return module.Versions[len(module.Versions)-1], nil
 }
 
-// Build compiles the project with the given options.
 func (b *Builder) Build(ctx context.Context, opts build.BuildOptions) error {
 	// Clean if requested
 	if opts.Clean {
@@ -326,7 +312,6 @@ func (b *Builder) Build(ctx context.Context, opts build.BuildOptions) error {
 	return nil
 }
 
-// Test runs the project's tests with the given options.
 func (b *Builder) Test(ctx context.Context, opts build.TestOptions) error {
 	fmt.Printf("%sRunning Bazel tests...%s\n", colors.Cyan, colors.Reset)
 
@@ -360,7 +345,6 @@ func (b *Builder) Test(ctx context.Context, opts build.TestOptions) error {
 	return nil
 }
 
-// Run builds and runs the project's main executable.
 func (b *Builder) Run(ctx context.Context, opts build.RunOptions) error {
 	// Build bazel run args
 	bazelArgs := []string{"run"}
@@ -441,7 +425,6 @@ func (b *Builder) Run(ctx context.Context, opts build.RunOptions) error {
 	return runCmd.Run()
 }
 
-// findBazelMainTarget tries to find a cc_binary target in BUILD.bazel
 func findBazelMainTarget() (string, error) {
 	// Read BUILD.bazel
 	content, err := os.ReadFile("BUILD.bazel")
@@ -474,7 +457,6 @@ func findBazelMainTarget() (string, error) {
 	return "//:" + projectName, nil
 }
 
-// Bench runs the project's benchmarks.
 func (b *Builder) Bench(ctx context.Context, opts build.BenchOptions) error {
 	fmt.Printf("%sRunning Bazel benchmarks...%s\n", colors.Cyan, colors.Reset)
 
@@ -524,7 +506,6 @@ func (b *Builder) Bench(ctx context.Context, opts build.BenchOptions) error {
 	return nil
 }
 
-// findBenchTarget tries to find a cc_binary target in bench/BUILD.bazel
 func findBenchTarget() string {
 	data, err := os.ReadFile("bench/BUILD.bazel")
 	if err != nil {
@@ -545,7 +526,6 @@ func findBenchTarget() string {
 	return ""
 }
 
-// Clean removes build artifacts.
 func (b *Builder) Clean(ctx context.Context, opts build.CleanOptions) error {
 	fmt.Printf("%sCleaning Bazel project...%s\n", colors.Cyan, colors.Reset)
 
@@ -586,8 +566,6 @@ func (b *Builder) Clean(ctx context.Context, opts build.CleanOptions) error {
 	return nil
 }
 
-// AddDependency adds a dependency to the project.
-// If version is empty, it fetches the latest version from BCR.
 func (b *Builder) AddDependency(ctx context.Context, name string, version string) error {
 	// If no version provided, get latest from BCR
 	// If no version provided, get latest from BCR
@@ -641,7 +619,6 @@ func (b *Builder) AddDependency(ctx context.Context, name string, version string
 	return nil
 }
 
-// RemoveDependency removes a dependency from the project.
 func (b *Builder) RemoveDependency(ctx context.Context, name string) error {
 	modulePath := "MODULE.bazel"
 	content, err := os.ReadFile(modulePath)
@@ -661,7 +638,6 @@ func (b *Builder) RemoveDependency(ctx context.Context, name string) error {
 	return nil
 }
 
-// ListDependencies returns the list of dependencies in the project.
 func (b *Builder) ListDependencies(ctx context.Context) ([]build.Dependency, error) {
 	modulePath := "MODULE.bazel"
 	content, err := os.ReadFile(modulePath)
@@ -686,7 +662,6 @@ func (b *Builder) ListDependencies(ctx context.Context) ([]build.Dependency, err
 	return deps, nil
 }
 
-// SearchDependencies searches for available packages matching the query.
 func (b *Builder) SearchDependencies(ctx context.Context, query string) ([]build.Dependency, error) {
 	if err := b.ensureBCRPath(); err != nil {
 		return nil, err
@@ -713,12 +688,10 @@ func (b *Builder) SearchDependencies(ctx context.Context, query string) ([]build
 	return deps, nil
 }
 
-// Name returns the name of the build system.
 func (b *Builder) Name() string {
 	return "bazel"
 }
 
-// DependencyInfo retrieves detailed information about a specific dependency.
 func (b *Builder) DependencyInfo(ctx context.Context, name string) (*build.DependencyInfo, error) {
 	// Use BCR client to get module info
 	if err := b.ensureBCRPath(); err != nil {
@@ -751,7 +724,6 @@ func (b *Builder) DependencyInfo(ctx context.Context, name string) (*build.Depen
 	return info, nil
 }
 
-// ListTargets returns the list of build targets.
 func (b *Builder) ListTargets(ctx context.Context) ([]string, error) {
 	// Query for all targets of type rule
 	// We use label_kind to get type info: "kind rule //package:target"
@@ -784,7 +756,6 @@ func (b *Builder) ListTargets(ctx context.Context) ([]string, error) {
 	return targets, nil
 }
 
-// GenerateGitignore generates the .gitignore file.
 func (b *Builder) GenerateGitignore(ctx context.Context, projectPath string) error {
 	gitignore := templates.GenerateBazelGitignore()
 	if err := os.WriteFile(filepath.Join(projectPath, ".gitignore"), []byte(gitignore), 0644); err != nil {
@@ -793,7 +764,6 @@ func (b *Builder) GenerateGitignore(ctx context.Context, projectPath string) err
 	return nil
 }
 
-// GenerateBuildSrc generates the build files for source code (core project files).
 func (b *Builder) GenerateBuildSrc(ctx context.Context, projectPath string, config build.InitConfig) error {
 	// Generate MODULE.bazel
 	moduleBazel := templates.GenerateModuleBazel(config.Name, config.Version, config.TestFramework, config.Benchmark)
@@ -842,7 +812,6 @@ func (b *Builder) GenerateBuildSrc(ctx context.Context, projectPath string, conf
 	return nil
 }
 
-// GenerateBuildTest generates the build files for tests.
 func (b *Builder) GenerateBuildTest(ctx context.Context, projectPath string, config build.InitConfig) error {
 	if config.TestFramework == "" || config.TestFramework == "none" {
 		return nil
@@ -860,7 +829,6 @@ func (b *Builder) GenerateBuildTest(ctx context.Context, projectPath string, con
 	return nil
 }
 
-// GenerateBuildBench generates the build files for benchmarks.
 func (b *Builder) GenerateBuildBench(ctx context.Context, projectPath string, config build.InitConfig) error {
 	if config.Benchmark == "" || config.Benchmark == "none" {
 		return nil

@@ -8,28 +8,32 @@ import (
 	"runtime"
 
 	"github.com/ozacod/cpx/internal/pkg/utils/colors"
+	"github.com/ozacod/cpx/internal/pkg/utils/common"
 	"github.com/ozacod/cpx/pkg/config"
 )
 
-// Variables for mocking in tests
 var (
 	execCommand  = exec.Command
 	execLookPath = exec.LookPath
 )
 
-// Version is the cpx version
+func CheckCommandExists(command string) bool {
+	return common.CheckCommandExists(command)
+}
+
+func CheckFileExists(path string) bool {
+	return common.CheckFileExists(path)
+}
+
 const Version = "1.2.0"
 
-// DefaultServer is the default server URL
 const DefaultServer = "https://cpx-dev.vercel.app"
 
-// PrintError prints an error message
 func PrintError(format string, args ...interface{}) {
 	msg := fmt.Sprintf(format, args...)
 	fmt.Fprintf(os.Stderr, "%s✗ %s%s\n", colors.Red, msg, colors.Reset)
 }
 
-// requireVcpkgProject ensures the current directory has a vcpkg.json manifest.
 func requireVcpkgProject(cmdName string) error {
 	if _, err := os.Stat("vcpkg.json"); err != nil {
 		if os.IsNotExist(err) {
@@ -40,7 +44,6 @@ func requireVcpkgProject(cmdName string) error {
 	return nil
 }
 
-// ProjectType represents the type of C++ project
 type ProjectType string
 
 const (
@@ -51,9 +54,7 @@ const (
 	ProjectTypeUnknown ProjectType = "unknown"
 )
 
-// DetectProjectType determines if current directory is vcpkg, bazel, meson, cmake, or unknown
 func DetectProjectType() ProjectType {
-	// Check vcpkg first (has both vcpkg.json and CMakeLists.txt)
 	if _, err := os.Stat("vcpkg.json"); err == nil {
 		return ProjectTypeVcpkg
 	}
@@ -70,7 +71,6 @@ func DetectProjectType() ProjectType {
 	return ProjectTypeUnknown
 }
 
-// RequireProject ensures the current directory is a cpx project (vcpkg, bazel, meson, or cmake)
 func RequireProject(cmdName string) (ProjectType, error) {
 	pt := DetectProjectType()
 	if pt == ProjectTypeUnknown {
@@ -79,42 +79,24 @@ func RequireProject(cmdName string) (ProjectType, error) {
 	return pt, nil
 }
 
-// Spinner represents a simple progress spinner
 type Spinner struct {
 	frames  []string
 	current int
 	message string
 }
 
-// Tick advances the spinner and prints the current frame
 func (s *Spinner) Tick() {
 	fmt.Printf("\r%s%s%s %s", colors.Cyan, s.frames[s.current], colors.Reset, s.message)
 	s.current = (s.current + 1) % len(s.frames)
 }
 
-// Done finishes the spinner with a success message
 func (s *Spinner) Done(message string) {
 	fmt.Printf("\r%s✓ %s%s\n", colors.Green, message, colors.Reset)
 }
-
-// Fail finishes the spinner with an error message
 func (s *Spinner) Fail(message string) {
 	fmt.Printf("\r%s✗ %s%s\n", colors.Red, message, colors.Reset)
 }
 
-// CheckCommandExists checks if a command is available in PATH
-func CheckCommandExists(command string) bool {
-	_, err := execLookPath(command)
-	return err == nil
-}
-
-// CheckFileExists checks if a file exists
-func CheckFileExists(path string) bool {
-	_, err := os.Stat(path)
-	return err == nil
-}
-
-// CheckBuildToolsForProject checks if the required build tools are available for the project type
 // Returns a list of missing tools
 func CheckBuildToolsForProject(projectType ProjectType) []string {
 	var missing []string

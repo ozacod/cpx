@@ -21,12 +21,10 @@ var execCommand = exec.Command
 // Builder implements the build.BuildSystem interface for Meson.
 type Builder struct{}
 
-// New creates a new Meson Builder.
 func New() *Builder {
 	return &Builder{}
 }
 
-// Build compiles the project with the given options.
 func (b *Builder) Build(ctx context.Context, opts build.BuildOptions) error {
 	buildDir := "builddir"
 
@@ -168,7 +166,6 @@ func (b *Builder) Build(ctx context.Context, opts build.BuildOptions) error {
 	return nil
 }
 
-// Test runs the project's tests with the given options.
 func (b *Builder) Test(ctx context.Context, opts build.TestOptions) error {
 	fmt.Printf("%sRunning Meson tests...%s\n", colors.Cyan, colors.Reset)
 
@@ -210,7 +207,6 @@ func (b *Builder) Test(ctx context.Context, opts build.TestOptions) error {
 	return nil
 }
 
-// Run builds and runs the project's main executable.
 func (b *Builder) Run(ctx context.Context, opts build.RunOptions) error {
 	// Ensure project is built first
 	if err := b.Build(ctx, build.BuildOptions{
@@ -280,7 +276,6 @@ func (b *Builder) Run(ctx context.Context, opts build.RunOptions) error {
 	return runCmd.Run()
 }
 
-// Bench runs the project's benchmarks.
 func (b *Builder) Bench(ctx context.Context, opts build.BenchOptions) error {
 	fmt.Printf("%sRunning Meson benchmarks...%s\n", colors.Cyan, colors.Reset)
 
@@ -339,7 +334,6 @@ func (b *Builder) Bench(ctx context.Context, opts build.BenchOptions) error {
 	return nil
 }
 
-// Clean removes build artifacts.
 func (b *Builder) Clean(ctx context.Context, opts build.CleanOptions) error {
 	fmt.Printf("%sCleaning Meson project...%s\n", colors.Cyan, colors.Reset)
 
@@ -392,7 +386,6 @@ func (b *Builder) AddDependency(ctx context.Context, name string, version string
 	return nil
 }
 
-// RemoveDependency removes a dependency from the project.
 func (b *Builder) RemoveDependency(ctx context.Context, name string) error {
 	// Remove the wrap file from subprojects
 	wrapFile := filepath.Join("subprojects", name+".wrap")
@@ -414,7 +407,6 @@ func (b *Builder) RemoveDependency(ctx context.Context, name string) error {
 	return nil
 }
 
-// ListDependencies returns the list of dependencies in the project.
 func (b *Builder) ListDependencies(ctx context.Context) ([]build.Dependency, error) {
 	subprojectsDir := "subprojects"
 	entries, err := os.ReadDir(subprojectsDir)
@@ -440,24 +432,20 @@ func (b *Builder) ListDependencies(ctx context.Context) ([]build.Dependency, err
 	return deps, nil
 }
 
-// SearchDependencies searches for available packages matching the query.
 func (b *Builder) SearchDependencies(ctx context.Context, query string) ([]build.Dependency, error) {
 	// WrapDB search would require HTTP calls to wrapdb.mesonbuild.com
 	// For now, return an error indicating this is not implemented
 	return nil, fmt.Errorf("SearchDependencies not implemented for Meson - use https://wrapdb.mesonbuild.com to search")
 }
 
-// Name returns the name of the build system.
 func (b *Builder) Name() string {
 	return "meson"
 }
 
-// DependencyInfo retrieves detailed information about a specific dependency.
 func (b *Builder) DependencyInfo(ctx context.Context, name string) (*build.DependencyInfo, error) {
 	return nil, fmt.Errorf("dependency info not implemented for Meson")
 }
 
-// ListTargets returns the list of build targets.
 func (b *Builder) ListTargets(ctx context.Context) ([]string, error) {
 	buildDir := "builddir"
 	if _, err := os.Stat(buildDir); os.IsNotExist(err) {
@@ -489,7 +477,6 @@ func (b *Builder) ListTargets(ctx context.Context) ([]string, error) {
 	return result, nil
 }
 
-// GenerateGitignore generates the .gitignore file.
 func (b *Builder) GenerateGitignore(ctx context.Context, projectPath string) error {
 	gitignore := templates.GenerateMesonGitignore()
 	if err := os.WriteFile(filepath.Join(projectPath, ".gitignore"), []byte(gitignore), 0644); err != nil {
@@ -498,7 +485,6 @@ func (b *Builder) GenerateGitignore(ctx context.Context, projectPath string) err
 	return nil
 }
 
-// GenerateBuildSrc generates the build files for source code (core project files).
 func (b *Builder) GenerateBuildSrc(ctx context.Context, projectPath string, config build.InitConfig) error {
 	// Generate meson.build (root)
 	mesonBuild := templates.GenerateMesonBuildRoot(config.Name, !config.IsLibrary, config.CppStandard, config.TestFramework, config.Benchmark)
@@ -563,7 +549,6 @@ func (b *Builder) GenerateBuildSrc(ctx context.Context, projectPath string, conf
 	return nil
 }
 
-// GenerateBuildTest generates the build files for tests.
 func (b *Builder) GenerateBuildTest(ctx context.Context, projectPath string, config build.InitConfig) error {
 	if config.TestFramework == "" || config.TestFramework == "none" {
 		return nil
@@ -581,7 +566,6 @@ func (b *Builder) GenerateBuildTest(ctx context.Context, projectPath string, con
 	return nil
 }
 
-// GenerateBuildBench generates the build files for benchmarks.
 func (b *Builder) GenerateBuildBench(ctx context.Context, projectPath string, config build.InitConfig) error {
 	if config.Benchmark == "" || config.Benchmark == "none" {
 		return nil
@@ -599,7 +583,6 @@ func (b *Builder) GenerateBuildBench(ctx context.Context, projectPath string, co
 	return nil
 }
 
-// downloadWrap installs a wrap file using 'meson wrap install' in the project dir
 func (b *Builder) downloadWrap(projectPath, wrapName string) error {
 	// Ensure meson is available (already checked usually)
 

@@ -10,6 +10,7 @@ import (
 	"github.com/charmbracelet/bubbles/spinner"
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/ozacod/cpx/internal/pkg/utils/common"
 )
 
 // ToolchainStep represents the current step in the target creation flow
@@ -18,18 +19,13 @@ type ToolchainStep int
 const (
 	ToolchainStepName ToolchainStep = iota
 	ToolchainStepRunner
-	ToolchainStepDockerMode
-	ToolchainStepDockerImageSelect // New: interactive image selection
+	ToolchainStepDockerImageSelect
 	ToolchainStepDockerImage
-	ToolchainStepCheckingImage // New: async checking step
-	ToolchainStepDockerfile    // for build mode
-	ToolchainStepBuildContext  // for build mode
-	ToolchainStepPlatform
+	ToolchainStepCheckingImage
 	ToolchainStepBuildType
 	ToolchainStepDone
 )
 
-// DockerImage represents a Docker image with its metadata
 type DockerImage struct {
 	Repository   string
 	Tag          string
@@ -39,7 +35,6 @@ type DockerImage struct {
 	Architecture string
 }
 
-// FullName returns the full image name (repo:tag)
 func (d DockerImage) FullName() string {
 	if d.Tag == "" || d.Tag == "<none>" {
 		return d.Repository
@@ -47,13 +42,10 @@ func (d DockerImage) FullName() string {
 	return d.Repository + ":" + d.Tag
 }
 
-// ImageCheckResult is the result of async image checking
 type ImageCheckResult struct {
 	Success bool
 	Error   string
 }
-
-// ImageCheckProgress is sent during async checking to update status
 type ImageCheckProgress struct {
 	Phase string // "pulling", "checking"
 }
@@ -68,26 +60,21 @@ type ToolchainModel struct {
 	cancelled      bool
 	errorMsg       string
 	warnMsg        string
-	checkingStatus string // Current phase: "pulling", "checking"
+	checkingStatus string
 
 	// Existing targets (for validation)
 	existingTargets map[string]bool
 
 	// Configuration being built
-	name         string
-	runner       string
-	dockerMode   string
-	image        string
-	dockerfile   string
-	buildContext string
-	platform     string
-	buildType    string
+	name      string
+	runner    string
+	image     string
+	platform  string
+	buildType string
 
 	// Options
-	runnerOptions     []string
-	dockerModeOptions []string
-	platformOptions   []string
-	buildTypeOptions  []string
+	runnerOptions    []string
+	buildTypeOptions []string
 
 	// Docker image selection
 	availableImages  []DockerImage
@@ -103,14 +90,11 @@ type ToolchainModel struct {
 
 // ToolchainConfig is the result of the TUI
 type ToolchainConfig struct {
-	Name         string
-	Runner       string
-	DockerMode   string
-	Image        string
-	Dockerfile   string
-	BuildContext string
-	Platform     string
-	BuildType    string
+	Name      string
+	Runner    string
+	Image     string
+	Platform  string
+	BuildType string
 }
 
 // NewToolchainModel creates a new model for adding a CI target
@@ -124,33 +108,27 @@ func NewToolchainModel(existingTargets []string) ToolchainModel {
 	ti.TextStyle = inputTextStyle
 	ti.Cursor.Style = cursorStyle
 
-	// Build existing targets map
 	existing := make(map[string]bool)
 	for _, t := range existingTargets {
 		existing[t] = true
 	}
 
-	// Create spinner
 	s := spinner.New()
 	s.Spinner = spinner.Dot
 	s.Style = spinnerStyle
 
 	return ToolchainModel{
-		step:              ToolchainStepName,
-		textInput:         ti,
-		spinner:           s,
-		cursor:            0,
-		existingTargets:   existing,
-		currentQuestion:   "What should this target be called?",
-		runnerOptions:     []string{"docker", "native"},
-		dockerModeOptions: []string{"pull", "build", "local"},
-		platformOptions:   []string{"linux/amd64", "linux/arm64", "linux/arm/v7", "None"},
-		buildTypeOptions:  []string{"Release", "Debug", "RelWithDebInfo", "MinSizeRel"},
-		runner:            "docker",
-		dockerMode:        "pull",
-		buildType:         "Release",
-		buildContext:      ".",
-		maxVisibleImages:  8,
+		step:             ToolchainStepName,
+		textInput:        ti,
+		spinner:          s,
+		cursor:           0,
+		existingTargets:  existing,
+		currentQuestion:  "What should this target be called?",
+		runnerOptions:    []string{"docker", "native"},
+		buildTypeOptions: []string{"Release", "Debug", "RelWithDebInfo", "MinSizeRel"},
+		runner:           "docker",
+		buildType:        "Release",
+		maxVisibleImages: 8,
 	}
 }
 
@@ -227,7 +205,6 @@ func (m ToolchainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if msg.Success {
 			m.errorMsg = ""
 			m.checkingStatus = ""
-			// Proceed to build type selection
 			m.currentQuestion = "Build type?"
 			m.step = ToolchainStepBuildType
 			m.cursor = 0
@@ -282,11 +259,9 @@ func (m ToolchainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 func (m ToolchainModel) isTextInputStep() bool {
 	return m.step == ToolchainStepName || m.step == ToolchainStepDockerImage ||
-		m.step == ToolchainStepDockerfile || m.step == ToolchainStepBuildContext ||
 		m.step == ToolchainStepDockerImageSelect
 }
 
-// checkDockerImageExists checks if a Docker image exists locally
 func checkDockerImageExists(image string) bool {
 	cmd := exec.Command("docker", "images", "-q", image)
 	output, err := cmd.Output()
@@ -296,7 +271,6 @@ func checkDockerImageExists(image string) bool {
 	return len(strings.TrimSpace(string(output))) > 0
 }
 
-// listDockerImages returns a list of available local Docker images
 func listDockerImages() []DockerImage {
 	cmd := exec.Command("docker", "images", "--format", "{{.Repository}}\t{{.Tag}}\t{{.ID}}\t{{.Size}}\t{{.CreatedSince}}")
 	output, err := cmd.Output()
@@ -313,7 +287,6 @@ func listDockerImages() []DockerImage {
 		}
 		parts := strings.Split(line, "\t")
 		if len(parts) >= 5 {
-			// Skip <none> repositories
 			if parts[0] == "<none>" {
 				continue
 			}
@@ -328,7 +301,6 @@ func listDockerImages() []DockerImage {
 		}
 	}
 
-	// Fetch architectures for all images in one call
 	if len(imageIDs) > 0 {
 		archMap := getImageArchitectures(imageIDs)
 		for i := range images {
@@ -341,11 +313,9 @@ func listDockerImages() []DockerImage {
 	return images
 }
 
-// getImageArchitectures fetches architecture info for multiple images
 func getImageArchitectures(imageIDs []string) map[string]string {
 	archMap := make(map[string]string)
 
-	// Use docker inspect to get architecture for all images at once
 	args := append([]string{"inspect", "--format", "{{.Id}}\t{{.Architecture}}"}, imageIDs...)
 	cmd := exec.Command("docker", args...)
 	output, err := cmd.Output()
@@ -370,7 +340,6 @@ func getImageArchitectures(imageIDs []string) map[string]string {
 	return archMap
 }
 
-// filterImages filters images based on a search string
 func filterImages(images []DockerImage, filter string) []DockerImage {
 	if filter == "" {
 		return images
@@ -386,49 +355,35 @@ func filterImages(images []DockerImage, filter string) []DockerImage {
 	return filtered
 }
 
-// checkFileExists checks if a file exists
-func checkFileExists(path string) bool {
-	_, err := os.Stat(path)
-	return err == nil
-}
-
-// checkCommandExists checks if a command is available in PATH
-func checkCommandExists(command string) bool {
-	_, err := exec.LookPath(command)
-	return err == nil
-}
-
-// detectProjectType returns "vcpkg", "Bazel", "meson", or "CMake"
 func detectProjectType() string {
-	if checkFileExists("vcpkg.json") {
+	if common.CheckFileExists("vcpkg.json") {
 		return "vcpkg"
 	}
-	if checkFileExists("BUILD.bazel") || checkFileExists("WORKSPACE") || checkFileExists("MODULE.bazel") {
+	if common.CheckFileExists("BUILD.bazel") || common.CheckFileExists("WORKSPACE") || common.CheckFileExists("MODULE.bazel") {
 		return "bazel"
 	}
-	if checkFileExists("meson.build") {
+	if common.CheckFileExists("meson.build") {
 		return "meson"
 	}
-	if checkFileExists("CMakeLists.txt") {
+	if common.CheckFileExists("CMakeLists.txt") {
 		return "cmake"
 	}
 	return "unknown"
 }
 
-// checkBuildToolsForProject checks if the required build tools are available for the project type
 func checkBuildToolsForProject(projectType string) []string {
 	var missing []string
 
 	switch projectType {
 	case "vcpkg", "cmake":
-		if !checkCommandExists("cmake") {
+		if !common.CheckCommandExists("cmake") {
 			missing = append(missing, "cmake")
 		}
-		if !checkCommandExists("make") && !checkCommandExists("ninja") {
+		if !common.CheckCommandExists("make") && !common.CheckCommandExists("ninja") {
 			missing = append(missing, "make or ninja")
 		}
-		hasCC := checkCommandExists("gcc") || checkCommandExists("clang") || checkCommandExists("cc")
-		hasCXX := checkCommandExists("g++") || checkCommandExists("clang++") || checkCommandExists("c++")
+		hasCC := common.CheckCommandExists("gcc") || common.CheckCommandExists("clang") || common.CheckCommandExists("cc")
+		hasCXX := common.CheckCommandExists("g++") || common.CheckCommandExists("clang++") || common.CheckCommandExists("c++")
 		if !hasCC {
 			missing = append(missing, "C compiler")
 		}
@@ -436,23 +391,23 @@ func checkBuildToolsForProject(projectType string) []string {
 			missing = append(missing, "C++ compiler")
 		}
 		if projectType == "vcpkg" {
-			if os.Getenv("VCPKG_ROOT") == "" && !checkCommandExists("vcpkg") {
+			if os.Getenv("VCPKG_ROOT") == "" && !common.CheckCommandExists("vcpkg") {
 				missing = append(missing, "vcpkg")
 			}
 		}
 	case "bazel":
-		if !checkCommandExists("bazel") && !checkCommandExists("bazelisk") {
+		if !common.CheckCommandExists("bazel") && !common.CheckCommandExists("bazelisk") {
 			missing = append(missing, "bazel or bazelisk")
 		}
 	case "meson":
-		if !checkCommandExists("meson") {
+		if !common.CheckCommandExists("meson") {
 			missing = append(missing, "meson")
 		}
-		if !checkCommandExists("ninja") {
+		if !common.CheckCommandExists("ninja") {
 			missing = append(missing, "ninja")
 		}
-		hasCC := checkCommandExists("gcc") || checkCommandExists("clang") || checkCommandExists("cc")
-		hasCXX := checkCommandExists("g++") || checkCommandExists("clang++") || checkCommandExists("c++")
+		hasCC := common.CheckCommandExists("gcc") || common.CheckCommandExists("clang") || common.CheckCommandExists("cc")
+		hasCXX := common.CheckCommandExists("g++") || common.CheckCommandExists("clang++") || common.CheckCommandExists("c++")
 		if !hasCC {
 			missing = append(missing, "C compiler")
 		}
@@ -464,7 +419,6 @@ func checkBuildToolsForProject(projectType string) []string {
 	return missing
 }
 
-// checkDockerImageHasCommand checks if a command exists inside a Docker image (with timeout)
 func checkDockerImageHasCommand(image, command string) bool {
 	cmd := exec.Command("docker", "run", "--rm", "--entrypoint", "which", image, command)
 	done := make(chan error, 1)
@@ -481,7 +435,6 @@ func checkDockerImageHasCommand(image, command string) bool {
 	}
 }
 
-// checkBuildToolsInDockerImage checks if build tools are available inside a Docker image
 func checkBuildToolsInDockerImage(image string, projectType string) []string {
 	var missing []string
 
@@ -541,7 +494,6 @@ const (
 	CheckPhaseChecking
 )
 
-// checkImageCmd verifies the Docker image exists locally
 func checkImageCmd(image, platform string) tea.Cmd {
 	return func() tea.Msg {
 		// Just check if image exists locally
@@ -556,12 +508,10 @@ func checkImageCmd(image, platform string) tea.Cmd {
 	}
 }
 
-// checkImageAsync runs the image validation asynchronously
 func checkImageAsync(image, platform string) tea.Cmd {
 	return checkImageCmd(image, platform)
 }
 
-// checkImageToolsCmd checks if build tools are available in the image
 func checkImageToolsCmd(image string) tea.Cmd {
 	return func() tea.Msg {
 		projectType := detectProjectType()
@@ -579,7 +529,6 @@ func checkImageToolsCmd(image string) tea.Cmd {
 }
 
 func (m ToolchainModel) handleEnter() (tea.Model, tea.Cmd) {
-	// Clear previous warnings
 	m.warnMsg = ""
 
 	switch m.step {
@@ -630,7 +579,7 @@ func (m ToolchainModel) handleEnter() (tea.Model, tea.Cmd) {
 		})
 
 		if m.runner == "docker" {
-			if !checkCommandExists("docker") {
+			if !common.CheckCommandExists("docker") {
 				m.errorMsg = "Docker is not installed or not in PATH"
 				return m, nil
 			}
@@ -662,55 +611,6 @@ func (m ToolchainModel) handleEnter() (tea.Model, tea.Cmd) {
 			m.cursor = 0
 		}
 
-	case ToolchainStepDockerMode:
-		m.dockerMode = m.dockerModeOptions[m.cursor]
-
-		m.questions = append(m.questions, Question{
-			Question: m.currentQuestion,
-			Answer:   m.dockerMode,
-			Complete: true,
-		})
-
-		if m.dockerMode == "build" {
-			m.currentQuestion = "Dockerfile path?"
-			m.step = ToolchainStepDockerfile
-
-			m.textInput.Reset()
-			m.textInput.Placeholder = "Dockerfile"
-			m.textInput.Focus()
-		} else if m.dockerMode == "local" {
-			// For local mode, show interactive image selection
-			m.availableImages = listDockerImages()
-			m.filteredImages = m.availableImages
-			m.imageFilter = ""
-			m.cursor = 0
-			m.imageScrollStart = 0
-
-			if len(m.availableImages) == 0 {
-				// No local images, fall back to text input
-				m.currentQuestion = "Docker image name/tag?"
-				m.step = ToolchainStepDockerImage
-				m.textInput.Reset()
-				m.textInput.Placeholder = "my-local-image:latest"
-				m.textInput.Focus()
-				m.warnMsg = "No local Docker images found"
-			} else {
-				m.currentQuestion = "Select Docker image (type to filter):"
-				m.step = ToolchainStepDockerImageSelect
-				m.textInput.Reset()
-				m.textInput.Placeholder = "Type to filter..."
-				m.textInput.Focus()
-			}
-		} else {
-			// For pull mode, use text input
-			m.currentQuestion = "Docker image name/tag?"
-			m.step = ToolchainStepDockerImage
-
-			m.textInput.Reset()
-			m.textInput.Placeholder = "ubuntu:22.04"
-			m.textInput.Focus()
-		}
-
 	case ToolchainStepDockerImageSelect:
 		// User selected an image from the list
 		if len(m.filteredImages) > 0 && m.cursor < len(m.filteredImages) {
@@ -730,70 +630,9 @@ func (m ToolchainModel) handleEnter() (tea.Model, tea.Cmd) {
 			Complete: true,
 		})
 
-		// Skip platform selection - local images have platform built in
-		// Go directly to image checking
 		m.step = ToolchainStepCheckingImage
 		m.checkingStatus = ""
 		return m, tea.Batch(m.spinner.Tick, checkImageAsync(m.image, m.platform))
-
-	case ToolchainStepDockerfile:
-		dockerfile := strings.TrimSpace(m.textInput.Value())
-		if dockerfile == "" {
-			dockerfile = "Dockerfile"
-		}
-
-		if !checkFileExists(dockerfile) {
-			m.errorMsg = fmt.Sprintf("Dockerfile not found: %s", dockerfile)
-			return m, nil
-		}
-
-		m.dockerfile = dockerfile
-		m.errorMsg = ""
-
-		m.questions = append(m.questions, Question{
-			Question: m.currentQuestion,
-			Answer:   dockerfile,
-			Complete: true,
-		})
-
-		m.currentQuestion = "Build context directory?"
-		m.step = ToolchainStepBuildContext
-
-		m.textInput.Reset()
-		m.textInput.Placeholder = "."
-		m.textInput.Focus()
-
-	case ToolchainStepBuildContext:
-		context := strings.TrimSpace(m.textInput.Value())
-		if context == "" {
-			context = "."
-		}
-
-		info, err := os.Stat(context)
-		if err != nil {
-			m.errorMsg = fmt.Sprintf("Directory not found: %s", context)
-			return m, nil
-		}
-		if !info.IsDir() {
-			m.errorMsg = fmt.Sprintf("Not a directory: %s", context)
-			return m, nil
-		}
-
-		m.buildContext = context
-		m.errorMsg = ""
-
-		m.questions = append(m.questions, Question{
-			Question: m.currentQuestion,
-			Answer:   context,
-			Complete: true,
-		})
-
-		m.currentQuestion = "Tag for the built image?"
-		m.step = ToolchainStepDockerImage
-
-		m.textInput.Reset()
-		m.textInput.Placeholder = "cpx-" + m.name
-		m.textInput.Focus()
 
 	case ToolchainStepDockerImage:
 		image := strings.TrimSpace(m.textInput.Value())
@@ -809,26 +648,6 @@ func (m ToolchainModel) handleEnter() (tea.Model, tea.Cmd) {
 			Complete: true,
 		})
 
-		// Skip platform selection - go directly to image checking
-		m.step = ToolchainStepCheckingImage
-		m.checkingStatus = ""
-		return m, tea.Batch(m.spinner.Tick, checkImageAsync(m.image, m.platform))
-
-	case ToolchainStepPlatform:
-		if m.cursor == len(m.platformOptions)-1 {
-			m.platform = ""
-		} else {
-			m.platform = m.platformOptions[m.cursor]
-		}
-
-		answer := m.platformOptions[m.cursor]
-		m.questions = append(m.questions, Question{
-			Question: m.currentQuestion,
-			Answer:   answer,
-			Complete: true,
-		})
-
-		// Check if the image exists
 		m.step = ToolchainStepCheckingImage
 		m.checkingStatus = ""
 		return m, tea.Batch(m.spinner.Tick, checkImageAsync(m.image, m.platform))
@@ -853,8 +672,6 @@ func (m ToolchainModel) getMaxCursor() int {
 	switch m.step {
 	case ToolchainStepRunner:
 		return len(m.runnerOptions) - 1
-	case ToolchainStepPlatform:
-		return len(m.platformOptions) - 1
 	case ToolchainStepBuildType:
 		return len(m.buildTypeOptions) - 1
 	default:
@@ -990,38 +807,10 @@ func (m ToolchainModel) View() string {
 				s.WriteString("\n  " + errorStyle.Render("✗ "+m.errorMsg))
 			}
 
-		case ToolchainStepDockerfile:
-			s.WriteString(cyanBold.Render(m.textInput.View()))
-			s.WriteString("\n" + dimStyle.Render("  (e.g., Dockerfile, dockerfiles/Dockerfile.ubuntu)"))
-			if m.errorMsg != "" {
-				s.WriteString("\n  " + errorStyle.Render("✗ "+m.errorMsg))
-			}
-
-		case ToolchainStepBuildContext:
-			s.WriteString(cyanBold.Render(m.textInput.View()))
-			s.WriteString("\n" + dimStyle.Render("  (e.g., . for current directory)"))
-			if m.errorMsg != "" {
-				s.WriteString("\n  " + errorStyle.Render("✗ "+m.errorMsg))
-			}
-
 		case ToolchainStepDockerImage:
 			s.WriteString(cyanBold.Render(m.textInput.View()))
-			if m.dockerMode == "local" {
-				s.WriteString("\n" + dimStyle.Render("  (must exist locally - use 'docker images' to check)"))
-			}
 			if m.errorMsg != "" {
 				s.WriteString("\n  " + errorStyle.Render("✗ "+m.errorMsg))
-			}
-
-		case ToolchainStepPlatform:
-			s.WriteString(dimStyle.Render(m.platformOptions[m.cursor]))
-			s.WriteString("\n")
-			for i, opt := range m.platformOptions {
-				cursor := " "
-				if m.cursor == i {
-					cursor = selectedStyle.Render("❯")
-				}
-				s.WriteString(fmt.Sprintf("  %s %s\n", cursor, opt))
 			}
 
 		case ToolchainStepBuildType:
@@ -1043,40 +832,16 @@ func (m ToolchainModel) View() string {
 	return s.String()
 }
 
-// GetConfig returns the target configuration
 func (m ToolchainModel) GetConfig() ToolchainConfig {
 	return ToolchainConfig{
-		Name:         m.name,
-		Runner:       m.runner,
-		DockerMode:   m.dockerMode,
-		Image:        m.image,
-		Dockerfile:   m.dockerfile,
-		BuildContext: m.buildContext,
-		Platform:     m.platform,
-		BuildType:    m.buildType,
+		Name:      m.name,
+		Runner:    m.runner,
+		Image:     m.image,
+		Platform:  m.platform,
+		BuildType: m.buildType,
 	}
 }
 
-// IsCancelled returns true if the user canceled
 func (m ToolchainModel) IsCancelled() bool {
 	return m.cancelled
-}
-
-// RunAddTargetTUI runs the interactive TUI for adding a toolchain
-func RunAddTargetTUI(existingTargets []string) (*ToolchainConfig, error) {
-	m := NewToolchainModel(existingTargets)
-	p := tea.NewProgram(m)
-
-	finalModel, err := p.Run()
-	if err != nil {
-		return nil, err
-	}
-
-	model := finalModel.(ToolchainModel)
-	if model.IsCancelled() {
-		return nil, nil
-	}
-
-	result := model.GetConfig()
-	return &result, nil
 }

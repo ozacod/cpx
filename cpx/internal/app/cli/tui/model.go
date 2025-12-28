@@ -31,7 +31,6 @@ const (
 	StepDone
 )
 
-// Question represents a single question with its answer
 type Question struct {
 	Question string
 	Answer   string

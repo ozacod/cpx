@@ -50,7 +50,6 @@ vcpkg_root: /tmp/test_vcpkg
 			os.Setenv("HOME", tmpDir)
 
 			if tt.hasFile {
-				// Create config directory and file
 				configDir := filepath.Join(tmpDir, ".config", "cpx")
 				require.NoError(t, os.MkdirAll(configDir, 0755))
 				configFile := filepath.Join(configDir, "config.yaml")

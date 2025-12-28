@@ -452,12 +452,13 @@ func (m AddRunnerModel) handleEnter() (tea.Model, tea.Cmd) {
 
 	case RunnerStepType:
 		m.runnerType = m.typeOptions[m.cursor]
-		if m.runnerType == "docker" {
+		switch m.runnerType {
+		case "docker":
 			m.step = RunnerStepDockerImage
 			m.textInput.Reset()
 			m.textInput.Placeholder = "gcc:13"
 			m.textInput.Focus()
-		} else if m.runnerType == "ssh" {
+		case "ssh":
 			m.step = RunnerStepSSHHost
 			m.textInput.Reset()
 			m.textInput.Placeholder = "build-server.local"

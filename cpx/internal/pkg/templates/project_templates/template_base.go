@@ -45,7 +45,6 @@ type TemplateInfo struct {
 // Registry holds all available templates
 var Registry = []TemplateInfo{}
 
-// RegisterTemplate adds a template to the registry
 func RegisterTemplate(t ProjectTemplate) {
 	Registry = append(Registry, TemplateInfo{
 		Name:        t.Name(),
@@ -54,7 +53,6 @@ func RegisterTemplate(t ProjectTemplate) {
 	})
 }
 
-// GetTemplateNames returns the names of all registered templates
 func GetTemplateNames() []string {
 	names := make([]string, len(Registry))
 	for i, t := range Registry {
@@ -63,7 +61,6 @@ func GetTemplateNames() []string {
 	return names
 }
 
-// GetTemplateByName returns a template by its name
 func GetTemplateByName(name string) (ProjectTemplate, bool) {
 	for _, t := range Registry {
 		if strings.EqualFold(t.Name, name) {
@@ -76,7 +73,6 @@ func GetTemplateByName(name string) (ProjectTemplate, bool) {
 // BaseTemplateHelper provides common utilities for templates
 type BaseTemplateHelper struct{}
 
-// CreateProjectStructure creates the basic project directory structure
 func (h *BaseTemplateHelper) CreateProjectStructure(projectName string, dirs []string) error {
 	// Create project root
 	if err := os.MkdirAll(projectName, 0755); err != nil {
@@ -93,7 +89,6 @@ func (h *BaseTemplateHelper) CreateProjectStructure(projectName string, dirs []s
 	return nil
 }
 
-// WriteFile writes content to a file within the project
 func (h *BaseTemplateHelper) WriteFile(projectName, relativePath, content string) error {
 	fullPath := filepath.Join(projectName, relativePath)
 	dir := filepath.Dir(fullPath)
@@ -106,7 +101,6 @@ func (h *BaseTemplateHelper) WriteFile(projectName, relativePath, content string
 	return nil
 }
 
-// GetBuilder returns the appropriate build system based on package manager
 func (h *BaseTemplateHelper) GetBuilder(packageManager string) build.BuildSystem {
 	switch packageManager {
 	case "bazel":
@@ -118,7 +112,6 @@ func (h *BaseTemplateHelper) GetBuilder(packageManager string) build.BuildSystem
 	}
 }
 
-// GenerateCommonFiles generates common files like .gitignore, .clang-format, etc.
 func (h *BaseTemplateHelper) GenerateCommonFiles(config TemplateConfig) error {
 	projectName := config.ProjectName
 
@@ -143,14 +136,12 @@ func (h *BaseTemplateHelper) GenerateCommonFiles(config TemplateConfig) error {
 	return nil
 }
 
-// InitGitRepo initializes a git repository in the project
 func (h *BaseTemplateHelper) InitGitRepo(projectName string) error {
 	cmd := exec.Command("git", "init")
 	cmd.Dir = projectName
 	return cmd.Run()
 }
 
-// SetupVcpkg initializes vcpkg in the project and adds dependencies
 func (h *BaseTemplateHelper) SetupVcpkg(projectName string, dependencies []string) error {
 	vcpkgBuilder := vcpkg.New()
 	vcpkgPath, err := vcpkgBuilder.GetPath()
@@ -207,7 +198,6 @@ func (h *BaseTemplateHelper) SetupVcpkg(projectName string, dependencies []strin
 	return nil
 }
 
-// PrintSuccess prints a success message with next steps
 func (h *BaseTemplateHelper) PrintSuccess(projectName string) {
 	fmt.Printf("\n%s✓ Project '%s' created successfully!%s\n\n", colors.Green, projectName, colors.Reset)
 	fmt.Printf("  cd %s && cpx build && cpx run\n\n", projectName)

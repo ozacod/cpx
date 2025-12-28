@@ -5,7 +5,6 @@ import (
 	"unicode"
 )
 
-// SafeIdent converts an arbitrary project name into a valid C++ identifier.
 func SafeIdent(name string) string {
 	if name == "" {
 		return "project"
@@ -27,12 +26,10 @@ func SafeIdent(name string) string {
 	return b.String()
 }
 
-// SafeIdentUpper returns the uppercase version of SafeIdent.
 func SafeIdentUpper(name string) string {
 	return strings.ToUpper(SafeIdent(name))
 }
 
-// SafeIdentTitle returns SafeIdent with the first letter capitalized.
 func SafeIdentTitle(name string) string {
 	id := SafeIdent(name)
 	if id == "" {

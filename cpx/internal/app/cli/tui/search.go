@@ -10,7 +10,6 @@ import (
 	"github.com/charmbracelet/lipgloss"
 )
 
-// SearchResult represents a single package result
 type SearchResult struct {
 	Name        string
 	Version     string

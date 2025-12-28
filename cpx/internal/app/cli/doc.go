@@ -30,7 +30,6 @@ func runDoc(cmd *cobra.Command, _ []string) error {
 	return generateDocs(open)
 }
 
-// getProjectInfo reads project name and version from CMakeLists.txt or vcpkg.json
 func getProjectInfo() (name string, version string) {
 	// Default values
 	name = "Project"
@@ -67,8 +66,7 @@ func getProjectInfo() (name string, version string) {
 }
 
 func generateDocs(openBrowser bool) error {
-	// Check if Doxygen is available
-	if _, err := exec.LookPath("doxygen"); err != nil {
+	if !CheckCommandExists("doxygen") {
 		return fmt.Errorf("doxygen not found. Please install it first:\n  macOS: brew install doxygen\n  Ubuntu: sudo apt install doxygen")
 	}
 
@@ -76,7 +74,6 @@ func generateDocs(openBrowser bool) error {
 
 	fmt.Printf("%s Generating documentation...%s\n", colors.Cyan, colors.Reset)
 
-	// Create Doxyfile if it doesn't exist
 	if _, err := os.Stat("Doxyfile"); os.IsNotExist(err) {
 		doxyContent := fmt.Sprintf(`PROJECT_NAME           = "%s"
 PROJECT_NUMBER         = "%s"
@@ -96,7 +93,6 @@ USE_MDFILE_AS_MAINPAGE = README.md
 		fmt.Printf("    Created Doxyfile\n")
 	}
 
-	// Run Doxygen
 	cmd := exec.Command("doxygen")
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr

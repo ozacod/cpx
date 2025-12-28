@@ -25,7 +25,6 @@ import (
 // It can be overridden in tests to mock command execution.
 var ExecCommand = exec.Command
 
-// GetProjectNameFromCMakeLists extracts the project name from CMakeLists.txt
 func GetProjectNameFromCMakeLists() string {
 	cmakeListsPath := "CMakeLists.txt"
 	data, err := os.ReadFile(cmakeListsPath)
@@ -43,7 +42,6 @@ func GetProjectNameFromCMakeLists() string {
 	return ""
 }
 
-// RemoveDir removes a directory with logging
 func RemoveDir(path string) {
 	if _, err := os.Stat(path); err == nil {
 		fmt.Printf("%s  Removing %s...%s\n", colors.Cyan, path, colors.Reset)
@@ -53,8 +51,6 @@ func RemoveDir(path string) {
 	}
 }
 
-// DetermineBuildType determines the CMake build type and CXX flags based on release flag and optimization level.
-// Returns (buildType, cxxFlags)
 func DetermineBuildType(release bool, optLevel string) (string, string) {
 	buildType := "Debug"
 	cxxFlags := ""
@@ -88,7 +84,6 @@ func DetermineBuildType(release bool, optLevel string) (string, string) {
 	return buildType, cxxFlags
 }
 
-// GetSanitizerFlags returns the CXX flags and linker flags for the given sanitizer
 func GetSanitizerFlags(sanitizer string) (string, string) {
 	cxxFlags := ""
 	linkerFlags := ""
@@ -109,7 +104,6 @@ func GetSanitizerFlags(sanitizer string) (string, string) {
 	return cxxFlags, linkerFlags
 }
 
-// FindExecutables finds all executables in the build directory
 func FindExecutables(buildDir string) ([]string, error) {
 	var executables []string
 
@@ -158,7 +152,6 @@ func FindExecutables(buildDir string) ([]string, error) {
 	return executables, nil
 }
 
-// CopyAndSign copies a file and signs it on macOS to prevent signal: killed
 func CopyAndSign(src, dest string) error {
 	// Remove destination to ensure clean copy
 	os.Remove(dest)
@@ -190,8 +183,6 @@ func CopyAndSign(src, dest string) error {
 
 var progressRe = regexp.MustCompile(`^\[\s*\d+%]`)
 
-// RunCMakeBuild runs "cmake --build" with optional verbose output.
-// If verbose is false, it streams only progress lines like "[ 93%]" and errors.
 func RunCMakeBuild(buildArgs []string, verbose bool, currentStep, totalSteps int) error {
 	cmd := ExecCommand("cmake", buildArgs...)
 
@@ -291,7 +282,6 @@ func extractPercent(line string) int {
 	return pct
 }
 
-// RunCMakeConfigure runs cmake configure quietly unless verbose is true.
 func RunCMakeConfigure(cmd *exec.Cmd, verbose bool) error {
 	if verbose {
 		cmd.Stdout = os.Stdout
@@ -309,7 +299,6 @@ func RunCMakeConfigure(cmd *exec.Cmd, verbose bool) error {
 	return nil
 }
 
-// GetBuildOptLabel returns a human-readable label for the build optimization settings
 func GetBuildOptLabel(release bool, optLevel, sanitizer string) string {
 	optLabel := "default (-O0)"
 	if release {
@@ -324,8 +313,6 @@ func GetBuildOptLabel(release bool, optLevel, sanitizer string) string {
 	return optLabel
 }
 
-// RemoveDirsMatchingPattern removes all directories in the current directory matching the given glob pattern.
-// If dirsOnly is true, only directories are removed; otherwise files matching the pattern are also removed.
 func RemoveDirsMatchingPattern(pattern string, dirsOnly bool) {
 	entries, err := os.ReadDir(".")
 	if err != nil {

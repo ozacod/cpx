@@ -13,7 +13,6 @@ import (
 	"github.com/ozacod/cpx/internal/pkg/utils/colors"
 )
 
-// RunDockerBuild implements the DockerBuilder interface for Meson builds.
 func (b *Builder) RunDockerBuild(ctx context.Context, opts build.DockerBuildOptions) error {
 	absProjectRoot, err := filepath.Abs(opts.ProjectRoot)
 	if err != nil {
@@ -213,5 +212,4 @@ if [ "%[5]s" = "true" ]; then ls -la /output/%[8]s/ 2>/dev/null || echo "  (no a
 	return nil
 }
 
-// Compile-time check that Builder implements DockerBuilder
 var _ build.DockerBuilder = (*Builder)(nil)

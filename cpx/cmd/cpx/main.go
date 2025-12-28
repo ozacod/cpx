@@ -14,7 +14,6 @@ import (
 func main() {
 	rootCmd := root.GetRootCmd()
 
-	// Register all commands
 	rootCmd.AddCommand(cli.BuildCmd())
 	rootCmd.AddCommand(cli.RunCmd())
 	rootCmd.AddCommand(cli.TestCmd())
@@ -81,6 +80,5 @@ func main() {
 		}
 	}
 
-	// Execute root command
 	root.Execute()
 }

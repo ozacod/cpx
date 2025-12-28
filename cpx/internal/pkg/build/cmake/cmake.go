@@ -21,17 +21,14 @@ var execCommand = exec.Command
 // Builder implements the build.BuildSystem interface for CMake-only projects.
 type Builder struct{}
 
-// New creates a new CMake Builder.
 func New() *Builder {
 	return &Builder{}
 }
 
-// Name returns the name of the build system.
 func (b *Builder) Name() string {
 	return "cmake"
 }
 
-// Build compiles the project with the given options.
 func (b *Builder) Build(ctx context.Context, opts build.BuildOptions) error {
 	// Get project name
 	projectName := common.GetProjectNameFromCMakeLists()
@@ -162,7 +159,6 @@ func (b *Builder) Build(ctx context.Context, opts build.BuildOptions) error {
 	return nil
 }
 
-// Test runs the project's tests with the given options.
 func (b *Builder) Test(ctx context.Context, opts build.TestOptions) error {
 	projectName := common.GetProjectNameFromCMakeLists()
 	if projectName == "" {
@@ -250,7 +246,6 @@ func (b *Builder) Test(ctx context.Context, opts build.TestOptions) error {
 	return nil
 }
 
-// Run builds and runs the project's main executable.
 func (b *Builder) Run(ctx context.Context, opts build.RunOptions) error {
 	// Build first
 	if err := b.Build(ctx, build.BuildOptions{
@@ -306,7 +301,6 @@ func (b *Builder) Run(ctx context.Context, opts build.RunOptions) error {
 	return runCmd.Run()
 }
 
-// Bench runs the project's benchmarks.
 func (b *Builder) Bench(ctx context.Context, opts build.BenchOptions) error {
 	projectName := common.GetProjectNameFromCMakeLists()
 	if projectName == "" {
@@ -421,7 +415,6 @@ func (b *Builder) Bench(ctx context.Context, opts build.BenchOptions) error {
 	return nil
 }
 
-// Clean removes build artifacts.
 func (b *Builder) Clean(ctx context.Context, opts build.CleanOptions) error {
 	fmt.Printf("%sCleaning CMake project...%s\n", colors.Cyan, colors.Reset)
 
@@ -441,7 +434,6 @@ func (b *Builder) Clean(ctx context.Context, opts build.CleanOptions) error {
 	return nil
 }
 
-// AddDependency tells the user to use a package manager for dependency management.
 func (b *Builder) AddDependency(ctx context.Context, name string, version string) error {
 	fmt.Printf("%s⚠ CMake-only projects don't have built-in dependency management%s\n\n", colors.Yellow, colors.Reset)
 	fmt.Printf("To add dependencies, consider one of these options:\n\n")
@@ -472,12 +464,10 @@ func (b *Builder) AddDependency(ctx context.Context, name string, version string
 	return nil
 }
 
-// RemoveDependency is not supported for CMake-only projects.
 func (b *Builder) RemoveDependency(ctx context.Context, name string) error {
 	return fmt.Errorf("CMake-only projects don't have built-in dependency management\n  hint: manually remove the dependency from CMakeLists.txt or FetchContent")
 }
 
-// ListDependencies is not fully supported for CMake-only projects.
 func (b *Builder) ListDependencies(ctx context.Context) ([]build.Dependency, error) {
 	fmt.Printf("%sNote: CMake-only projects don't have a standard dependency manifest%s\n", colors.Yellow, colors.Reset)
 	fmt.Printf("Check your CMakeLists.txt for:\n")
@@ -487,17 +477,14 @@ func (b *Builder) ListDependencies(ctx context.Context) ([]build.Dependency, err
 	return nil, nil
 }
 
-// SearchDependencies is not supported for CMake-only projects.
 func (b *Builder) SearchDependencies(ctx context.Context, query string) ([]build.Dependency, error) {
 	return nil, fmt.Errorf("CMake-only projects don't have a package registry\n  hint: search on GitHub, vcpkg ports, or Conan packages")
 }
 
-// DependencyInfo is not supported for CMake-only projects.
 func (b *Builder) DependencyInfo(ctx context.Context, name string) (*build.DependencyInfo, error) {
 	return nil, fmt.Errorf("CMake-only projects don't have dependency info\n  hint: check the package's GitHub page or documentation")
 }
 
-// ListTargets returns the list of build targets from CMake.
 func (b *Builder) ListTargets(ctx context.Context) ([]string, error) {
 	// Try to find a build directory
 	buildDirs := []string{".cache/native/debug", ".cache/native/release", "build"}
@@ -538,7 +525,6 @@ func (b *Builder) ListTargets(ctx context.Context) ([]string, error) {
 	return targets, nil
 }
 
-// parseTargetsFromCMakeLists attempts to extract targets from CMakeLists.txt
 func (b *Builder) parseTargetsFromCMakeLists() ([]string, error) {
 	data, err := os.ReadFile("CMakeLists.txt")
 	if err != nil {
@@ -569,7 +555,6 @@ func (b *Builder) parseTargetsFromCMakeLists() ([]string, error) {
 	return targets, nil
 }
 
-// GenerateGitignore generates the .gitignore file for CMake projects.
 func (b *Builder) GenerateGitignore(ctx context.Context, projectPath string) error {
 	gitignore := templates.GenerateCMakeGitignore()
 	if err := os.WriteFile(filepath.Join(projectPath, ".gitignore"), []byte(gitignore), 0644); err != nil {
@@ -578,9 +563,7 @@ func (b *Builder) GenerateGitignore(ctx context.Context, projectPath string) err
 	return nil
 }
 
-// GenerateBuildSrc generates the build files for source code.
 func (b *Builder) GenerateBuildSrc(ctx context.Context, projectPath string, config build.InitConfig) error {
-	// Generate CMakeLists.txt
 	cmakeLists := templates.GenerateCMakeLists(
 		config.Name,
 		config.CppStandard,
@@ -597,7 +580,6 @@ func (b *Builder) GenerateBuildSrc(ctx context.Context, projectPath string, conf
 	return nil
 }
 
-// GenerateBuildTest generates the build files for tests.
 func (b *Builder) GenerateBuildTest(ctx context.Context, projectPath string, config build.InitConfig) error {
 	if config.TestFramework == "" || config.TestFramework == "none" {
 		return nil
@@ -616,7 +598,6 @@ func (b *Builder) GenerateBuildTest(ctx context.Context, projectPath string, con
 	return nil
 }
 
-// GenerateBuildBench generates the build files for benchmarks.
 func (b *Builder) GenerateBuildBench(ctx context.Context, projectPath string, config build.InitConfig) error {
 	if config.Benchmark == "" || config.Benchmark == "none" {
 		return nil
@@ -635,5 +616,4 @@ func (b *Builder) GenerateBuildBench(ctx context.Context, projectPath string, co
 	return nil
 }
 
-// Ensure Builder implements BuildSystem interface
 var _ build.BuildSystem = (*Builder)(nil)

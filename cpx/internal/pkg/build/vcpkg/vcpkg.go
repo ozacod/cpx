@@ -28,7 +28,6 @@ type Builder struct {
 	globalConfig *config.GlobalConfig
 }
 
-// New creates a new vcpkg Builder.
 func New() *Builder {
 	return &Builder{}
 }
@@ -46,7 +45,6 @@ func (b *Builder) ensureConfig() error {
 	return nil
 }
 
-// SetupEnv sets VCPKG_ROOT and VCPKG_FEATURE_FLAGS environment variables from cpx config
 func (b *Builder) SetupEnv() error {
 	if err := b.ensureConfig(); err != nil {
 		return err
@@ -86,7 +84,6 @@ func (b *Builder) SetupEnv() error {
 	return nil
 }
 
-// GetPath returns the path to the vcpkg executable
 func (b *Builder) GetPath() (string, error) {
 	if err := b.ensureConfig(); err != nil {
 		return "", err
@@ -123,7 +120,6 @@ func (b *Builder) GetPath() (string, error) {
 	return vcpkgPath, nil
 }
 
-// RunCommand runs a vcpkg command
 func (b *Builder) RunCommand(args []string) error {
 	vcpkgPath, err := b.GetPath()
 	if err != nil {
@@ -145,7 +141,6 @@ func (b *Builder) RunCommand(args []string) error {
 	return cmd.Run()
 }
 
-// GenerateGitignore generates the .gitignore file.
 func (b *Builder) GenerateGitignore(ctx context.Context, projectPath string) error {
 	gitignore := templates.GenerateGitignore()
 	if err := os.WriteFile(filepath.Join(projectPath, ".gitignore"), []byte(gitignore), 0644); err != nil {
@@ -154,7 +149,6 @@ func (b *Builder) GenerateGitignore(ctx context.Context, projectPath string) err
 	return nil
 }
 
-// GenerateBuildSrc generates the build files for source code (core project files).
 func (b *Builder) GenerateBuildSrc(ctx context.Context, projectPath string, config build.InitConfig) error {
 	hasTest := config.TestFramework != "" && config.TestFramework != "none"
 	hasBench := config.Benchmark != "" && config.Benchmark != "none"
@@ -174,7 +168,6 @@ func (b *Builder) GenerateBuildSrc(ctx context.Context, projectPath string, conf
 	return nil
 }
 
-// GenerateBuildTest generates the build files for tests.
 func (b *Builder) GenerateBuildTest(ctx context.Context, projectPath string, config build.InitConfig) error {
 	if config.TestFramework == "" || config.TestFramework == "none" {
 		return nil
@@ -192,7 +185,6 @@ func (b *Builder) GenerateBuildTest(ctx context.Context, projectPath string, con
 	return nil
 }
 
-// GenerateBuildBench generates the build files for benchmarks.
 func (b *Builder) GenerateBuildBench(ctx context.Context, projectPath string, config build.InitConfig) error {
 	if config.Benchmark == "" || config.Benchmark == "none" {
 		return nil
@@ -210,7 +202,6 @@ func (b *Builder) GenerateBuildBench(ctx context.Context, projectPath string, co
 	return nil
 }
 
-// Build compiles the project with the given options.
 func (b *Builder) Build(ctx context.Context, opts build.BuildOptions) error {
 	// Set VCPKG_ROOT from cpx config if not already set
 	if err := b.SetupEnv(); err != nil {
@@ -378,7 +369,6 @@ func (b *Builder) Build(ctx context.Context, opts build.BuildOptions) error {
 	return nil
 }
 
-// Test runs the project's tests with the given options.
 func (b *Builder) Test(ctx context.Context, opts build.TestOptions) error {
 	// Set VCPKG_ROOT from cpx config if not already set
 	if err := b.SetupEnv(); err != nil {
@@ -487,7 +477,6 @@ func (b *Builder) Test(ctx context.Context, opts build.TestOptions) error {
 	return nil
 }
 
-// Run builds and runs the project's main executable.
 func (b *Builder) Run(ctx context.Context, opts build.RunOptions) error {
 	// Set VCPKG_ROOT from cpx config if not already set
 	if err := b.SetupEnv(); err != nil {
@@ -673,7 +662,6 @@ func (b *Builder) Run(ctx context.Context, opts build.RunOptions) error {
 	return runCmd.Run()
 }
 
-// Bench runs the project's benchmarks.
 func (b *Builder) Bench(ctx context.Context, opts build.BenchOptions) error {
 	// Set VCPKG_ROOT from cpx config if not already set
 	if err := b.SetupEnv(); err != nil {
@@ -793,7 +781,6 @@ func (b *Builder) Bench(ctx context.Context, opts build.BenchOptions) error {
 	return nil
 }
 
-// Clean removes build artifacts.
 func (b *Builder) Clean(ctx context.Context, opts build.CleanOptions) error {
 	fmt.Printf("%sCleaning CMake/vcpkg project...%s\n", colors.Cyan, colors.Reset)
 
@@ -829,7 +816,6 @@ func (b *Builder) Clean(ctx context.Context, opts build.CleanOptions) error {
 	return nil
 }
 
-// AddDependency adds a dependency to the project.
 func (b *Builder) AddDependency(ctx context.Context, name string, version string) error {
 	// Set up environment
 	if err := b.SetupEnv(); err != nil {
@@ -875,7 +861,6 @@ func (b *Builder) printUsageInfo(pkgName string) {
 	fmt.Printf("   https://cpx-dev.vercel.app/packages#package/%s\n\n", pkgName)
 }
 
-// RemoveDependency removes a dependency from the project.
 func (b *Builder) RemoveDependency(ctx context.Context, name string) error {
 	// Check for vcpkg.json (Manifest mode)
 	if _, err := os.Stat("vcpkg.json"); err != nil {
@@ -947,7 +932,6 @@ func (b *Builder) RemoveDependency(ctx context.Context, name string) error {
 	return nil
 }
 
-// ListDependencies returns the list of dependencies in the project.
 func (b *Builder) ListDependencies(ctx context.Context) ([]build.Dependency, error) {
 	// Read vcpkg.json
 	data, err := os.ReadFile("vcpkg.json")
@@ -997,7 +981,6 @@ func (b *Builder) ListDependencies(ctx context.Context) ([]build.Dependency, err
 	return deps, nil
 }
 
-// SearchDependencies searches for available packages matching the query.
 func (b *Builder) SearchDependencies(ctx context.Context, query string) ([]build.Dependency, error) {
 	// Get vcpkg path
 	vcpkgPath, err := b.GetPath()
@@ -1046,12 +1029,10 @@ func (b *Builder) SearchDependencies(ctx context.Context, query string) ([]build
 	return deps, nil
 }
 
-// Name returns the name of the build system.
 func (b *Builder) Name() string {
 	return "vcpkg"
 }
 
-// DependencyInfo retrieves detailed information about a specific dependency.
 func (b *Builder) DependencyInfo(ctx context.Context, name string) (*build.DependencyInfo, error) {
 	// Use vcpkg x-package-info command
 	// Format: vcpkg x-package-info <name> --x-json
@@ -1155,10 +1136,8 @@ func (b *Builder) DependencyInfo(ctx context.Context, name string) (*build.Depen
 	return info, nil
 }
 
-// Compile-time check that Builder implements build.BuildSystem.
 var _ build.BuildSystem = (*Builder)(nil)
 
-// ListTargets returns the list of build targets.
 func (b *Builder) ListTargets(ctx context.Context) ([]string, error) {
 	// Look for any configured build directory in .cache/native
 	cacheDir := filepath.Join(".cache", "native")

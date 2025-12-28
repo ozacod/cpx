@@ -10,7 +10,6 @@ func init() {
 	RegisterTemplate(&ImGuiTemplate{})
 }
 
-// ImGuiTemplate generates an ImGui GUI application
 type ImGuiTemplate struct {
 	BaseTemplateHelper
 }

@@ -19,7 +19,6 @@ Generate, build, lint, test, and ship CMake/vcpkg-based C++ projects with sensib
 	SilenceErrors: true, // handle printing ourselves in Execute
 }
 
-// Execute runs the root command
 func Execute() {
 	if err := rootCmd.Execute(); err != nil {
 		cli.PrintError("%v", err)
@@ -27,7 +26,6 @@ func Execute() {
 	}
 }
 
-// GetRootCmd returns the root command (for testing or extending)
 func GetRootCmd() *cobra.Command {
 	return rootCmd
 }

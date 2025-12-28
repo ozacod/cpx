@@ -65,6 +65,8 @@ scripts/*.gif
 content/
 aim.md
 
+.cursorrules
+
 cpx/test_all_commands.sh
 
 IMPROVEMENTS.md

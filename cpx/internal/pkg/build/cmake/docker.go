@@ -14,7 +14,6 @@ import (
 	"github.com/ozacod/cpx/internal/pkg/utils/colors"
 )
 
-// RunDockerBuild implements the DockerBuilder interface for CMake-only builds.
 func (b *Builder) RunDockerBuild(ctx context.Context, opts build.DockerBuildOptions) error {
 	// Create target-specific output directory
 	targetOutputDir := filepath.Join(opts.OutputDir, opts.TargetName)
@@ -229,7 +228,6 @@ cmake %s%s
 	return nil
 }
 
-// detectCMakeProjectType detects if the project is an executable or library
 func detectCMakeProjectType(projectRoot string) (bool, error) {
 	cmakeListsPath := filepath.Join(projectRoot, "CMakeLists.txt")
 	data, err := os.ReadFile(cmakeListsPath)
@@ -261,5 +259,4 @@ func detectCMakeProjectType(projectRoot string) (bool, error) {
 	return true, nil
 }
 
-// Compile-time check that Builder implements DockerBuilder
 var _ build.DockerBuilder = (*Builder)(nil)

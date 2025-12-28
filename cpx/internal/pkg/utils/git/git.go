@@ -8,7 +8,6 @@ import (
 	"strings"
 )
 
-// GetGitTrackedCppFiles returns all git-tracked C/C++ source files
 func GetGitTrackedCppFiles() ([]string, error) {
 	// Check if we're in a git repository
 	if _, err := exec.LookPath("git"); err != nil {
@@ -56,8 +55,6 @@ func GetGitTrackedCppFiles() ([]string, error) {
 	return trackedCppFiles, nil
 }
 
-// FilterGitTrackedFiles filters targets to only include git-tracked C/C++ files
-// This respects .gitignore by only including files that git tracks
 func FilterGitTrackedFiles(targets []string) ([]string, error) {
 	// Check if we're in a git repository
 	if _, err := exec.LookPath("git"); err != nil {

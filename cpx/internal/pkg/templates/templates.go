@@ -7,18 +7,12 @@ import (
 	"github.com/ozacod/cpx/internal/pkg/utils/naming"
 )
 
-// ============================================================================
-// C++ SOURCE TEMPLATES
-// ============================================================================
-
-// generateVersionHpp generates version.hpp directly from project name and version
 func GenerateVersionHpp(projectName, projectVersion string) string {
 	if projectVersion == "" {
 		projectVersion = "1.0.0"
 	}
 	safeNameUpper := naming.SafeIdentUpper(projectName)
 
-	// Parse version components
 	parts := strings.Split(projectVersion, ".")
 	major := "0"
 	minor := "0"
@@ -249,8 +243,6 @@ endif()
 	return sb.String()
 }
 
-// generateCMakePresets generates CMakePresets.json
-// Assumes VCPKG_ROOT environment variable is set
 func GenerateCMakePresets() string {
 	return `{
   "version": 2,
@@ -350,7 +342,6 @@ FetchContent_MakeAvailable(doctest)
 	return sb.String()
 }
 
-// GenerateBenchCMake generates bench/CMakeLists.txt with FetchContent for benchmark frameworks
 func GenerateBenchCMake(projectName string, benchmarkFramework string) string {
 	hasGoogleBench := false
 	hasCatch2Bench := false
@@ -518,7 +509,6 @@ IndentCaseLabels: true
 	}
 }
 
-// GenerateCpxCI generates a cpx-ci.yaml file with empty toolchains
 func GenerateCpxCI() string {
 	return `# cpx-ci.yaml - Toolchain configuration
 # This file defines toolchains for building your project
@@ -602,7 +592,6 @@ output: .bin/ci
 // DOCUMENTATION TEMPLATES
 // ============================================================================
 
-// generateVcpkgReadme generates README with vcpkg instructions
 func GenerateVcpkgReadme(projectName string, cppStandard int, isLib bool) string {
 	codeBlock := "```"
 	if isLib {
@@ -690,7 +679,6 @@ MIT
 // BAZEL TEMPLATES
 // ============================================================================
 
-// GenerateModuleBazel generates MODULE.bazel content for a Bazel project
 func GenerateModuleBazel(projectName, version, testFramework, benchmarkFramework string) string {
 	if version == "" {
 		version = "0.1.0"
@@ -737,7 +725,6 @@ bazel_dep(name = "rules_cc", version = "0.1.1")
 	return content
 }
 
-// GenerateBuildBazelRoot generates root BUILD.bazel (empty or just aliases)
 func GenerateBuildBazelRoot(projectName string, isExe bool) string {
 	if isExe {
 		return fmt.Sprintf(`# Root BUILD.bazel - aliases for convenience
@@ -768,7 +755,6 @@ alias(
 `, projectName, projectName)
 }
 
-// GenerateBuildBazelSrc generates src/BUILD.bazel
 func GenerateBuildBazelSrc(projectName string, isExe bool) string {
 	if isExe {
 		return fmt.Sprintf(`load("@rules_cc//cc:defs.bzl", "cc_binary", "cc_library")
@@ -802,7 +788,6 @@ cc_library(
 `, projectName, projectName, projectName)
 }
 
-// GenerateBuildBazelInclude generates include/BUILD.bazel
 func GenerateBuildBazelInclude(projectName string) string {
 	return fmt.Sprintf(`load("@rules_cc//cc:defs.bzl", "cc_library")
 
@@ -816,7 +801,6 @@ cc_library(
 `, projectName, projectName)
 }
 
-// GenerateBuildBazelTests generates tests/BUILD.bazel
 func GenerateBuildBazelTests(projectName string, testFramework string) string {
 	switch testFramework {
 	case "googletest":
@@ -873,7 +857,6 @@ cc_test(
 	}
 }
 
-// GenerateBuildBazelBench generates bench/BUILD.bazel
 func GenerateBuildBazelBench(projectName, benchmarkFramework string) string {
 	switch benchmarkFramework {
 	case "google-benchmark", "googlebenchmark":
@@ -930,7 +913,6 @@ cc_binary(
 	}
 }
 
-// GenerateBazelrc generates .bazelrc with common settings
 func GenerateBazelrc(cppStandard int) string {
 	return fmt.Sprintf(`# C++ standard
 build --cxxopt=-std=c++%d
@@ -953,7 +935,6 @@ test --test_output=errors
 `, cppStandard)
 }
 
-// GenerateBazelignore generates .bazelignore file
 func GenerateBazelignore() string {
 	return `# Ignore build output directory
 build
@@ -970,7 +951,6 @@ build
 `
 }
 
-// GenerateBazelGitignore generates .gitignore for Bazel projects
 func GenerateBazelGitignore() string {
 	return `# Bazel
 bazel-*
@@ -1001,7 +981,6 @@ build/
 `
 }
 
-// GenerateBazelReadme generates README with Bazel instructions
 func GenerateBazelReadme(projectName string, cppStandard int, isLib bool) string {
 	codeBlock := "```"
 	if isLib {
@@ -1097,7 +1076,6 @@ MIT
 // MESON TEMPLATES
 // ============================================================================
 
-// GenerateMesonBuildRoot generates root meson.build
 func GenerateMesonBuildRoot(projectName string, isExe bool, cppStandard int, testFramework, benchmarkFramework string) string {
 	targetType := "executable"
 	if !isExe {
@@ -1137,7 +1115,6 @@ summary({
 `, projectName, targetType, cppStandard)
 }
 
-// GenerateMesonBuildSrc generates src/meson.build
 func GenerateMesonBuildSrc(projectName string, isExe bool) string {
 	safeName := naming.SafeIdent(projectName)
 
@@ -1179,7 +1156,6 @@ src_files = files(
 `, projectName, safeName, projectName)
 }
 
-// GenerateMesonBuildTests generates tests/meson.build
 func GenerateMesonBuildTests(projectName, testFramework string) string {
 	safeName := naming.SafeIdent(projectName)
 
@@ -1226,7 +1202,6 @@ test('%s tests', test_exe)
 `, depLine, projectName, safeName, depsArg, projectName)
 }
 
-// GenerateMesonBuildBench generates bench/meson.build
 func GenerateMesonBuildBench(projectName, benchmarkFramework string) string {
 	safeName := naming.SafeIdent(projectName)
 
@@ -1264,7 +1239,6 @@ bench_exe = executable('%s_bench',
 `, depLine, projectName, safeName, depsArg)
 }
 
-// GenerateMesonOptions generates meson.options
 func GenerateMesonOptions() string {
 	return `# Build options
 option('enable_tests', type : 'boolean', value : true,
@@ -1275,7 +1249,6 @@ option('enable_benchmarks', type : 'boolean', value : true,
 `
 }
 
-// GenerateMesonGitignore generates .gitignore for Meson projects
 func GenerateMesonGitignore() string {
 	return `# Meson build directory
 builddir/
@@ -1303,7 +1276,6 @@ build/
 `
 }
 
-// GenerateMesonReadme generates README with Meson instructions
 func GenerateMesonReadme(projectName string, cppStandard int, isLib bool) string {
 	codeBlock := "```"
 	if isLib {
@@ -1396,7 +1368,6 @@ MIT
 // CMAKE-ONLY TEMPLATES (no package manager)
 // ============================================================================
 
-// GenerateCMakeLists generates CMakeLists.txt for CMake-only projects
 func GenerateCMakeLists(projectName string, cppStandard int, isExe bool, includeTests bool, benchmarkFramework string, includeBench bool, projectVersion string) string {
 	var sb strings.Builder
 
@@ -1478,7 +1449,6 @@ endif()
 	return sb.String()
 }
 
-// GenerateCMakeGitignore generates .gitignore for CMake-only projects
 func GenerateCMakeGitignore() string {
 	return `# Build directories
 build/
@@ -1520,7 +1490,6 @@ test_results/
 `
 }
 
-// GenerateCMakeReadme generates README with CMake-only instructions
 func GenerateCMakeReadme(projectName string, cppStandard int, isLib bool) string {
 	codeBlock := "```"
 	if isLib {
@@ -1673,8 +1642,11 @@ type BenchSources struct {
 	Main string
 }
 
-// GenerateBenchmarkSources generates benchmark source files based on framework
 func GenerateBenchmarkSources(projectName, benchmarkFramework string) (*BenchSources, []string) {
+	if benchmarkFramework == "" || benchmarkFramework == "none" {
+		return nil, nil
+	}
+
 	safeName := SafeIdent(projectName)
 
 	switch benchmarkFramework {

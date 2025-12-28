@@ -3,7 +3,6 @@ package tui
 import "github.com/charmbracelet/lipgloss"
 
 var (
-	// Colors
 	cyan    = lipgloss.Color("#00D4FF")
 	green   = lipgloss.Color("#00FF00")
 	red     = lipgloss.Color("#FF0000")
@@ -55,7 +54,6 @@ var (
 			Foreground(cyan)
 )
 
-// renderCursor returns a cursor for the given position
 func (m Model) renderCursor(pos int) string {
 	if m.cursor == pos {
 		return selectedStyle.Render("❯")

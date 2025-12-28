@@ -9,14 +9,12 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-// GlobalConfig represents the global cpx configuration
 type GlobalConfig struct {
 	VcpkgRoot  string `yaml:"vcpkg_root"`
 	BcrRoot    string `yaml:"bcr_root"`    // Bazel Central Registry path
 	WrapdbRoot string `yaml:"wrapdb_root"` // Meson WrapDB path
 }
 
-// GetConfigDir returns the directory where cpx stores its global config
 func GetConfigDir() (string, error) {
 	homeDir, err := os.UserHomeDir()
 	if err != nil {
@@ -40,7 +38,6 @@ func GetConfigDir() (string, error) {
 	return configDir, nil
 }
 
-// GetConfigPath returns the path to the global cpx config file
 func GetConfigPath() (string, error) {
 	configDir, err := GetConfigDir()
 	if err != nil {
@@ -49,8 +46,6 @@ func GetConfigPath() (string, error) {
 	return filepath.Join(configDir, "config.yaml"), nil
 }
 
-// LoadGlobal loads the global cpx configuration
-// If the config file doesn't exist, it will be created with default values
 func LoadGlobal() (*GlobalConfig, error) {
 	configPath, err := GetConfigPath()
 	if err != nil {
@@ -79,14 +74,12 @@ func LoadGlobal() (*GlobalConfig, error) {
 	return &config, nil
 }
 
-// SaveGlobal saves the global cpx configuration
 func SaveGlobal(config *GlobalConfig) error {
 	configDir, err := GetConfigDir()
 	if err != nil {
 		return err
 	}
 
-	// Create config directory if it doesn't exist
 	if err := os.MkdirAll(configDir, 0755); err != nil {
 		return fmt.Errorf("failed to create config directory: %w", err)
 	}
