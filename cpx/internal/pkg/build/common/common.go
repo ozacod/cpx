@@ -129,6 +129,7 @@ func FindExecutables(buildDir string) ([]string, error) {
 			strings.HasSuffix(name, ".a") || strings.HasSuffix(name, ".so") ||
 			strings.HasSuffix(name, ".dylib") || strings.HasSuffix(name, ".dll") ||
 			strings.HasSuffix(name, ".lib") || strings.HasSuffix(name, ".o") ||
+			strings.HasSuffix(name, ".elf") ||
 			strings.HasSuffix(name, ".cmake") || strings.HasSuffix(name, ".ninja") ||
 			strings.HasSuffix(name, ".make") || strings.HasSuffix(name, ".txt") {
 			continue
@@ -150,6 +151,35 @@ func FindExecutables(buildDir string) ([]string, error) {
 	sort.Strings(executables)
 
 	return executables, nil
+}
+
+func FindLibraries(buildDir string) ([]string, error) {
+	var libraries []string
+
+	entries, err := os.ReadDir(buildDir)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read build directory: %w", err)
+	}
+
+	for _, entry := range entries {
+		if entry.IsDir() {
+			continue
+		}
+
+		name := entry.Name()
+
+		// Include library files
+		if strings.HasSuffix(name, ".a") || strings.HasSuffix(name, ".so") ||
+			strings.HasSuffix(name, ".dylib") || strings.HasSuffix(name, ".dll") ||
+			strings.HasSuffix(name, ".lib") {
+			libraries = append(libraries, filepath.Join(buildDir, name))
+		}
+	}
+
+	// Sort by name for consistent ordering
+	sort.Strings(libraries)
+
+	return libraries, nil
 }
 
 func CopyAndSign(src, dest string) error {

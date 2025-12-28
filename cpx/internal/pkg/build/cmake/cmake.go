@@ -153,6 +153,14 @@ func (b *Builder) Build(ctx context.Context, opts build.BuildOptions) error {
 		}
 	}
 
+	libraries, err := common.FindLibraries(buildDir)
+	if err == nil {
+		for _, lib := range libraries {
+			dest := filepath.Join(finalDir, filepath.Base(lib))
+			_ = common.CopyAndSign(lib, dest)
+		}
+	}
+
 	fmt.Printf("%s  ✔ Build complete%s\n", colors.Green, colors.Reset)
 	fmt.Printf("  Artifacts in: %s/\n\n", finalDir)
 

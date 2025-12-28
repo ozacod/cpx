@@ -372,6 +372,14 @@ func (b *Builder) Build(ctx context.Context, opts build.BuildOptions) error {
 		}
 	}
 
+	libraries, err := common.FindLibraries(cacheBuildDir)
+	if err == nil {
+		for _, lib := range libraries {
+			dest := filepath.Join(finalBuildDir, filepath.Base(lib))
+			_ = common.CopyAndSign(lib, dest)
+		}
+	}
+
 	fmt.Printf("%s  ✔ Build complete%s %s[%s]%s\n", colors.Green, colors.Reset, colors.Gray, time.Since(buildStart).Round(10*time.Millisecond), colors.Reset)
 	fmt.Printf("  Artifacts in: %s/\n\n", finalBuildDir)
 	return nil
@@ -608,6 +616,13 @@ func (b *Builder) Run(ctx context.Context, opts build.RunOptions) error {
 		for _, exe := range executables {
 			dest := filepath.Join(finalBuildDir, filepath.Base(exe))
 			_ = common.CopyAndSign(exe, dest)
+		}
+	}
+	libraries, err := common.FindLibraries(cacheBuildDir)
+	if err == nil {
+		for _, lib := range libraries {
+			dest := filepath.Join(finalBuildDir, filepath.Base(lib))
+			_ = common.CopyAndSign(lib, dest)
 		}
 	}
 

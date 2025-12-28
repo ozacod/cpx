@@ -468,6 +468,7 @@ out/
 *.so
 *.dylib
 *.dll
+*.elf
 
 # CMake
 CMakeFiles/
@@ -996,6 +997,7 @@ build/
 *.so
 *.dylib
 *.dll
+*.elf
 `
 }
 
@@ -1306,6 +1308,7 @@ build/
 *.so
 *.dylib
 *.dll
+*.elf
 `
 }
 
@@ -1512,6 +1515,7 @@ out/
 *.so
 *.dylib
 *.dll
+*.elf
 
 # CMake
 CMakeFiles/
