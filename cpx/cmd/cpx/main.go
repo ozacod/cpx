@@ -29,7 +29,6 @@ func main() {
 	rootCmd.AddCommand(cli.LintCmd())
 	rootCmd.AddCommand(cli.FlawfinderCmd())
 	rootCmd.AddCommand(cli.CppcheckCmd())
-	rootCmd.AddCommand(cli.AnalyzeCmd())
 
 	rootCmd.AddCommand(cli.DocCmd())
 	rootCmd.AddCommand(cli.ReleaseCmd())

@@ -35,7 +35,6 @@ Read the full docs at [cpx-dev.vercel.app/docs](https://cpx-dev.vercel.app/docs)
     - **Bazel Central Registry** for Bazel projects 
 - **Unified Workflow**: `cpx build`, `cpx run`, `cpx test`, `cpx bench` work consistently across all project types.
 - **Code Quality**: Built-in support for `clang-format`, `clang-tidy`, `cppcheck`, and `flawfinder`.
-  - `cpx analyze` runs a comprehensive static analysis report.
 - **Sanitizers**: Easy flags for ASan, TSan, MSan, UBSan.
 - **Cross-Compilation**: Generate Docker-based toolchains with `cpx add-toolchain`.
 - **Smart Tool Detection**: Automatically validates environment and warns about missing build tools.
@@ -128,7 +127,6 @@ Google's multi-language build system. `cpx` manages `MODULE.bazel` (Bzlmod).
 | `bench --toolchain <name>` | Run benchmarks in Docker toolchain |
 | `fmt` | Format code using `clang-format` |
 | `lint` | Lint code using `clang-tidy` |
-| `analyze` | Run static analysis (cppcheck, flawfinder) & report |
 | `clean` | Remove build artifacts |
 | `search` | Search for libraries interactively |
 | `info <pkg>` | Show detailed library information |
@@ -208,7 +206,6 @@ toolchains:
 | `build`, `run` | `--verbose` | `-v` |
 | `run` | `--release` | `-r` |
 | `test` | `--filter` | `-f` |
-| `analyze` | `--output` | `-o` |
 | `fmt` | `--check` | `-c` |
 | `lint` | `--fix` | `-f` |
 
