@@ -534,6 +534,7 @@ func GenerateCpxCI() string {
 # This file defines runners (execution environments) and toolchains (build configurations).
 # Use 'cpx build all' to build for all active toolchains.
 # Use 'cpx build --toolchain <name>' to build for a specific toolchain.
+# Use 'cpx add-toolchain' for an interactive wizard to add new toolchains.
 
 # ============================================================================
 # RUNNERS
@@ -547,20 +548,19 @@ func GenerateCpxCI() string {
 #   host   - SSH host (required for type: ssh)
 #   user   - SSH user (required for type: ssh)
 
-runners:
-  - name: ubuntu20-docker
-    type: docker
-    image: ubuntu:20.04
-
-  - name: debian
-    type: docker
-    image: debian:trixie
-
-  # Uncomment for SSH-based builds:
-  # - name: build-server
-  #   type: ssh
-  #   host: build.example.com
-  #   user: builder
+# runners:
+#   - name: ubuntu20-docker
+#     type: docker
+#     image: ubuntu:20.04
+#
+#   - name: debian
+#     type: docker
+#     image: debian:trixie
+#
+#   - name: build-server
+#     type: ssh
+#     host: build.example.com
+#     user: builder
 
 # ============================================================================
 # TOOLCHAINS
@@ -581,31 +581,30 @@ runners:
 #   cmake_toolchain_file - Path to CMake toolchain file
 #   env          - Environment variables
 
-toolchains:
-  - name: linux-amd64
-    runner: ubuntu20-docker
-    cc: gcc
-    cxx: g++
-    build_type: Release
-    optimization: "2"
-    active: true
-    # cmake_options:
-    #   - -DENABLE_TESTING=ON
-    # env:
-    #   CFLAGS: "-march=native"
-
-  - name: linux-clang
-    runner: debian
-    cc: clang
-    cxx: clang++
-    build_type: Release
-    optimization: "3"
-
-  # Native build (runs on your host machine):
-  # - name: native
-  #   runner: native
-  #   cc: clang
-  #   cxx: clang++
+# toolchains:
+#   - name: linux-amd64
+#     runner: ubuntu20-docker
+#     cc: gcc
+#     cxx: g++
+#     build_type: Release
+#     optimization: "2"
+#     active: true
+#     cmake_options:
+#       - -DENABLE_TESTING=ON
+#     env:
+#       CFLAGS: "-march=native"
+#
+#   - name: linux-clang
+#     runner: debian
+#     cc: clang
+#     cxx: clang++
+#     build_type: Release
+#     optimization: "3"
+#
+#   - name: native
+#     runner: native
+#     cc: clang
+#     cxx: clang++
 `
 }
 
