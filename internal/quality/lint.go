@@ -1,0 +1,311 @@
+package quality
+
+import (
+	"fmt"
+	"os"
+	"os/exec"
+	"path/filepath"
+	"strings"
+
+	"github.com/ozacod/cpx/internal/utils/colors"
+	"github.com/ozacod/cpx/internal/utils/git"
+)
+
+// LintCode runs clang-tidy static analysis
+func LintCode(fix bool, vcpkg VcpkgSetup) error {
+	// Check if clang-tidy is available
+	if _, err := exec.LookPath("clang-tidy"); err != nil {
+		return fmt.Errorf("clang-tidy not found. Please install it first")
+	}
+
+	fmt.Printf("%s Running static analysis...%s\n", colors.Cyan, colors.Reset)
+
+	// Detect project type and find compile_commands.json
+	var compileDb string
+	var buildDir string
+
+	// Check for Meson project
+	if _, err := os.Stat("meson.build"); err == nil {
+		buildDir = "builddir"
+		compileDb = filepath.Join(buildDir, "compile_commands.json")
+
+		if _, err := os.Stat(compileDb); os.IsNotExist(err) {
+			// Try to generate compile_commands.json with meson
+			fmt.Printf("%s  Generating compile_commands.json for Meson project...%s\n", colors.Cyan, colors.Reset)
+			if _, err := os.Stat(buildDir); os.IsNotExist(err) {
+				// Need to run meson setup first
+				cmd := exec.Command("meson", "setup", buildDir)
+				cmd.Stdout = os.Stdout
+				cmd.Stderr = os.Stderr
+				if err := cmd.Run(); err != nil {
+					return fmt.Errorf("failed to setup meson project: %w\n  Run 'cpx build' first", err)
+				}
+			}
+		}
+	} else if _, err := os.Stat("MODULE.bazel"); err == nil {
+		// Bazel project - use bazel-compile-commands or hedron
+		buildDir = "."
+		compileDb = "compile_commands.json"
+
+		if _, err := os.Stat(compileDb); os.IsNotExist(err) {
+			// Try to generate using refresh_compile_commands if available
+			fmt.Printf("%s  Generating compile_commands.json for Bazel project...%s\n", colors.Cyan, colors.Reset)
+			// Check if hedron compile-commands is configured
+			cmd := exec.Command("bazel", "run", "@hedron_compile_commands//:refresh_all")
+			if err := cmd.Run(); err != nil {
+				// Hedron not available, print instructions
+				fmt.Printf("%s  Note: To enable clang-tidy for Bazel, add hedron_compile_commands to your project.%s\n", colors.Yellow, colors.Reset)
+				fmt.Printf("  See: https://github.com/hedronvision/bazel-compile-commands-extractor\n")
+				fmt.Printf("%s  Proceeding without compile_commands.json (limited analysis)...%s\n", colors.Yellow, colors.Reset)
+				compileDb = "" // Will skip compile database usage
+			}
+		}
+	} else {
+		// CMake/vcpkg project
+		// Set up vcpkg environment
+		if err := vcpkg.SetupEnv(); err != nil {
+			return fmt.Errorf("failed to setup vcpkg: %w", err)
+		}
+
+		// Use .cache/native/debug for consistency with build command
+		buildDir = filepath.Join(".cache", "native", "debug")
+		compileDb = filepath.Join(buildDir, "compile_commands.json")
+		needsRegenerate := false
+
+		if _, err := os.Stat(compileDb); os.IsNotExist(err) {
+			needsRegenerate = true
+			fmt.Printf("%s  Generating compile_commands.json...%s\n", colors.Cyan, colors.Reset)
+		} else {
+			// Check if CMakeCache.txt exists - if not, we need to configure
+			if _, err := os.Stat(filepath.Join(buildDir, "CMakeCache.txt")); os.IsNotExist(err) {
+				needsRegenerate = true
+				fmt.Printf("%s  Regenerating compile_commands.json (CMake not configured)...%s\n", colors.Cyan, colors.Reset)
+			}
+		}
+
+		if needsRegenerate {
+			// Get vcpkg root for toolchain file
+			vcpkgPath, err := vcpkg.GetPath()
+			if err != nil {
+				return fmt.Errorf("vcpkg not configured: %w", err)
+			}
+			vcpkgRoot := filepath.Dir(vcpkgPath)
+			toolchainFile := filepath.Join(vcpkgRoot, "scripts", "buildsystems", "vcpkg.cmake")
+
+			// Check if toolchain file exists
+			if _, err := os.Stat(toolchainFile); os.IsNotExist(err) {
+				return fmt.Errorf("vcpkg toolchain file not found: %s\n  Make sure vcpkg is properly installed", toolchainFile)
+			}
+
+			// Configure CMake with vcpkg toolchain
+			// Use shared vcpkg_installed directory
+			cwd, _ := os.Getwd()
+			vcpkgInstalledDir := filepath.Join(cwd, ".cache", "native", "vcpkg_installed")
+			vcpkgInstallArg := "-DVCPKG_INSTALLED_DIR=" + vcpkgInstalledDir
+
+			cmakeArgs := []string{
+				"-B", buildDir,
+				"-DCMAKE_EXPORT_COMPILE_COMMANDS=ON",
+				"-DCMAKE_TOOLCHAIN_FILE=" + toolchainFile,
+				vcpkgInstallArg,
+			}
+
+			// Check if CMakePresets.json exists and use it
+			if _, err := os.Stat("CMakePresets.json"); err == nil {
+				// Use preset if available
+				cmakeArgs = []string{
+					"--preset", "default",
+					"-B", buildDir,
+					"-DCMAKE_EXPORT_COMPILE_COMMANDS=ON",
+					vcpkgInstallArg,
+				}
+			}
+
+			cmd := exec.Command("cmake", cmakeArgs...)
+			cmd.Env = os.Environ()
+			cmd.Stdout = os.Stdout
+			cmd.Stderr = os.Stderr
+			if err := cmd.Run(); err != nil {
+				return fmt.Errorf("failed to generate compile_commands.json: %w\n  Try running 'cpx build' first to configure the project", err)
+			}
+		}
+	}
+
+	// Find source files (only git-tracked files, respect .gitignore)
+	var files []string
+	trackedFiles, err := git.GetGitTrackedCppFiles()
+	if err != nil {
+		// If not in git repo, fall back to scanning src/include directories
+		fmt.Printf("%s Warning: Not in a git repository. Scanning src/, include/, and current directory.%s\n", colors.Yellow, colors.Reset)
+		for _, dir := range []string{".", "src", "include"} {
+			if _, err := os.Stat(dir); os.IsNotExist(err) {
+				continue
+			}
+			_ = filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
+				if err != nil || info.IsDir() {
+					return nil
+				}
+				// Skip build directories, cache, and third-party dependencies
+				// Check for common build/cache directory patterns
+				if strings.HasPrefix(path, ".cache") ||
+					strings.HasPrefix(path, ".bin") ||
+					strings.HasPrefix(path, "build") ||
+					strings.HasPrefix(path, "builddir") ||
+					strings.HasPrefix(path, "subprojects") ||
+					strings.HasPrefix(path, "out") ||
+					strings.HasPrefix(path, ".bazel") ||
+					strings.HasPrefix(path, "bazel-") ||
+					strings.Contains(path, "/build/") ||
+					strings.Contains(path, "\\build\\") ||
+					strings.Contains(path, "/.cache/") ||
+					strings.Contains(path, "\\.cache\\") ||
+					strings.Contains(path, "_deps/") ||
+					strings.Contains(path, "CMakeFiles/") {
+					return nil
+				}
+				ext := filepath.Ext(path)
+				if ext == ".cpp" || ext == ".cc" || ext == ".cxx" || ext == ".c++" {
+					files = append(files, path)
+				}
+				return nil
+			})
+		}
+	} else {
+		// Filter out files in build directories and other common ignored paths
+		for _, file := range trackedFiles {
+			// Skip files in build/, out/, bin/, .vcpkg/, builddir/, subprojects/, etc.
+			if strings.HasPrefix(file, "build/") ||
+				strings.HasPrefix(file, "builddir/") ||
+				strings.HasPrefix(file, "subprojects/") ||
+				strings.HasPrefix(file, "out/") ||
+				strings.HasPrefix(file, "bin/") ||
+				strings.HasPrefix(file, ".vcpkg/") ||
+				strings.HasPrefix(file, ".cache/") ||
+				strings.HasPrefix(file, ".bazel/") ||
+				strings.HasPrefix(file, "bazel-") ||
+				strings.Contains(file, "/build/") ||
+				strings.Contains(file, "\\build\\") {
+				continue
+			}
+			files = append(files, file)
+		}
+	}
+
+	if len(files) == 0 {
+		fmt.Printf("%s No source files found%s\n", colors.Green, colors.Reset)
+		return nil
+	}
+
+	// Build clang-tidy args
+	var tidyArgs []string
+
+	// If we have a compile database, use it
+	if compileDb != "" {
+		if _, err := os.Stat(compileDb); os.IsNotExist(err) {
+			return fmt.Errorf("compile_commands.json not found at %s\n  Run 'cpx build' first to generate it", compileDb)
+		}
+		absBuildDir, _ := filepath.Abs(buildDir)
+		tidyArgs = append(tidyArgs, "-p", absBuildDir)
+	}
+
+	if fix {
+		tidyArgs = append(tidyArgs, "-fix")
+	}
+
+	// Get system include paths from the compiler to help clang-tidy find standard headers
+	// This is needed because compile_commands.json might not have all system includes
+	systemIncludes := GetSystemIncludePaths()
+
+	// Add system include paths as extra arguments
+	for _, include := range systemIncludes {
+		tidyArgs = append(tidyArgs, "--extra-arg=-isystem"+include)
+	}
+	tidyArgs = append(tidyArgs, files...)
+
+	cmd := exec.Command("clang-tidy", tidyArgs...)
+	output, err := cmd.CombinedOutput()
+
+	// Write output to stderr (warnings/errors) and stdout (info)
+	os.Stderr.Write(output)
+
+	// Check if output contains warnings or errors
+	outputStr := string(output)
+	hasWarnings := strings.Contains(outputStr, "warning:") ||
+		strings.Contains(outputStr, "error:") ||
+		strings.Contains(outputStr, "note:")
+
+	if err != nil {
+		// clang-tidy returns non-zero on errors or when warnings are treated as errors
+		if hasWarnings {
+			fmt.Printf("%s  Analysis complete with issues found%s\n", colors.Yellow, colors.Reset)
+		} else {
+			fmt.Printf("%s  Analysis failed%s\n", colors.Yellow, colors.Reset)
+		}
+		return nil
+	}
+
+	if hasWarnings {
+		fmt.Printf("%s  Analysis complete with warnings%s\n", colors.Yellow, colors.Reset)
+		return nil
+	}
+
+	fmt.Printf("%s No issues found!%s\n", colors.Green, colors.Reset)
+	return nil
+}
+
+// GetSystemIncludePaths gets system include paths from the compiler
+func GetSystemIncludePaths() []string {
+	var includes []string
+
+	// Try to get system includes from clang++
+	// Use -E -x c++ - -v to get verbose include search paths
+	cmd := exec.Command("clang++", "-E", "-x", "c++", "-", "-v")
+	nullFile, err := os.Open(os.DevNull)
+	if err != nil {
+		return includes
+	}
+	defer nullFile.Close()
+	cmd.Stdin = nullFile
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		// If clang++ fails, try clang
+		cmd = exec.Command("clang", "-E", "-x", "c++", "-", "-v")
+		nullFile2, err2 := os.Open(os.DevNull)
+		if err2 != nil {
+			return includes
+		}
+		defer nullFile2.Close()
+		cmd.Stdin = nullFile2
+		output, err = cmd.CombinedOutput()
+		if err != nil {
+			return includes
+		}
+	}
+
+	// Parse the output to find include paths
+	// The output format is:
+	// #include <...> search starts here:
+	//  /path/to/include
+	// End of search list.
+	lines := strings.Split(string(output), "\n")
+	inIncludeSection := false
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		if strings.Contains(line, "#include <...> search starts here:") {
+			inIncludeSection = true
+			continue
+		}
+		if strings.Contains(line, "End of search list.") {
+			break
+		}
+		if inIncludeSection && line != "" && !strings.HasPrefix(line, "#") {
+			// Remove leading/trailing whitespace and check if it's a valid path
+			includePath := strings.TrimSpace(line)
+			if filepath.IsAbs(includePath) || strings.HasPrefix(includePath, "/") {
+				includes = append(includes, includePath)
+			}
+		}
+	}
+
+	return includes
+}

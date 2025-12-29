@@ -1,0 +1,117 @@
+package commands
+
+import (
+	"fmt"
+
+	"github.com/ozacod/cpx/internal/build/bazel"
+	"github.com/ozacod/cpx/internal/build/cmake"
+	"github.com/ozacod/cpx/internal/build/interfaces"
+	"github.com/ozacod/cpx/internal/build/meson"
+	"github.com/ozacod/cpx/internal/build/vcpkg"
+	"github.com/spf13/cobra"
+)
+
+func RunCmd() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:     "run",
+		Aliases: []string{"r"},
+		Short:   "Build and run the project",
+		Long: `Build the project and run the executable. Automatically detects project type:
+  - vcpkg/CMake projects: Builds with CMake and runs the binary
+  - Bazel projects: Uses bazel run
+
+Arguments after -- are passed to the binary.`,
+		Example: `  cpx run                 # Debug build by default
+  cpx run --release        # Release build, then run
+  cpx run --asan           # Run with AddressSanitizer
+  cpx run --target app -- --flag value`,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return runRun(cmd, args)
+		},
+	}
+
+	cmd.Flags().BoolP("release", "r", false, "Build in release mode (-O2). Default is debug")
+	cmd.Flags().StringP("toolchain", "t", "", "Toolchain to run in Docker (from cpx-ci.yaml)")
+	cmd.Flags().StringP("opt", "O", "", "Override optimization level: 0,1,2,3,s,fast")
+	cmd.Flags().BoolP("verbose", "v", false, "Show full build output")
+	cmd.Flags().Bool("asan", false, "Run with AddressSanitizer")
+	cmd.Flags().Bool("tsan", false, "Run with ThreadSanitizer")
+	cmd.Flags().Bool("msan", false, "Run with MemorySanitizer")
+	cmd.Flags().Bool("ubsan", false, "Run with UndefinedBehaviorSanitizer")
+
+	return cmd
+}
+
+func runRun(cmd *cobra.Command, args []string) error {
+	release, _ := cmd.Flags().GetBool("release")
+	toolchain, _ := cmd.Flags().GetString("toolchain")
+	optLevel, _ := cmd.Flags().GetString("opt")
+	verbose, _ := cmd.Flags().GetBool("verbose")
+
+	if toolchain != "" {
+		return runToolchainBuild(ToolchainBuildOptions{
+			ToolchainName:     toolchain,
+			ExecuteAfterBuild: true,
+			RunTests:          false,
+			RunBenchmarks:     false,
+			Verbose:           verbose,
+		})
+	}
+
+	asan, _ := cmd.Flags().GetBool("asan")
+	tsan, _ := cmd.Flags().GetBool("tsan")
+	msan, _ := cmd.Flags().GetBool("msan")
+	ubsan, _ := cmd.Flags().GetBool("ubsan")
+
+	sanitizer := ""
+	sanitizerCount := 0
+	if asan {
+		sanitizer = "asan"
+		sanitizerCount++
+	}
+	if tsan {
+		sanitizer = "tsan"
+		sanitizerCount++
+	}
+	if msan {
+		sanitizer = "msan"
+		sanitizerCount++
+	}
+	if ubsan {
+		sanitizer = "ubsan"
+		sanitizerCount++
+	}
+	if sanitizerCount > 1 {
+		return fmt.Errorf("only one sanitizer can be used at a time (got %d)", sanitizerCount)
+	}
+
+	projectType := DetectProjectType()
+
+	WarnMissingBuildTools(projectType)
+
+	opts := build.RunOptions{
+		Release:   release,
+		OptLevel:  optLevel,
+		Sanitizer: sanitizer,
+		Target:    "",
+		Args:      args,
+		Verbose:   verbose,
+	}
+
+	switch projectType {
+	case ProjectTypeBazel:
+		builder := bazel.New()
+		return builder.Run(opts)
+	case ProjectTypeMeson:
+		builder := meson.New()
+		return builder.Run(opts)
+	case ProjectTypeCMake:
+		builder := cmake.New()
+		return builder.Run(opts)
+	case ProjectTypeVcpkg:
+		builder := vcpkg.New()
+		return builder.Run(opts)
+	default:
+		return fmt.Errorf("unsupported project type")
+	}
+}

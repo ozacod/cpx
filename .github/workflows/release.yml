@@ -19,29 +19,27 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: '1.21'
+          go-version: '1.24'
 
       - name: Build binaries
         run: |
-          cd cpx
-
           VERSION="${GITHUB_REF_NAME#v}"
-          mkdir -p ../bin
-          
+          mkdir -p bin
+
           # Linux AMD64
-          GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -ldflags="-s -w -X github.com/ozacod/cpx/internal/app/cli.Version=${VERSION}" -o ../bin/cpx-linux-amd64 ./cmd/cpx
-          
+          GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -ldflags="-s -w -X github.com/ozacod/cpx/internal/cli/commands.Version=${VERSION}" -o bin/cpx-linux-amd64 ./cmd/cpx
+
           # Linux ARM64
-          GOOS=linux GOARCH=arm64 CGO_ENABLED=0 go build -ldflags="-s -w -X github.com/ozacod/cpx/internal/app/cli.Version=${VERSION}" -o ../bin/cpx-linux-arm64 ./cmd/cpx
-          
+          GOOS=linux GOARCH=arm64 CGO_ENABLED=0 go build -ldflags="-s -w -X github.com/ozacod/cpx/internal/cli/commands.Version=${VERSION}" -o bin/cpx-linux-arm64 ./cmd/cpx
+
           # Windows AMD64
-          GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go build -ldflags="-s -w -X github.com/ozacod/cpx/internal/app/cli.Version=${VERSION}" -o ../bin/cpx-windows-amd64.exe ./cmd/cpx
-          
+          GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go build -ldflags="-s -w -X github.com/ozacod/cpx/internal/cli/commands.Version=${VERSION}" -o bin/cpx-windows-amd64.exe ./cmd/cpx
+
           # macOS AMD64
-          GOOS=darwin GOARCH=amd64 CGO_ENABLED=0 go build -ldflags="-s -w -X github.com/ozacod/cpx/internal/app/cli.Version=${VERSION}" -o ../bin/cpx-darwin-amd64 ./cmd/cpx
-          
+          GOOS=darwin GOARCH=amd64 CGO_ENABLED=0 go build -ldflags="-s -w -X github.com/ozacod/cpx/internal/cli/commands.Version=${VERSION}" -o bin/cpx-darwin-amd64 ./cmd/cpx
+
           # macOS ARM64 (Apple Silicon)
-          GOOS=darwin GOARCH=arm64 CGO_ENABLED=0 go build -ldflags="-s -w -X github.com/ozacod/cpx/internal/app/cli.Version=${VERSION}" -o ../bin/cpx-darwin-arm64 ./cmd/cpx
+          GOOS=darwin GOARCH=arm64 CGO_ENABLED=0 go build -ldflags="-s -w -X github.com/ozacod/cpx/internal/cli/commands.Version=${VERSION}" -o bin/cpx-darwin-arm64 ./cmd/cpx
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
