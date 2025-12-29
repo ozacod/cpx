@@ -2,7 +2,6 @@ package bazel
 
 import (
 	"bytes"
-	"context"
 	"fmt"
 	"os"
 	"os/exec"
@@ -125,7 +124,7 @@ func TestBuild(t *testing.T) {
 				Sanitizer: tt.sanitizer,
 			}
 
-			err := builder.Build(context.Background(), opts)
+			err := builder.Build(opts)
 			assert.NoError(t, err)
 
 			// Check that bazel build was called
@@ -204,7 +203,7 @@ cc_binary(
 
 	builder := New()
 
-	err = builder.Run(context.Background(), build.RunOptions{
+	err = builder.Run(build.RunOptions{
 		Release: false,
 		Target:  "//:main",
 		Verbose: true,
@@ -237,7 +236,7 @@ func TestTest(t *testing.T) {
 
 	builder := New()
 
-	err := builder.Test(context.Background(), build.TestOptions{
+	err := builder.Test(build.TestOptions{
 		Verbose: true,
 		Filter:  "//:main_test",
 	})
@@ -270,7 +269,7 @@ func TestBench(t *testing.T) {
 	builder := New()
 
 	// Test Bench with specific target
-	err := builder.Bench(context.Background(), build.BenchOptions{
+	err := builder.Bench(build.BenchOptions{
 		Verbose: true,
 		Target:  "//bench:myapp_bench",
 	})
@@ -333,7 +332,7 @@ func TestClean(t *testing.T) {
 			}
 
 			builder := New()
-			err = builder.Clean(context.Background(), build.CleanOptions{All: tt.all})
+			err = builder.Clean(build.CleanOptions{All: tt.all})
 			assert.NoError(t, err)
 
 			// Check that bazel clean was called
@@ -384,7 +383,7 @@ bazel_dep(name = "rules_cc", version = "0.0.1")
 	os.Stdout = w
 
 	// Add with explicit version (BCR not needed)
-	err = builder.AddDependency(context.Background(), "com_google_googletest", "1.14.0")
+	err = builder.AddDependency("com_google_googletest", "1.14.0")
 
 	// Restore stdout
 	if err := w.Close(); err != nil {
@@ -430,7 +429,7 @@ bazel_dep(name = "com_google_googletest", version = "1.14.0")
 	builder := New()
 
 	// Remove the dependency
-	err = builder.RemoveDependency(context.Background(), "com_google_googletest")
+	err = builder.RemoveDependency("com_google_googletest")
 	assert.NoError(t, err)
 
 	// Verify MODULE.bazel was updated
@@ -465,7 +464,7 @@ bazel_dep(name = "gtest", version = "1.11.0")`
 	require.NoError(t, os.WriteFile("MODULE.bazel", []byte(content), 0644))
 
 	builder := New()
-	deps, err := builder.ListDependencies(context.Background())
+	deps, err := builder.ListDependencies()
 	assert.NoError(t, err)
 	assert.Len(t, deps, 2)
 	assert.Equal(t, "zlib", deps[0].Name)
@@ -476,7 +475,7 @@ func TestSearchDependencies(t *testing.T) {
 	bcrDir := setupMockBCR(t)
 	builder := NewWithBCR(bcrDir)
 
-	results, err := builder.SearchDependencies(context.Background(), "zli")
+	results, err := builder.SearchDependencies("zli")
 	assert.NoError(t, err)
 	assert.Len(t, results, 1)
 	assert.Equal(t, "zlib", results[0].Name)
@@ -492,7 +491,7 @@ func TestDependencyInfo(t *testing.T) {
 	bcrDir := setupMockBCR(t)
 	builder := NewWithBCR(bcrDir)
 
-	info, err := builder.DependencyInfo(context.Background(), "zlib")
+	info, err := builder.DependencyInfo("zlib")
 	assert.NoError(t, err)
 	assert.Equal(t, "zlib", info.Name)
 	assert.Equal(t, "1.2.13", info.Version)
@@ -520,7 +519,7 @@ func TestListTargets(t *testing.T) {
 	}
 
 	builder := New()
-	targets, err := builder.ListTargets(context.Background())
+	targets, err := builder.ListTargets()
 	assert.NoError(t, err)
 	assert.Contains(t, targets, "//src:main (cc_binary)")
 	assert.Contains(t, targets, "//src:mylib (cc_library)")

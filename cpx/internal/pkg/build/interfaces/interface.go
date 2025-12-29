@@ -4,10 +4,6 @@
 // (CMake, Bazel, Meson) and provides implementations for each.
 package build
 
-import (
-	"context"
-)
-
 // DockerBuildOptions contains options for Docker-based builds.
 type DockerBuildOptions struct {
 	// ImageName is the Docker image to use for the build.
@@ -62,7 +58,7 @@ type DockerBuildOptions struct {
 // DockerBuilder defines the interface for Docker-based builds.
 type DockerBuilder interface {
 	// RunDockerBuild runs a build inside a Docker container.
-	RunDockerBuild(ctx context.Context, opts DockerBuildOptions) error
+	RunDockerBuild(opts DockerBuildOptions) error
 }
 
 // DependencyInfo contains detailed information about a package
@@ -80,52 +76,52 @@ type DependencyInfo struct {
 // a unified way to build, test, run, and benchmark projects.
 type BuildSystem interface {
 	// Build compiles the project with the given options.
-	Build(ctx context.Context, opts BuildOptions) error
+	Build(opts BuildOptions) error
 
 	// Test runs the project's tests with the given options.
-	Test(ctx context.Context, opts TestOptions) error
+	Test(opts TestOptions) error
 
 	// Run builds and runs the project's main executable.
-	Run(ctx context.Context, opts RunOptions) error
+	Run(opts RunOptions) error
 
 	// Bench runs the project's benchmarks.
-	Bench(ctx context.Context, opts BenchOptions) error
+	Bench(opts BenchOptions) error
 
 	// Clean removes build artifacts.
-	Clean(ctx context.Context, opts CleanOptions) error
+	Clean(opts CleanOptions) error
 
 	// ListDependencies returns the list of dependencies in the project.
-	ListDependencies(ctx context.Context) ([]Dependency, error)
+	ListDependencies() ([]Dependency, error)
 
 	// ListTargets returns the list of build targets (executables, libraries).
-	ListTargets(ctx context.Context) ([]string, error)
+	ListTargets() ([]string, error)
 
 	// SearchDependencies searches for available packages matching the query.
-	SearchDependencies(ctx context.Context, query string) ([]Dependency, error)
+	SearchDependencies(query string) ([]Dependency, error)
 
 	// DependencyInfo retrieves detailed information about a specific dependency.
-	DependencyInfo(ctx context.Context, name string) (*DependencyInfo, error)
+	DependencyInfo(name string) (*DependencyInfo, error)
 
 	// AddDependency adds a dependency to the project.
-	AddDependency(ctx context.Context, name string, version string) error
+	AddDependency(name string, version string) error
 
 	// RemoveDependency removes a dependency from the project.
-	RemoveDependency(ctx context.Context, name string) error
+	RemoveDependency(name string) error
 
 	// Name returns the name of the build system (e.g., "cmake", "bazel", "meson").
 	Name() string
 
 	// GenerateGitignore generates the .gitignore file.
-	GenerateGitignore(ctx context.Context, projectPath string) error
+	GenerateGitignore(projectPath string) error
 
 	// GenerateBuildSrc generates the build files for source code (core project files).
-	GenerateBuildSrc(ctx context.Context, projectPath string, config InitConfig) error
+	GenerateBuildSrc(projectPath string, config InitConfig) error
 
 	// GenerateBuildTest generates the build files for tests.
-	GenerateBuildTest(ctx context.Context, projectPath string, config InitConfig) error
+	GenerateBuildTest(projectPath string, config InitConfig) error
 
 	// GenerateBuildBench generates the build files for benchmarks.
-	GenerateBuildBench(ctx context.Context, projectPath string, config InitConfig) error
+	GenerateBuildBench(projectPath string, config InitConfig) error
 }
 
 // InitConfig contains configuration for initializing a new project.

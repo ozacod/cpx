@@ -1,7 +1,6 @@
 package meson
 
 import (
-	"context"
 	"fmt"
 	"os"
 	"os/exec"
@@ -54,7 +53,7 @@ func TestBuild(t *testing.T) {
 
 	// Test Debug Build
 	capturedArgs = nil
-	err = builder.Build(context.Background(), build.BuildOptions{
+	err = builder.Build(build.BuildOptions{
 		Release: false,
 	})
 	assert.NoError(t, err)
@@ -81,7 +80,7 @@ func TestBuild(t *testing.T) {
 	// So for Release build, we expect `setup` to be called again with release flags.
 
 	capturedArgs = nil
-	err = builder.Build(context.Background(), build.BuildOptions{
+	err = builder.Build(build.BuildOptions{
 		Release: true,
 		Clean:   true, // Clean will remove builddir anyway
 	})
@@ -149,7 +148,7 @@ func TestRun(t *testing.T) {
 
 	builder := New()
 
-	err = builder.Run(context.Background(), build.RunOptions{
+	err = builder.Run(build.RunOptions{
 		Release: false,
 		Target:  "myapp",
 		Verbose: true,
@@ -202,7 +201,7 @@ func TestTest(t *testing.T) {
 
 	builder := New()
 
-	err = builder.Test(context.Background(), build.TestOptions{
+	err = builder.Test(build.TestOptions{
 		Verbose: true,
 		Filter:  "mytest",
 	})
@@ -250,7 +249,7 @@ func TestBench(t *testing.T) {
 	builder := New()
 
 	// Test Bench with specific target
-	err = builder.Bench(context.Background(), build.BenchOptions{
+	err = builder.Bench(build.BenchOptions{
 		Verbose: true,
 		Target:  "myapp_bench",
 	})
@@ -306,7 +305,7 @@ func TestClean(t *testing.T) {
 			_ = os.MkdirAll("build-release", 0755)
 
 			builder := New()
-			err := builder.Clean(context.Background(), build.CleanOptions{All: tt.all})
+			err := builder.Clean(build.CleanOptions{All: tt.all})
 			assert.NoError(t, err)
 
 			// Verify expected directories were removed
@@ -335,7 +334,7 @@ func TestAddDependency(t *testing.T) {
 	_ = os.Chdir(tmpDir)
 
 	builder := New()
-	err := builder.AddDependency(context.Background(), "zlib", "")
+	err := builder.AddDependency("zlib", "")
 	assert.NoError(t, err)
 
 	found := false
@@ -362,7 +361,7 @@ func TestRemoveDependency(t *testing.T) {
 	_ = os.MkdirAll(extractedDir, 0755)
 
 	builder := New()
-	err := builder.RemoveDependency(context.Background(), "zlib")
+	err := builder.RemoveDependency("zlib")
 	assert.NoError(t, err)
 
 	_, err = os.Stat(wrapFile)
@@ -383,7 +382,7 @@ func TestListDependencies(t *testing.T) {
 	_ = os.WriteFile(filepath.Join(subprojectsDir, "glib.wrap"), []byte(""), 0644)
 
 	builder := New()
-	deps, err := builder.ListDependencies(context.Background())
+	deps, err := builder.ListDependencies()
 	assert.NoError(t, err)
 	assert.Len(t, deps, 2)
 
@@ -421,7 +420,7 @@ func TestListTargets(t *testing.T) {
 	_ = os.MkdirAll("builddir", 0755)
 
 	builder := New()
-	targets, err := builder.ListTargets(context.Background())
+	targets, err := builder.ListTargets()
 	assert.NoError(t, err)
 	assert.Contains(t, targets, "myapp (executable)")
 	assert.Contains(t, targets, "mylib (shared library)")

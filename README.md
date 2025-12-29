@@ -83,21 +83,21 @@ The wizard guides you through:
 #### Available Templates
 When using **Template** mode, choose from pre-configured project starters:
 
-| Template | Description |
-|----------|-------------|
-| SDL2 | Game/multimedia application with SDL2 |
-| ImGui | Immediate mode GUI application |
-| Qt | Cross-platform Qt application |
-| Raylib | Simple game development with Raylib |
-| SFML | Multimedia/game application with SFML |
-| Vulkan | Graphics application with Vulkan API |
-| OpenCV | Computer vision application |
-| gRPC | High-performance RPC services |
-| REST API | RESTful web service |
-| CLI | Command-line application with argument parsing |
-| Audio | Audio processing application |
-| Game Engine | Basic game engine starter |
-| WebAssembly | Browser-based C++ with Emscripten |
+| Template    | Description                                    |
+|-------------|------------------------------------------------|
+| SDL2        | Game/multimedia application with SDL2          |
+| ImGui       | Immediate mode GUI application                 |
+| Qt          | Cross-platform Qt application                  |
+| Raylib      | Simple game development with Raylib            |
+| SFML        | Multimedia/game application with SFML          |
+| Vulkan      | Graphics application with Vulkan API           |
+| OpenCV      | Computer vision application                    |
+| gRPC        | High-performance RPC services                  |
+| REST API    | RESTful web service                            |
+| CLI         | Command-line application with argument parsing |
+| Audio       | Audio processing application                   |
+| Game Engine | Basic game engine starter                      |
+| WebAssembly | Browser-based C++ with Emscripten              |
 
 ### Common Commands
 All commands auto-detect the project type (`vcpkg.json`, `MODULE.bazel`, or `meson.build`).
@@ -142,47 +142,47 @@ Google's multi-language build system. `cpx` manages `MODULE.bazel` (Bzlmod).
 
 ## Command Reference
 
-| Command | Description |
-|---------|-------------|
-| `new` | Interactive project creation wizard |
-| `add <pkg>` | Add a dependency (supports vcpkg, WrapDB, Bazel) |
-| `remove <pkg>` | Remove a dependency |
-| `build` | Compile project (`--release`, `--asan`, `--tsan`, `--msan`, `--ubsan`) |
-| `build --toolchain <name>` | Build using a toolchain in Docker (from cpx-ci.yaml) |
-| `build all` | Build all toolchains using Docker (from cpx-ci.yaml) |
-| `run` | Build and run executable (`--asan`, `--tsan`, `--msan`, `--ubsan`) |
-| `run --toolchain <name>` | Build and run in Docker toolchain |
-| `test` | Run tests (`--filter`) |
-| `test --toolchain <name>` | Run tests in Docker toolchain |
-| `bench` | Run benchmarks |
-| `bench --toolchain <name>` | Run benchmarks in Docker toolchain |
-| `fmt` | Format code using `clang-format` |
-| `lint` | Lint code using `clang-tidy` |
-| `clean` | Remove build artifacts |
-| `search` | Search for libraries interactively |
-| `info <pkg>` | Show detailed library information |
-| `list` | List available libraries |
-| `update` | Update dependencies to latest versions |
-| `doc` | Generate documentation |
-| `release` | Bump version number |
-| `hooks` | Install git hooks |
-| `workflow` | Generate CI/CD workflow files |
-| `upgrade` | Self-update to the latest version |
+| Command                    | Description                                                            |
+|----------------------------|------------------------------------------------------------------------|
+| `new`                      | Interactive project creation wizard                                    |
+| `add <pkg>`                | Add a dependency (supports vcpkg, WrapDB, Bazel)                       |
+| `remove <pkg>`             | Remove a dependency                                                    |
+| `build`                    | Compile project (`--release`, `--asan`, `--tsan`, `--msan`, `--ubsan`) |
+| `build --toolchain <name>` | Build using a toolchain in Docker (from cpx-ci.yaml)                   |
+| `build all`                | Build all toolchains using Docker (from cpx-ci.yaml)                   |
+| `run`                      | Build and run executable (`--asan`, `--tsan`, `--msan`, `--ubsan`)     |
+| `run --toolchain <name>`   | Build and run in Docker toolchain                                      |
+| `test`                     | Run tests (`--filter`)                                                 |
+| `test --toolchain <name>`  | Run tests in Docker toolchain                                          |
+| `bench`                    | Run benchmarks                                                         |
+| `bench --toolchain <name>` | Run benchmarks in Docker toolchain                                     |
+| `fmt`                      | Format code using `clang-format`                                       |
+| `lint`                     | Lint code using `clang-tidy`                                           |
+| `clean`                    | Remove build artifacts                                                 |
+| `search`                   | Search for libraries interactively                                     |
+| `info <pkg>`               | Show detailed library information                                      |
+| `list`                     | List available libraries                                               |
+| `update`                   | Update dependencies to latest versions                                 |
+| `doc`                      | Generate documentation                                                 |
+| `release`                  | Bump version number                                                    |
+| `hooks`                    | Install git hooks                                                      |
+| `workflow`                 | Generate CI/CD workflow files                                          |
+| `upgrade`                  | Self-update to the latest version                                      |
 
 ### Cross-Compilation & Toolchains
 
 Manage Docker-based build toolchains defined in `cpx-ci.yaml`. `cpx` provides a clean build output by default when using toolchains, only showing the final result.
 
-| Command | Description |
-|---------|-------------|
-| `add-toolchain` | Interactive wizard to add build configurations |
-| `add-runner` | Interactive wizard to add execution environments |
-| `rm-toolchain [name...]` | Remove toolchain(s) from cpx-ci.yaml |
-| `rm-runner [name...]` | Remove runner(s) from cpx-ci.yaml |
+| Command                    | Description                                      |
+|----------------------------|--------------------------------------------------|
+| `add-toolchain`            | Interactive wizard to add build configurations   |
+| `add-runner`               | Interactive wizard to add execution environments |
+| `rm-toolchain [name...]`   | Remove toolchain(s) from cpx-ci.yaml             |
+| `rm-runner [name...]`      | Remove runner(s) from cpx-ci.yaml                |
 | `build --toolchain <name>` | Build using Docker (`--verbose` for full output) |
-| `run --toolchain <name>` | Build and run in Docker (quiet build by default) |
-| `test --toolchain <name>` | Run tests in Docker |
-| `bench --toolchain <name>` | Run benchmarks in Docker |
+| `run --toolchain <name>`   | Build and run in Docker (quiet build by default) |
+| `test --toolchain <name>`  | Run tests in Docker                              |
+| `bench --toolchain <name>` | Run benchmarks in Docker                         |
 
 #### `cpx-ci.yaml` Configuration
 
@@ -211,34 +211,34 @@ toolchains:
 
 ### Config Commands (`cpx config`)
 
-| Command | Description |
-|---------|-------------|
+| Command                 | Description              |
+|-------------------------|--------------------------|
 | `config set-vcpkg-root` | Set vcpkg root directory |
 
 ### Upgrade Commands (`cpx upgrade`)
 
-| Command | Description |
-|---------|-------------|
-| `upgrade` | Self-update cpx to the latest version |
+| Command         | Description                           |
+|-----------------|---------------------------------------|
+| `upgrade`       | Self-update cpx to the latest version |
 | `upgrade vcpkg` | Update vcpkg via git pull + bootstrap |
 
 ## Shortcuts Cheat Sheet
 
-| Command | Flag | Shorthand |
-| :--- | :--- | :--- |
-| `build` | | `b` |
-| `run` | | `r` |
-| `test` | | `t` |
-| `bench` | | `be` |
-| `add` | | `a` |
-| `remove` | | `rm` |
-| `clean` | | `cl`, `cls` |
-| `build`, `run`, `test`, `bench` | `--toolchain` | `-t` |
-| `build`, `run` | `--verbose` | `-v` |
-| `run` | `--release` | `-r` |
-| `test` | `--filter` | `-f` |
-| `fmt` | `--check` | `-c` |
-| `lint` | `--fix` | `-f` |
+| Command                         | Flag          | Shorthand   |
+|:--------------------------------|:--------------|:------------|
+| `build`                         |               | `b`         |
+| `run`                           |               | `r`         |
+| `test`                          |               | `t`         |
+| `bench`                         |               | `be`        |
+| `add`                           |               | `a`         |
+| `remove`                        |               | `rm`        |
+| `clean`                         |               | `cl`, `cls` |
+| `build`, `run`, `test`, `bench` | `--toolchain` | `-t`        |
+| `build`, `run`                  | `--verbose`   | `-v`        |
+| `run`                           | `--release`   | `-r`        |
+| `test`                          | `--filter`    | `-f`        |
+| `fmt`                           | `--check`     | `-c`        |
+| `lint`                          | `--fix`       | `-f`        |
 
 ## Roadmap
 - SSH support for remote builds

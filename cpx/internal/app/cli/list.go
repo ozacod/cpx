@@ -1,7 +1,6 @@
 package cli
 
 import (
-	"context"
 	"fmt"
 
 	"github.com/ozacod/cpx/internal/pkg/build/bazel"
@@ -49,7 +48,7 @@ func runList(cmd *cobra.Command, _ []string) error {
 	showTargets, _ := cmd.Flags().GetBool("targets")
 
 	if showTargets {
-		targets, err := builder.ListTargets(context.Background())
+		targets, err := builder.ListTargets()
 		if err != nil {
 			return fmt.Errorf("failed to list targets: %w", err)
 		}
@@ -67,7 +66,7 @@ func runList(cmd *cobra.Command, _ []string) error {
 	}
 
 	// List dependencies (default)
-	deps, err := builder.ListDependencies(context.Background())
+	deps, err := builder.ListDependencies()
 	if err != nil {
 		return fmt.Errorf("failed to list dependencies: %w", err)
 	}

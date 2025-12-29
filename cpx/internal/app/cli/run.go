@@ -1,7 +1,6 @@
 package cli
 
 import (
-	"context"
 	"fmt"
 
 	"github.com/ozacod/cpx/internal/pkg/build/bazel"
@@ -102,16 +101,16 @@ func runRun(cmd *cobra.Command, args []string) error {
 	switch projectType {
 	case ProjectTypeBazel:
 		builder := bazel.New()
-		return builder.Run(context.Background(), opts)
+		return builder.Run(opts)
 	case ProjectTypeMeson:
 		builder := meson.New()
-		return builder.Run(context.Background(), opts)
+		return builder.Run(opts)
 	case ProjectTypeCMake:
 		builder := cmake.New()
-		return builder.Run(context.Background(), opts)
+		return builder.Run(opts)
 	case ProjectTypeVcpkg:
 		builder := vcpkg.New()
-		return builder.Run(context.Background(), opts)
+		return builder.Run(opts)
 	default:
 		return fmt.Errorf("unsupported project type")
 	}

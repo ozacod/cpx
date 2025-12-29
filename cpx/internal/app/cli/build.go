@@ -1,7 +1,6 @@
 package cli
 
 import (
-	"context"
 	"fmt"
 
 	"github.com/ozacod/cpx/internal/pkg/build/bazel"
@@ -59,7 +58,7 @@ func BuildCmd() *cobra.Command {
 				ExecuteAfterBuild: false,
 				RunTests:          false,
 				RunBenchmarks:     false,
-				Verbose:           true, // Build all is often verbose or we can get it from flag
+				Verbose:           true, // Build all is often verbose, or we can get it from flag
 			})
 		},
 	}
@@ -121,7 +120,7 @@ func runBuild(cmd *cobra.Command, _ []string) error {
 	list, _ := cmd.Flags().GetBool("list")
 
 	handleList := func(b build.BuildSystem) error {
-		targets, err := b.ListTargets(context.Background())
+		targets, err := b.ListTargets()
 		if err != nil {
 			return fmt.Errorf("failed to list targets: %w", err)
 		}
@@ -164,5 +163,5 @@ func runBuild(cmd *cobra.Command, _ []string) error {
 		return handleList(builder)
 	}
 
-	return builder.Build(context.Background(), buildOpts)
+	return builder.Build(buildOpts)
 }

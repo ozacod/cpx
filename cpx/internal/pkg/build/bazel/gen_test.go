@@ -1,7 +1,6 @@
 package bazel
 
 import (
-	"context"
 	"os"
 	"path/filepath"
 	"testing"
@@ -20,7 +19,6 @@ func TestGenerate(t *testing.T) {
 	require.NoError(t, os.Chdir(tmpDir))
 
 	builder := New()
-	ctx := context.Background()
 	projectName := "test-project"
 
 	// Create project directory
@@ -37,12 +35,12 @@ func TestGenerate(t *testing.T) {
 	}
 
 	// Test GenerateGitignore
-	err = builder.GenerateGitignore(ctx, projectPath)
+	err = builder.GenerateGitignore(projectPath)
 	assert.NoError(t, err)
 	assert.FileExists(t, filepath.Join(projectPath, ".gitignore"))
 
 	// Test GenerateBuildSrc
-	err = builder.GenerateBuildSrc(ctx, projectPath, initConfig)
+	err = builder.GenerateBuildSrc(projectPath, initConfig)
 	assert.NoError(t, err)
 	assert.FileExists(t, filepath.Join(projectPath, "MODULE.bazel"))
 	assert.FileExists(t, filepath.Join(projectPath, "BUILD.bazel"))
@@ -52,12 +50,12 @@ func TestGenerate(t *testing.T) {
 	assert.FileExists(t, filepath.Join(projectPath, ".bazelignore"))
 
 	// Test GenerateBuildTest
-	err = builder.GenerateBuildTest(ctx, projectPath, initConfig)
+	err = builder.GenerateBuildTest(projectPath, initConfig)
 	assert.NoError(t, err)
 	assert.FileExists(t, filepath.Join(projectPath, "tests", "BUILD.bazel"))
 
 	// Test GenerateBuildBench
-	err = builder.GenerateBuildBench(ctx, projectPath, initConfig)
+	err = builder.GenerateBuildBench(projectPath, initConfig)
 	assert.NoError(t, err)
 	assert.FileExists(t, filepath.Join(projectPath, "bench", "BUILD.bazel"))
 }

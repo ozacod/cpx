@@ -2,7 +2,6 @@
 package vcpkg
 
 import (
-	"context"
 	"fmt"
 	"os"
 	"os/exec"
@@ -14,7 +13,7 @@ import (
 	"github.com/ozacod/cpx/internal/pkg/utils/colors"
 )
 
-func (b *Builder) RunDockerBuild(ctx context.Context, opts build.DockerBuildOptions) error {
+func (b *Builder) RunDockerBuild(opts build.DockerBuildOptions) error {
 	// Create target-specific output directory
 	targetOutputDir := filepath.Join(opts.OutputDir, opts.TargetName)
 	if err := os.MkdirAll(targetOutputDir, 0755); err != nil {

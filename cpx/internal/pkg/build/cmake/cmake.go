@@ -2,7 +2,6 @@
 package cmake
 
 import (
-	"context"
 	"fmt"
 	"os"
 	"os/exec"
@@ -29,7 +28,7 @@ func (b *Builder) Name() string {
 	return "cmake"
 }
 
-func (b *Builder) Build(ctx context.Context, opts build.BuildOptions) error {
+func (b *Builder) Build(opts build.BuildOptions) error {
 	// Get project name
 	projectName := common.GetProjectNameFromCMakeLists()
 	if projectName == "" {
@@ -52,7 +51,7 @@ func (b *Builder) Build(ctx context.Context, opts build.BuildOptions) error {
 
 	// Clean if requested
 	if opts.Clean {
-		if err := b.Clean(ctx, build.CleanOptions{All: false}); err != nil {
+		if err := b.Clean(build.CleanOptions{All: false}); err != nil {
 			return err
 		}
 	}
@@ -167,7 +166,7 @@ func (b *Builder) Build(ctx context.Context, opts build.BuildOptions) error {
 	return nil
 }
 
-func (b *Builder) Test(ctx context.Context, opts build.TestOptions) error {
+func (b *Builder) Test(opts build.TestOptions) error {
 	projectName := common.GetProjectNameFromCMakeLists()
 	if projectName == "" {
 		projectName = "project"
@@ -254,9 +253,9 @@ func (b *Builder) Test(ctx context.Context, opts build.TestOptions) error {
 	return nil
 }
 
-func (b *Builder) Run(ctx context.Context, opts build.RunOptions) error {
+func (b *Builder) Run(opts build.RunOptions) error {
 	// Build first
-	if err := b.Build(ctx, build.BuildOptions{
+	if err := b.Build(build.BuildOptions{
 		Release:   opts.Release,
 		OptLevel:  opts.OptLevel,
 		Sanitizer: opts.Sanitizer,
@@ -309,7 +308,7 @@ func (b *Builder) Run(ctx context.Context, opts build.RunOptions) error {
 	return runCmd.Run()
 }
 
-func (b *Builder) Bench(ctx context.Context, opts build.BenchOptions) error {
+func (b *Builder) Bench(opts build.BenchOptions) error {
 	projectName := common.GetProjectNameFromCMakeLists()
 	if projectName == "" {
 		projectName = "project"
@@ -423,7 +422,7 @@ func (b *Builder) Bench(ctx context.Context, opts build.BenchOptions) error {
 	return nil
 }
 
-func (b *Builder) Clean(ctx context.Context, opts build.CleanOptions) error {
+func (b *Builder) Clean(opts build.CleanOptions) error {
 	fmt.Printf("%sCleaning CMake project...%s\n", colors.Cyan, colors.Reset)
 
 	// Remove cache directory
@@ -442,7 +441,7 @@ func (b *Builder) Clean(ctx context.Context, opts build.CleanOptions) error {
 	return nil
 }
 
-func (b *Builder) AddDependency(ctx context.Context, name string, version string) error {
+func (b *Builder) AddDependency(name string, _ string) error {
 	fmt.Printf("%s⚠ CMake-only projects don't have built-in dependency management%s\n\n", colors.Yellow, colors.Reset)
 	fmt.Printf("To add dependencies, consider one of these options:\n\n")
 
@@ -472,11 +471,11 @@ func (b *Builder) AddDependency(ctx context.Context, name string, version string
 	return nil
 }
 
-func (b *Builder) RemoveDependency(ctx context.Context, name string) error {
+func (b *Builder) RemoveDependency(_ string) error {
 	return fmt.Errorf("CMake-only projects don't have built-in dependency management\n  hint: manually remove the dependency from CMakeLists.txt or FetchContent")
 }
 
-func (b *Builder) ListDependencies(ctx context.Context) ([]build.Dependency, error) {
+func (b *Builder) ListDependencies() ([]build.Dependency, error) {
 	fmt.Printf("%sNote: CMake-only projects don't have a standard dependency manifest%s\n", colors.Yellow, colors.Reset)
 	fmt.Printf("Check your CMakeLists.txt for:\n")
 	fmt.Printf("  - find_package() calls\n")
@@ -485,15 +484,15 @@ func (b *Builder) ListDependencies(ctx context.Context) ([]build.Dependency, err
 	return nil, nil
 }
 
-func (b *Builder) SearchDependencies(ctx context.Context, query string) ([]build.Dependency, error) {
+func (b *Builder) SearchDependencies(_ string) ([]build.Dependency, error) {
 	return nil, fmt.Errorf("CMake-only projects don't have a package registry\n  hint: search on GitHub, vcpkg ports, or Conan packages")
 }
 
-func (b *Builder) DependencyInfo(ctx context.Context, name string) (*build.DependencyInfo, error) {
+func (b *Builder) DependencyInfo(_ string) (*build.DependencyInfo, error) {
 	return nil, fmt.Errorf("CMake-only projects don't have dependency info\n  hint: check the package's GitHub page or documentation")
 }
 
-func (b *Builder) ListTargets(ctx context.Context) ([]string, error) {
+func (b *Builder) ListTargets() ([]string, error) {
 	// Try to find a build directory
 	buildDirs := []string{".cache/native/debug", ".cache/native/release", "build"}
 	var buildDir string
@@ -563,7 +562,7 @@ func (b *Builder) parseTargetsFromCMakeLists() ([]string, error) {
 	return targets, nil
 }
 
-func (b *Builder) GenerateGitignore(ctx context.Context, projectPath string) error {
+func (b *Builder) GenerateGitignore(projectPath string) error {
 	gitignore := templates.GenerateCMakeGitignore()
 	if err := os.WriteFile(filepath.Join(projectPath, ".gitignore"), []byte(gitignore), 0644); err != nil {
 		return fmt.Errorf("failed to write .gitignore: %w", err)
@@ -571,7 +570,7 @@ func (b *Builder) GenerateGitignore(ctx context.Context, projectPath string) err
 	return nil
 }
 
-func (b *Builder) GenerateBuildSrc(ctx context.Context, projectPath string, config build.InitConfig) error {
+func (b *Builder) GenerateBuildSrc(projectPath string, config build.InitConfig) error {
 	cmakeLists := templates.GenerateCMakeLists(templates.CMakeOptions{
 		ProjectName:        config.Name,
 		CppStandard:        config.CppStandard,
@@ -588,7 +587,7 @@ func (b *Builder) GenerateBuildSrc(ctx context.Context, projectPath string, conf
 	return nil
 }
 
-func (b *Builder) GenerateBuildTest(ctx context.Context, projectPath string, config build.InitConfig) error {
+func (b *Builder) GenerateBuildTest(projectPath string, config build.InitConfig) error {
 	if config.TestFramework == "" || config.TestFramework == "none" {
 		return nil
 	}
@@ -606,7 +605,7 @@ func (b *Builder) GenerateBuildTest(ctx context.Context, projectPath string, con
 	return nil
 }
 
-func (b *Builder) GenerateBuildBench(ctx context.Context, projectPath string, config build.InitConfig) error {
+func (b *Builder) GenerateBuildBench(projectPath string, config build.InitConfig) error {
 	if config.Benchmark == "" || config.Benchmark == "none" {
 		return nil
 	}

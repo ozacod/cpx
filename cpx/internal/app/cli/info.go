@@ -1,7 +1,6 @@
 package cli
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -70,7 +69,7 @@ func runInfo(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("unsupported project type")
 	}
 
-	info, err := builder.DependencyInfo(context.Background(), packageName)
+	info, err := builder.DependencyInfo(packageName)
 	if err != nil {
 		return err
 	}

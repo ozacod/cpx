@@ -1,8 +1,6 @@
 package cli
 
 import (
-	"context"
-
 	"github.com/ozacod/cpx/internal/app/cli/tui"
 	"github.com/ozacod/cpx/internal/pkg/build/bazel"
 	"github.com/ozacod/cpx/internal/pkg/build/cmake"
@@ -51,7 +49,7 @@ func runSearch(_ *cobra.Command, args []string) error {
 
 	// Adapter for search
 	searchFunc := func(q string) ([]tui.SearchResult, error) {
-		deps, err := builder.SearchDependencies(context.Background(), q)
+		deps, err := builder.SearchDependencies(q)
 		if err != nil {
 			return nil, err
 		}
@@ -68,7 +66,7 @@ func runSearch(_ *cobra.Command, args []string) error {
 
 	// Adapter for add
 	addFunc := func(pkg string) error {
-		return builder.AddDependency(context.Background(), pkg, "")
+		return builder.AddDependency(pkg, "")
 	}
 
 	return tui.RunSearch(query, searchFunc, addFunc)

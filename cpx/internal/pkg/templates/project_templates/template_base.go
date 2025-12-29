@@ -1,7 +1,6 @@
 package project_templates
 
 import (
-	"context"
 	"fmt"
 	"os"
 	"os/exec"
@@ -43,7 +42,7 @@ type TemplateInfo struct {
 }
 
 // Registry holds all available templates
-var Registry = []TemplateInfo{}
+var Registry []TemplateInfo
 
 func RegisterTemplate(t ProjectTemplate) {
 	Registry = append(Registry, TemplateInfo{
@@ -129,7 +128,7 @@ func (h *BaseTemplateHelper) GenerateCommonFiles(config TemplateConfig) error {
 
 	// Generate .gitignore based on build system
 	builder := h.GetBuilder(config.PackageManager)
-	if err := builder.GenerateGitignore(context.Background(), projectName); err != nil {
+	if err := builder.GenerateGitignore(projectName); err != nil {
 		return fmt.Errorf("failed to generate .gitignore: %w", err)
 	}
 

@@ -1,7 +1,6 @@
 package cli
 
 import (
-	"context"
 	"fmt"
 	"os"
 	"os/exec"
@@ -183,7 +182,7 @@ func runToolchainBuild(options ToolchainBuildOptions) error {
 				opts.CMakeArgs = append(opts.CMakeArgs, "-DCMAKE_TOOLCHAIN_FILE="+cmakeToolchainFile)
 			}
 
-			if err := dockerBuilder.RunDockerBuild(context.Background(), opts); err != nil {
+			if err := dockerBuilder.RunDockerBuild(opts); err != nil {
 				return fmt.Errorf("failed to build '%s': %w", tc.Name, err)
 			}
 		} else if runner.IsSSH() {

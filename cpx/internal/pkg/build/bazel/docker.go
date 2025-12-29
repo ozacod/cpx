@@ -2,7 +2,6 @@
 package bazel
 
 import (
-	"context"
 	"fmt"
 	"os"
 	"os/exec"
@@ -12,7 +11,7 @@ import (
 	"github.com/ozacod/cpx/internal/pkg/utils/colors"
 )
 
-func (b *Builder) RunDockerBuild(ctx context.Context, opts build.DockerBuildOptions) error {
+func (b *Builder) RunDockerBuild(opts build.DockerBuildOptions) error {
 	absProjectRoot, err := filepath.Abs(opts.ProjectRoot)
 	if err != nil {
 		return fmt.Errorf("failed to get absolute path for project root: %w", err)

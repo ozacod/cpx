@@ -2,7 +2,6 @@
 package meson
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -25,7 +24,7 @@ func New() *Builder {
 	return &Builder{}
 }
 
-func (b *Builder) Build(ctx context.Context, opts build.BuildOptions) error {
+func (b *Builder) Build(opts build.BuildOptions) error {
 	buildDir := "builddir"
 
 	// Determine build type and optimization from flags
@@ -77,7 +76,7 @@ func (b *Builder) Build(ctx context.Context, opts build.BuildOptions) error {
 
 	// Clean if requested
 	if opts.Clean {
-		if err := b.Clean(ctx, build.CleanOptions{All: false}); err != nil {
+		if err := b.Clean(build.CleanOptions{All: false}); err != nil {
 			return err
 		}
 	}
@@ -166,12 +165,12 @@ func (b *Builder) Build(ctx context.Context, opts build.BuildOptions) error {
 	return nil
 }
 
-func (b *Builder) Test(ctx context.Context, opts build.TestOptions) error {
+func (b *Builder) Test(opts build.TestOptions) error {
 	fmt.Printf("%sRunning Meson tests...%s\n", colors.Cyan, colors.Reset)
 
 	// Ensure builddir exists - need build first
 	if _, err := os.Stat("builddir"); os.IsNotExist(err) {
-		if err := b.Build(ctx, build.BuildOptions{Verbose: opts.Verbose}); err != nil {
+		if err := b.Build(build.BuildOptions{Verbose: opts.Verbose}); err != nil {
 			return fmt.Errorf("build failed: %w", err)
 		}
 	}
@@ -207,9 +206,9 @@ func (b *Builder) Test(ctx context.Context, opts build.TestOptions) error {
 	return nil
 }
 
-func (b *Builder) Run(ctx context.Context, opts build.RunOptions) error {
+func (b *Builder) Run(opts build.RunOptions) error {
 	// Ensure project is built first
-	if err := b.Build(ctx, build.BuildOptions{
+	if err := b.Build(build.BuildOptions{
 		Release:   opts.Release,
 		OptLevel:  opts.OptLevel,
 		Sanitizer: opts.Sanitizer,
@@ -276,12 +275,12 @@ func (b *Builder) Run(ctx context.Context, opts build.RunOptions) error {
 	return runCmd.Run()
 }
 
-func (b *Builder) Bench(ctx context.Context, opts build.BenchOptions) error {
+func (b *Builder) Bench(opts build.BenchOptions) error {
 	fmt.Printf("%sRunning Meson benchmarks...%s\n", colors.Cyan, colors.Reset)
 
 	// Ensure builddir exists
 	if _, err := os.Stat("builddir"); os.IsNotExist(err) {
-		if err := b.Build(ctx, build.BuildOptions{Verbose: opts.Verbose}); err != nil {
+		if err := b.Build(build.BuildOptions{Verbose: opts.Verbose}); err != nil {
 			return fmt.Errorf("build failed: %w", err)
 		}
 	}
@@ -334,7 +333,7 @@ func (b *Builder) Bench(ctx context.Context, opts build.BenchOptions) error {
 	return nil
 }
 
-func (b *Builder) Clean(ctx context.Context, opts build.CleanOptions) error {
+func (b *Builder) Clean(opts build.CleanOptions) error {
 	fmt.Printf("%sCleaning Meson project...%s\n", colors.Cyan, colors.Reset)
 
 	// Remove builddir
@@ -355,7 +354,7 @@ func (b *Builder) Clean(ctx context.Context, opts build.CleanOptions) error {
 	return nil
 }
 
-func (b *Builder) AddDependency(ctx context.Context, name string, version string) error {
+func (b *Builder) AddDependency(name string, _ string) error {
 	fmt.Printf("%sInstalling wrap for %s...%s\n", colors.Cyan, name, colors.Reset)
 
 	// Create subprojects dir if it doesn't exist
@@ -386,7 +385,7 @@ func (b *Builder) AddDependency(ctx context.Context, name string, version string
 	return nil
 }
 
-func (b *Builder) RemoveDependency(ctx context.Context, name string) error {
+func (b *Builder) RemoveDependency(name string) error {
 	// Remove the wrap file from subprojects
 	wrapFile := filepath.Join("subprojects", name+".wrap")
 	if _, err := os.Stat(wrapFile); os.IsNotExist(err) {
@@ -407,7 +406,7 @@ func (b *Builder) RemoveDependency(ctx context.Context, name string) error {
 	return nil
 }
 
-func (b *Builder) ListDependencies(ctx context.Context) ([]build.Dependency, error) {
+func (b *Builder) ListDependencies() ([]build.Dependency, error) {
 	subprojectsDir := "subprojects"
 	entries, err := os.ReadDir(subprojectsDir)
 	if err != nil {
@@ -432,7 +431,7 @@ func (b *Builder) ListDependencies(ctx context.Context) ([]build.Dependency, err
 	return deps, nil
 }
 
-func (b *Builder) SearchDependencies(ctx context.Context, query string) ([]build.Dependency, error) {
+func (b *Builder) SearchDependencies(_ string) ([]build.Dependency, error) {
 	// WrapDB search would require HTTP calls to wrapdb.mesonbuild.com
 	// For now, return an error indicating this is not implemented
 	return nil, fmt.Errorf("SearchDependencies not implemented for Meson - use https://wrapdb.mesonbuild.com to search")
@@ -442,11 +441,11 @@ func (b *Builder) Name() string {
 	return "meson"
 }
 
-func (b *Builder) DependencyInfo(ctx context.Context, name string) (*build.DependencyInfo, error) {
+func (b *Builder) DependencyInfo(_ string) (*build.DependencyInfo, error) {
 	return nil, fmt.Errorf("dependency info not implemented for Meson")
 }
 
-func (b *Builder) ListTargets(ctx context.Context) ([]string, error) {
+func (b *Builder) ListTargets() ([]string, error) {
 	buildDir := "builddir"
 	if _, err := os.Stat(buildDir); os.IsNotExist(err) {
 		return nil, fmt.Errorf("build directory '%s' does not exist. Run 'cpx build' first", buildDir)
@@ -477,7 +476,7 @@ func (b *Builder) ListTargets(ctx context.Context) ([]string, error) {
 	return result, nil
 }
 
-func (b *Builder) GenerateGitignore(ctx context.Context, projectPath string) error {
+func (b *Builder) GenerateGitignore(projectPath string) error {
 	gitignore := templates.GenerateMesonGitignore()
 	if err := os.WriteFile(filepath.Join(projectPath, ".gitignore"), []byte(gitignore), 0644); err != nil {
 		return fmt.Errorf("failed to write .gitignore: %w", err)
@@ -485,7 +484,7 @@ func (b *Builder) GenerateGitignore(ctx context.Context, projectPath string) err
 	return nil
 }
 
-func (b *Builder) GenerateBuildSrc(ctx context.Context, projectPath string, config build.InitConfig) error {
+func (b *Builder) GenerateBuildSrc(projectPath string, config build.InitConfig) error {
 	// Generate meson.build (root)
 	mesonBuild := templates.GenerateMesonBuildRoot(templates.MesonRootOptions{
 		ProjectName:        config.Name,
@@ -555,7 +554,7 @@ func (b *Builder) GenerateBuildSrc(ctx context.Context, projectPath string, conf
 	return nil
 }
 
-func (b *Builder) GenerateBuildTest(ctx context.Context, projectPath string, config build.InitConfig) error {
+func (b *Builder) GenerateBuildTest(projectPath string, config build.InitConfig) error {
 	if config.TestFramework == "" || config.TestFramework == "none" {
 		return nil
 	}
@@ -572,7 +571,7 @@ func (b *Builder) GenerateBuildTest(ctx context.Context, projectPath string, con
 	return nil
 }
 
-func (b *Builder) GenerateBuildBench(ctx context.Context, projectPath string, config build.InitConfig) error {
+func (b *Builder) GenerateBuildBench(projectPath string, config build.InitConfig) error {
 	if config.Benchmark == "" || config.Benchmark == "none" {
 		return nil
 	}

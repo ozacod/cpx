@@ -13,7 +13,6 @@ import (
 )
 
 var (
-	execCommand  = exec.Command
 	execLookPath = exec.LookPath
 )
 
@@ -97,7 +96,6 @@ func (s *Spinner) Fail(message string) {
 	fmt.Printf("\r%s✗ %s%s\n", colors.Red, message, colors.Reset)
 }
 
-// Returns a list of missing tools
 func CheckBuildToolsForProject(projectType ProjectType) []string {
 	var missing []string
 
@@ -167,24 +165,8 @@ func CheckBuildToolsForProject(projectType ProjectType) []string {
 		if !hasCXX {
 			missing = append(missing, "C++ compiler (g++, clang++, or c++)")
 		}
-	case ProjectTypeCMake:
+	case ProjectTypeCMake, ProjectTypeUnknown:
 		// CMake-only projects need cmake, make/ninja, and compilers
-		if !CheckCommandExists("cmake") {
-			missing = append(missing, "cmake")
-		}
-		if !CheckCommandExists("make") && !CheckCommandExists("ninja") {
-			missing = append(missing, "make or ninja")
-		}
-		hasCC := CheckCommandExists("gcc") || CheckCommandExists("clang") || CheckCommandExists("cc")
-		hasCXX := CheckCommandExists("g++") || CheckCommandExists("clang++") || CheckCommandExists("c++")
-		if !hasCC {
-			missing = append(missing, "C compiler (gcc, clang, or cc)")
-		}
-		if !hasCXX {
-			missing = append(missing, "C++ compiler (g++, clang++, or c++)")
-		}
-	case ProjectTypeUnknown:
-		// For unknown projects, assume CMake-based
 		if !CheckCommandExists("cmake") {
 			missing = append(missing, "cmake")
 		}

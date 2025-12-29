@@ -27,10 +27,6 @@ const (
 
 type ImagesLoadedMsg []DockerImage
 
-func loadImagesCmd() tea.Msg {
-	return ImagesLoadedMsg(listDockerImages())
-}
-
 type AddRunnerModel struct {
 	step      AddRunnerStep
 	textInput textinput.Model

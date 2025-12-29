@@ -1,7 +1,6 @@
 package cli
 
 import (
-	"context"
 	"fmt"
 	"strings"
 
@@ -57,7 +56,7 @@ func runRemove(_ *cobra.Command, args []string) error {
 		if strings.HasPrefix(pkgName, "-") {
 			continue
 		}
-		if err := builder.RemoveDependency(context.Background(), pkgName); err != nil {
+		if err := builder.RemoveDependency(pkgName); err != nil {
 			fmt.Printf("%s✗ Failed to remove %s: %v%s\n", colors.Red, pkgName, err, colors.Reset)
 			continue
 		}

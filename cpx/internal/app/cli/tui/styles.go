@@ -21,8 +21,6 @@ var (
 	greenStyle = lipgloss.NewStyle().
 			Foreground(green)
 
-	successStyle = greenCheck // Alias for consistency
-
 	questionMark = lipgloss.NewStyle().
 			Foreground(cyan).
 			Bold(true)

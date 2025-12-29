@@ -1,7 +1,6 @@
 package cli
 
 import (
-	"context"
 	"fmt"
 	"os"
 	"os/exec"
@@ -186,7 +185,7 @@ func createProjectFromTUI(config tui.ProjectConfig) error {
 		Benchmark:     cfg.Benchmark,
 	}
 
-	if err := builder.GenerateBuildSrc(context.Background(), projectName, initConfig); err != nil {
+	if err := builder.GenerateBuildSrc(projectName, initConfig); err != nil {
 		return fmt.Errorf("failed to generate build source files: %w", err)
 	}
 
@@ -217,7 +216,7 @@ func createProjectFromTUI(config tui.ProjectConfig) error {
 			return fmt.Errorf("failed to write bench_main.cpp: %w", err)
 		}
 
-		if err := builder.GenerateBuildBench(context.Background(), projectName, initConfig); err != nil {
+		if err := builder.GenerateBuildBench(projectName, initConfig); err != nil {
 			return fmt.Errorf("failed to generate benchmark build files: %w", err)
 		}
 	}
@@ -240,7 +239,7 @@ func createProjectFromTUI(config tui.ProjectConfig) error {
 	}
 
 	if cfg.VCS == "" || cfg.VCS == "git" {
-		if err := builder.GenerateGitignore(context.Background(), projectName); err != nil {
+		if err := builder.GenerateGitignore(projectName); err != nil {
 			return fmt.Errorf("failed to generate .gitignore: %w", err)
 		}
 	}
@@ -255,7 +254,7 @@ func createProjectFromTUI(config tui.ProjectConfig) error {
 	}
 
 	if cfg.TestFramework != "" && cfg.TestFramework != "none" {
-		if err := builder.GenerateBuildTest(context.Background(), projectName, initConfig); err != nil {
+		if err := builder.GenerateBuildTest(projectName, initConfig); err != nil {
 			return fmt.Errorf("failed to generate test build files: %w", err)
 		}
 

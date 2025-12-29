@@ -1,7 +1,6 @@
 package vcpkg
 
 import (
-	"context"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -61,7 +60,7 @@ func TestClean(t *testing.T) {
 			_ = os.MkdirAll("build-release", 0755)
 
 			builder := New()
-			err := builder.Clean(context.Background(), build.CleanOptions{All: tt.all})
+			err := builder.Clean(build.CleanOptions{All: tt.all})
 			assert.NoError(t, err)
 
 			// Verify expected directories were removed
@@ -86,7 +85,7 @@ func mockExecCommand(capturedArgs *[][]string) func(string, ...string) *exec.Cmd
 	}
 }
 
-func setupTestConfig(t *testing.T, tmpDir string) *Builder {
+func setupTestConfig(tmpDir string) *Builder {
 	b := New()
 	cfg := &config.GlobalConfig{
 		VcpkgRoot: tmpDir,
@@ -124,9 +123,9 @@ func TestBuild(t *testing.T) {
 	_ = os.MkdirAll(cacheDir, 0755)
 	_ = os.WriteFile(filepath.Join(cacheDir, "CMakeCache.txt"), []byte(""), 0644)
 
-	builder := setupTestConfig(t, tmpDir)
+	builder := setupTestConfig(tmpDir)
 
-	err := builder.Build(context.Background(), build.BuildOptions{
+	err := builder.Build(build.BuildOptions{
 		Release: true,
 		Clean:   true,
 	})
@@ -171,9 +170,9 @@ func TestTest(t *testing.T) {
 	_ = os.MkdirAll(testCacheDir, 0755)
 	_ = os.WriteFile(filepath.Join(testCacheDir, "CMakeCache.txt"), []byte(""), 0644)
 
-	builder := setupTestConfig(t, tmpDir)
+	builder := setupTestConfig(tmpDir)
 
-	err := builder.Test(context.Background(), build.TestOptions{
+	err := builder.Test(build.TestOptions{
 		Verbose: true,
 	})
 	assert.NoError(t, err)
@@ -222,9 +221,9 @@ func TestRun(t *testing.T) {
 	exePath := filepath.Join(binDir, "test")
 	_ = os.WriteFile(exePath, []byte(""), 0755)
 
-	builder := setupTestConfig(t, tmpDir)
+	builder := setupTestConfig(tmpDir)
 
-	err := builder.Run(context.Background(), build.RunOptions{})
+	err := builder.Run(build.RunOptions{})
 	assert.NoError(t, err)
 
 	foundRun := false
@@ -258,9 +257,9 @@ func TestAddDependency(t *testing.T) {
 	vcpkgPath := filepath.Join(tmpDir, "vcpkg")
 	_ = os.WriteFile(vcpkgPath, []byte(""), 0755)
 
-	builder := setupTestConfig(t, tmpDir)
+	builder := setupTestConfig(tmpDir)
 
-	err := builder.AddDependency(context.Background(), "zlib", "1.2.11")
+	err := builder.AddDependency("zlib", "1.2.11")
 	assert.NoError(t, err)
 
 	foundVcpkgAdd := false

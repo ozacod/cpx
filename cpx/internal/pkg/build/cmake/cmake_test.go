@@ -1,7 +1,6 @@
 package cmake
 
 import (
-	"context"
 	"fmt"
 	"os"
 	"os/exec"
@@ -130,7 +129,7 @@ add_executable(testproj src/main.cpp)
 				Sanitizer: tt.sanitizer,
 			}
 
-			err := builder.Build(context.Background(), opts)
+			err := builder.Build(opts)
 			assert.NoError(t, err)
 
 			// Check that cmake configure was called
@@ -197,7 +196,7 @@ add_executable(myapp src/main.cpp)
 
 	builder := New()
 
-	err = builder.Run(context.Background(), build.RunOptions{
+	err = builder.Run(build.RunOptions{
 		Release: false,
 		Target:  "myapp",
 		Verbose: true,
@@ -238,7 +237,7 @@ project(myapp VERSION 1.0)
 
 	builder := New()
 
-	err = builder.Test(context.Background(), build.TestOptions{
+	err = builder.Test(build.TestOptions{
 		Verbose: true,
 		Filter:  "mytest",
 	})
@@ -295,7 +294,7 @@ project(myapp VERSION 1.0)
 
 	builder := New()
 
-	err = builder.Bench(context.Background(), build.BenchOptions{
+	err = builder.Bench(build.BenchOptions{
 		Verbose: true,
 		Target:  "myapp_bench",
 	})
@@ -344,7 +343,7 @@ func TestClean(t *testing.T) {
 			_ = os.MkdirAll("build-release", 0755)
 
 			builder := New()
-			err := builder.Clean(context.Background(), build.CleanOptions{All: tt.all})
+			err := builder.Clean(build.CleanOptions{All: tt.all})
 			assert.NoError(t, err)
 
 			// Verify expected directories were removed
@@ -360,7 +359,7 @@ func TestAddDependency(t *testing.T) {
 	builder := New()
 
 	// AddDependency should not error, just print guidance
-	err := builder.AddDependency(context.Background(), "zlib", "1.2.13")
+	err := builder.AddDependency("zlib", "1.2.13")
 	assert.NoError(t, err)
 }
 
@@ -368,7 +367,7 @@ func TestRemoveDependency(t *testing.T) {
 	builder := New()
 
 	// RemoveDependency should return an error for cmake-only projects
-	err := builder.RemoveDependency(context.Background(), "zlib")
+	err := builder.RemoveDependency("zlib")
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "don't have built-in dependency management")
 }
@@ -377,7 +376,7 @@ func TestListDependencies(t *testing.T) {
 	builder := New()
 
 	// ListDependencies returns nil for cmake-only projects
-	deps, err := builder.ListDependencies(context.Background())
+	deps, err := builder.ListDependencies()
 	assert.NoError(t, err)
 	assert.Nil(t, deps)
 }
@@ -386,7 +385,7 @@ func TestSearchDependencies(t *testing.T) {
 	builder := New()
 
 	// SearchDependencies should return an error for cmake-only projects
-	deps, err := builder.SearchDependencies(context.Background(), "zlib")
+	deps, err := builder.SearchDependencies("zlib")
 	assert.Error(t, err)
 	assert.Nil(t, deps)
 }
@@ -395,7 +394,7 @@ func TestDependencyInfo(t *testing.T) {
 	builder := New()
 
 	// DependencyInfo should return an error for cmake-only projects
-	info, err := builder.DependencyInfo(context.Background(), "zlib")
+	info, err := builder.DependencyInfo("zlib")
 	assert.Error(t, err)
 	assert.Nil(t, info)
 }
@@ -434,7 +433,7 @@ add_library(mylib src/lib.cpp)
 `), 0644))
 
 	builder := New()
-	targets, err := builder.ListTargets(context.Background())
+	targets, err := builder.ListTargets()
 	assert.NoError(t, err)
 	assert.Contains(t, targets, "myapp")
 	assert.Contains(t, targets, "mylib")
@@ -468,7 +467,7 @@ add_library(mylib src/lib.cpp)
 `), 0644))
 
 	builder := New()
-	targets, err := builder.ListTargets(context.Background())
+	targets, err := builder.ListTargets()
 	assert.NoError(t, err)
 	assert.Contains(t, targets, "myapp")
 	assert.Contains(t, targets, "mylib")
@@ -478,7 +477,7 @@ func TestGenerateBuildSrc(t *testing.T) {
 	tmpDir := t.TempDir()
 
 	builder := New()
-	err := builder.GenerateBuildSrc(context.Background(), tmpDir, build.InitConfig{
+	err := builder.GenerateBuildSrc(tmpDir, build.InitConfig{
 		Name:          "testproj",
 		Version:       "1.0.0",
 		CppStandard:   17,
@@ -499,7 +498,7 @@ func TestGenerateBuildTest(t *testing.T) {
 	builder := New()
 
 	// Test with no test framework
-	err := builder.GenerateBuildTest(context.Background(), tmpDir, build.InitConfig{
+	err := builder.GenerateBuildTest(tmpDir, build.InitConfig{
 		Name:          "testproj",
 		TestFramework: "none",
 	})
@@ -508,7 +507,7 @@ func TestGenerateBuildTest(t *testing.T) {
 	assert.True(t, os.IsNotExist(err), "tests/CMakeLists.txt should not be created when no framework")
 
 	// Test with googletest
-	err = builder.GenerateBuildTest(context.Background(), tmpDir, build.InitConfig{
+	err = builder.GenerateBuildTest(tmpDir, build.InitConfig{
 		Name:          "testproj",
 		TestFramework: "googletest",
 	})
@@ -523,7 +522,7 @@ func TestGenerateBuildBench(t *testing.T) {
 	builder := New()
 
 	// Test with no benchmark framework
-	err := builder.GenerateBuildBench(context.Background(), tmpDir, build.InitConfig{
+	err := builder.GenerateBuildBench(tmpDir, build.InitConfig{
 		Name:      "testproj",
 		Benchmark: "none",
 	})
@@ -532,7 +531,7 @@ func TestGenerateBuildBench(t *testing.T) {
 	assert.True(t, os.IsNotExist(err), "bench/CMakeLists.txt should not be created when no framework")
 
 	// Test with google-benchmark
-	err = builder.GenerateBuildBench(context.Background(), tmpDir, build.InitConfig{
+	err = builder.GenerateBuildBench(tmpDir, build.InitConfig{
 		Name:      "testproj",
 		Benchmark: "google-benchmark",
 	})
@@ -545,7 +544,7 @@ func TestGenerateGitignore(t *testing.T) {
 	tmpDir := t.TempDir()
 
 	builder := New()
-	err := builder.GenerateGitignore(context.Background(), tmpDir)
+	err := builder.GenerateGitignore(tmpDir)
 	assert.NoError(t, err)
 
 	// Verify .gitignore was created

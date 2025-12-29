@@ -6,7 +6,6 @@ import (
 )
 
 var (
-	ExecCommand  = exec.Command
 	ExecLookPath = exec.LookPath
 )
 

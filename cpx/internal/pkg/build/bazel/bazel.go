@@ -2,7 +2,6 @@
 package bazel
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -168,10 +167,10 @@ func (b *Builder) getLatestVersion(moduleName string) (string, error) {
 	return module.Versions[len(module.Versions)-1], nil
 }
 
-func (b *Builder) Build(ctx context.Context, opts build.BuildOptions) error {
+func (b *Builder) Build(opts build.BuildOptions) error {
 	// Clean if requested
 	if opts.Clean {
-		if err := b.Clean(ctx, build.CleanOptions{All: false}); err != nil {
+		if err := b.Clean(build.CleanOptions{All: false}); err != nil {
 			return err
 		}
 	}
@@ -312,7 +311,7 @@ func (b *Builder) Build(ctx context.Context, opts build.BuildOptions) error {
 	return nil
 }
 
-func (b *Builder) Test(ctx context.Context, opts build.TestOptions) error {
+func (b *Builder) Test(opts build.TestOptions) error {
 	fmt.Printf("%sRunning Bazel tests...%s\n", colors.Cyan, colors.Reset)
 
 	bazelArgs := []string{"test"}
@@ -345,7 +344,7 @@ func (b *Builder) Test(ctx context.Context, opts build.TestOptions) error {
 	return nil
 }
 
-func (b *Builder) Run(ctx context.Context, opts build.RunOptions) error {
+func (b *Builder) Run(opts build.RunOptions) error {
 	// Build bazel run args
 	bazelArgs := []string{"run"}
 
@@ -457,7 +456,7 @@ func findBazelMainTarget() (string, error) {
 	return "//:" + projectName, nil
 }
 
-func (b *Builder) Bench(ctx context.Context, opts build.BenchOptions) error {
+func (b *Builder) Bench(opts build.BenchOptions) error {
 	fmt.Printf("%sRunning Bazel benchmarks...%s\n", colors.Cyan, colors.Reset)
 
 	target := opts.Target
@@ -526,7 +525,7 @@ func findBenchTarget() string {
 	return ""
 }
 
-func (b *Builder) Clean(ctx context.Context, opts build.CleanOptions) error {
+func (b *Builder) Clean(opts build.CleanOptions) error {
 	fmt.Printf("%sCleaning Bazel project...%s\n", colors.Cyan, colors.Reset)
 
 	// Run bazel clean
@@ -566,8 +565,7 @@ func (b *Builder) Clean(ctx context.Context, opts build.CleanOptions) error {
 	return nil
 }
 
-func (b *Builder) AddDependency(ctx context.Context, name string, version string) error {
-	// If no version provided, get latest from BCR
+func (b *Builder) AddDependency(name string, version string) error {
 	// If no version provided, get latest from BCR
 	if version == "" {
 		// Ensure BCR path is configured
@@ -619,7 +617,7 @@ func (b *Builder) AddDependency(ctx context.Context, name string, version string
 	return nil
 }
 
-func (b *Builder) RemoveDependency(ctx context.Context, name string) error {
+func (b *Builder) RemoveDependency(name string) error {
 	modulePath := "MODULE.bazel"
 	content, err := os.ReadFile(modulePath)
 	if err != nil {
@@ -638,7 +636,7 @@ func (b *Builder) RemoveDependency(ctx context.Context, name string) error {
 	return nil
 }
 
-func (b *Builder) ListDependencies(ctx context.Context) ([]build.Dependency, error) {
+func (b *Builder) ListDependencies() ([]build.Dependency, error) {
 	modulePath := "MODULE.bazel"
 	content, err := os.ReadFile(modulePath)
 	if err != nil {
@@ -662,7 +660,7 @@ func (b *Builder) ListDependencies(ctx context.Context) ([]build.Dependency, err
 	return deps, nil
 }
 
-func (b *Builder) SearchDependencies(ctx context.Context, query string) ([]build.Dependency, error) {
+func (b *Builder) SearchDependencies(query string) ([]build.Dependency, error) {
 	if err := b.ensureBCRPath(); err != nil {
 		return nil, err
 	}
@@ -692,7 +690,7 @@ func (b *Builder) Name() string {
 	return "bazel"
 }
 
-func (b *Builder) DependencyInfo(ctx context.Context, name string) (*build.DependencyInfo, error) {
+func (b *Builder) DependencyInfo(name string) (*build.DependencyInfo, error) {
 	// Use BCR client to get module info
 	if err := b.ensureBCRPath(); err != nil {
 		return nil, err
@@ -724,7 +722,7 @@ func (b *Builder) DependencyInfo(ctx context.Context, name string) (*build.Depen
 	return info, nil
 }
 
-func (b *Builder) ListTargets(ctx context.Context) ([]string, error) {
+func (b *Builder) ListTargets() ([]string, error) {
 	// Query for all targets of type rule
 	// We use label_kind to get type info: "kind rule //package:target"
 	cmd := execCommand("bazel", "query", "//...", "--output", "label_kind")
@@ -756,7 +754,7 @@ func (b *Builder) ListTargets(ctx context.Context) ([]string, error) {
 	return targets, nil
 }
 
-func (b *Builder) GenerateGitignore(ctx context.Context, projectPath string) error {
+func (b *Builder) GenerateGitignore(projectPath string) error {
 	gitignore := templates.GenerateBazelGitignore()
 	if err := os.WriteFile(filepath.Join(projectPath, ".gitignore"), []byte(gitignore), 0644); err != nil {
 		return fmt.Errorf("failed to write .gitignore: %w", err)
@@ -764,7 +762,7 @@ func (b *Builder) GenerateGitignore(ctx context.Context, projectPath string) err
 	return nil
 }
 
-func (b *Builder) GenerateBuildSrc(ctx context.Context, projectPath string, config build.InitConfig) error {
+func (b *Builder) GenerateBuildSrc(projectPath string, config build.InitConfig) error {
 	// Generate MODULE.bazel
 	moduleBazel := templates.GenerateModuleBazel(config.Name, config.Version, config.TestFramework, config.Benchmark)
 	if err := os.WriteFile(filepath.Join(projectPath, "MODULE.bazel"), []byte(moduleBazel), 0644); err != nil {
@@ -812,7 +810,7 @@ func (b *Builder) GenerateBuildSrc(ctx context.Context, projectPath string, conf
 	return nil
 }
 
-func (b *Builder) GenerateBuildTest(ctx context.Context, projectPath string, config build.InitConfig) error {
+func (b *Builder) GenerateBuildTest(projectPath string, config build.InitConfig) error {
 	if config.TestFramework == "" || config.TestFramework == "none" {
 		return nil
 	}
@@ -829,7 +827,7 @@ func (b *Builder) GenerateBuildTest(ctx context.Context, projectPath string, con
 	return nil
 }
 
-func (b *Builder) GenerateBuildBench(ctx context.Context, projectPath string, config build.InitConfig) error {
+func (b *Builder) GenerateBuildBench(projectPath string, config build.InitConfig) error {
 	if config.Benchmark == "" || config.Benchmark == "none" {
 		return nil
 	}

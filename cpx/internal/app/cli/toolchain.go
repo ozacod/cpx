@@ -2,7 +2,6 @@ package cli
 
 import (
 	"fmt"
-	"strings"
 
 	"github.com/ozacod/cpx/internal/app/cli/tui"
 	"github.com/ozacod/cpx/internal/pkg/utils/colors"
@@ -237,11 +236,4 @@ func loadOrCreateConfig() (*config.ToolchainConfig, error) {
 		ciConfig = &config.ToolchainConfig{}
 	}
 	return ciConfig, nil
-}
-
-func utilsSanitizeRunnerName(name string) string {
-	name = strings.ReplaceAll(name, ":", "-")
-	name = strings.ReplaceAll(name, "/", "-")
-	name = strings.ToLower(name)
-	return name
 }

@@ -17,7 +17,7 @@ func TestSaveToolchainConfig(t *testing.T) {
 	// Create test config with simplified structure
 	ciConfig := &config.ToolchainConfig{
 		Runners: []config.Runner{
-			{Name: "ubuntu-docker", Type: "docker", Image: "ubuntu:22.04", CC: "gcc-13", CXX: "g++-13"},
+			{Name: "ubuntu-docker", Type: "docker", Image: "ubuntu:22.04"},
 		},
 		Toolchains: []config.Toolchain{
 			{Name: "linux-release", Runner: "ubuntu-docker", BuildType: "Release"},
@@ -40,7 +40,6 @@ func TestSaveToolchainConfig(t *testing.T) {
 	assert.Len(t, loadedConfig.Runners, 1)
 	assert.Equal(t, "ubuntu-docker", loadedConfig.Runners[0].Name)
 	assert.Equal(t, "docker", loadedConfig.Runners[0].Type)
-	assert.Equal(t, "gcc-13", loadedConfig.Runners[0].CC)
 
 	// Verify toolchains (build configs)
 	assert.Len(t, loadedConfig.Toolchains, 1)
@@ -55,7 +54,7 @@ func TestSaveToolchainConfig(t *testing.T) {
 func TestFindToolchainAndRunner(t *testing.T) {
 	ciConfig := &config.ToolchainConfig{
 		Runners: []config.Runner{
-			{Name: "docker-ubuntu", Type: "docker", Image: "ubuntu:22.04", CC: "gcc-13"},
+			{Name: "docker-ubuntu", Type: "docker", Image: "ubuntu:22.04"},
 			{Name: "local"},
 		},
 		Toolchains: []config.Toolchain{
@@ -76,7 +75,6 @@ func TestFindToolchainAndRunner(t *testing.T) {
 	r := ciConfig.FindRunner("docker-ubuntu")
 	require.NotNil(t, r)
 	assert.Equal(t, "docker", r.Type)
-	assert.Equal(t, "gcc-13", r.CC)
 
 	r = ciConfig.FindRunner("local")
 	require.NotNil(t, r)

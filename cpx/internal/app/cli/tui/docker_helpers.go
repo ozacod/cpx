@@ -2,7 +2,6 @@ package tui
 
 import (
 	"fmt"
-	"os"
 	"os/exec"
 	"strings"
 	"time"
@@ -34,15 +33,6 @@ type ImageCheckResult struct {
 
 type ImageCheckProgress struct {
 	Phase string // "pulling", "checking"
-}
-
-func checkDockerImageExists(image string) bool {
-	cmd := exec.Command("docker", "images", "-q", image)
-	output, err := cmd.Output()
-	if err != nil {
-		return false
-	}
-	return len(strings.TrimSpace(string(output))) > 0
 }
 
 func listDockerImages() []DockerImage {
@@ -114,21 +104,6 @@ func getImageArchitectures(imageIDs []string) map[string]string {
 	return archMap
 }
 
-func filterImages(images []DockerImage, filter string) []DockerImage {
-	if filter == "" {
-		return images
-	}
-	filter = strings.ToLower(filter)
-	var filtered []DockerImage
-	for _, img := range images {
-		name := strings.ToLower(img.FullName())
-		if strings.Contains(name, filter) {
-			filtered = append(filtered, img)
-		}
-	}
-	return filtered
-}
-
 func detectProjectType() string {
 	if common.CheckFileExists("vcpkg.json") {
 		return "vcpkg"
@@ -143,54 +118,6 @@ func detectProjectType() string {
 		return "cmake"
 	}
 	return "unknown"
-}
-
-func checkBuildToolsForProject(projectType string) []string {
-	var missing []string
-
-	switch projectType {
-	case "vcpkg", "cmake":
-		if !common.CheckCommandExists("cmake") {
-			missing = append(missing, "cmake")
-		}
-		if !common.CheckCommandExists("make") && !common.CheckCommandExists("ninja") {
-			missing = append(missing, "make or ninja")
-		}
-		hasCC := common.CheckCommandExists("gcc") || common.CheckCommandExists("clang") || common.CheckCommandExists("cc")
-		hasCXX := common.CheckCommandExists("g++") || common.CheckCommandExists("clang++") || common.CheckCommandExists("c++")
-		if !hasCC {
-			missing = append(missing, "C compiler")
-		}
-		if !hasCXX {
-			missing = append(missing, "C++ compiler")
-		}
-		if projectType == "vcpkg" {
-			if os.Getenv("VCPKG_ROOT") == "" && !common.CheckCommandExists("vcpkg") {
-				missing = append(missing, "vcpkg")
-			}
-		}
-	case "bazel":
-		if !common.CheckCommandExists("bazel") && !common.CheckCommandExists("bazelisk") {
-			missing = append(missing, "bazel or bazelisk")
-		}
-	case "meson":
-		if !common.CheckCommandExists("meson") {
-			missing = append(missing, "meson")
-		}
-		if !common.CheckCommandExists("ninja") {
-			missing = append(missing, "ninja")
-		}
-		hasCC := common.CheckCommandExists("gcc") || common.CheckCommandExists("clang") || common.CheckCommandExists("cc")
-		hasCXX := common.CheckCommandExists("g++") || common.CheckCommandExists("clang++") || common.CheckCommandExists("c++")
-		if !hasCC {
-			missing = append(missing, "C compiler")
-		}
-		if !hasCXX {
-			missing = append(missing, "C++ compiler")
-		}
-	}
-
-	return missing
 }
 
 func checkDockerImageHasCommand(image, command string) bool {
@@ -258,24 +185,6 @@ func checkBuildToolsInDockerImage(image string, projectType string) []string {
 	}
 
 	return missing
-}
-
-func checkImageCmd(image, platform string) tea.Cmd {
-	return func() tea.Msg {
-		// Just check if image exists locally
-		if !checkDockerImageExists(image) {
-			return ImageCheckResult{
-				Success: false,
-				Error:   fmt.Sprintf("Docker image not found locally: %s. Use 'docker pull %s' to download it first.", image, image),
-			}
-		}
-		// Image exists, now check tools
-		return ImageCheckProgress{Phase: "checking"}
-	}
-}
-
-func checkImageAsync(image, platform string) tea.Cmd {
-	return checkImageCmd(image, platform)
 }
 
 func checkImageToolsCmd(image string) tea.Cmd {

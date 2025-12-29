@@ -1,7 +1,6 @@
 package cli
 
 import (
-	"context"
 	"fmt"
 
 	"github.com/ozacod/cpx/internal/pkg/build/bazel"
@@ -23,7 +22,7 @@ func TestCmd() *cobra.Command {
   cpx test --verbose       # Show verbose output
   cpx test --filter MySuite.*`,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return runTest(cmd, args)
+			return runTest(cmd)
 		},
 	}
 
@@ -34,7 +33,7 @@ func TestCmd() *cobra.Command {
 	return cmd
 }
 
-func runTest(cmd *cobra.Command, _ []string) error {
+func runTest(cmd *cobra.Command) error {
 	verbose, _ := cmd.Flags().GetBool("verbose")
 	filter, _ := cmd.Flags().GetString("filter")
 	toolchain, _ := cmd.Flags().GetString("toolchain")
@@ -74,5 +73,5 @@ func runTest(cmd *cobra.Command, _ []string) error {
 		Filter:  filter,
 	}
 
-	return builder.Test(context.Background(), opts)
+	return builder.Test(opts)
 }

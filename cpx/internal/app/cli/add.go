@@ -1,7 +1,6 @@
 package cli
 
 import (
-	"context"
 	"fmt"
 
 	"github.com/ozacod/cpx/internal/pkg/build/bazel"
@@ -67,5 +66,5 @@ func runAdd(_ *cobra.Command, args []string) error {
 		return fmt.Errorf("unsupported project type")
 	}
 
-	return builder.AddDependency(context.Background(), name, version)
+	return builder.AddDependency(name, version)
 }

@@ -12,7 +12,7 @@ func LintCmd() *cobra.Command {
 		Short: "Run clang-tidy static analysis",
 		Long:  "Run clang-tidy static analysis. Use --fix to automatically fix issues.",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return runLint(cmd, args)
+			return runLint(cmd)
 		},
 	}
 
@@ -21,7 +21,7 @@ func LintCmd() *cobra.Command {
 	return cmd
 }
 
-func runLint(cmd *cobra.Command, args []string) error {
+func runLint(cmd *cobra.Command) error {
 	fix, _ := cmd.Flags().GetBool("fix")
 	return quality.LintCode(fix, vcpkg.New())
 }

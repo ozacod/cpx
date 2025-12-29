@@ -2,7 +2,6 @@
 package vcpkg
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -232,7 +231,7 @@ func (b *Builder) RunCommand(args []string) error {
 	return cmd.Run()
 }
 
-func (b *Builder) GenerateGitignore(ctx context.Context, projectPath string) error {
+func (b *Builder) GenerateGitignore(projectPath string) error {
 	gitignore := templates.GenerateGitignore()
 	if err := os.WriteFile(filepath.Join(projectPath, ".gitignore"), []byte(gitignore), 0644); err != nil {
 		return fmt.Errorf("failed to write .gitignore: %w", err)
@@ -240,7 +239,7 @@ func (b *Builder) GenerateGitignore(ctx context.Context, projectPath string) err
 	return nil
 }
 
-func (b *Builder) GenerateBuildSrc(ctx context.Context, projectPath string, config build.InitConfig) error {
+func (b *Builder) GenerateBuildSrc(projectPath string, config build.InitConfig) error {
 	hasTest := config.TestFramework != "" && config.TestFramework != "none"
 	hasBench := config.Benchmark != "" && config.Benchmark != "none"
 
@@ -267,7 +266,7 @@ func (b *Builder) GenerateBuildSrc(ctx context.Context, projectPath string, conf
 	return nil
 }
 
-func (b *Builder) GenerateBuildTest(ctx context.Context, projectPath string, config build.InitConfig) error {
+func (b *Builder) GenerateBuildTest(projectPath string, config build.InitConfig) error {
 	if config.TestFramework == "" || config.TestFramework == "none" {
 		return nil
 	}
@@ -284,7 +283,7 @@ func (b *Builder) GenerateBuildTest(ctx context.Context, projectPath string, con
 	return nil
 }
 
-func (b *Builder) GenerateBuildBench(ctx context.Context, projectPath string, config build.InitConfig) error {
+func (b *Builder) GenerateBuildBench(projectPath string, config build.InitConfig) error {
 	if config.Benchmark == "" || config.Benchmark == "none" {
 		return nil
 	}
@@ -301,7 +300,7 @@ func (b *Builder) GenerateBuildBench(ctx context.Context, projectPath string, co
 	return nil
 }
 
-func (b *Builder) Build(ctx context.Context, opts build.BuildOptions) error {
+func (b *Builder) Build(opts build.BuildOptions) error {
 	// Set VCPKG_ROOT from cpx config if not already set
 	if err := b.SetupEnv(); err != nil {
 		return err
@@ -465,7 +464,7 @@ func (b *Builder) Build(ctx context.Context, opts build.BuildOptions) error {
 	return nil
 }
 
-func (b *Builder) Test(ctx context.Context, opts build.TestOptions) error {
+func (b *Builder) Test(opts build.TestOptions) error {
 	projectName := common.GetProjectNameFromCMakeLists()
 	if projectName == "" {
 		return fmt.Errorf("failed to get project name from CMakeLists.txt")
@@ -478,7 +477,7 @@ func (b *Builder) Test(ctx context.Context, opts build.TestOptions) error {
 		Verbose:       opts.Verbose,
 	}
 
-	if err := b.Build(ctx, buildOpts); err != nil {
+	if err := b.Build(buildOpts); err != nil {
 		return fmt.Errorf("failed to build tests: %w", err)
 	}
 
@@ -511,7 +510,7 @@ func (b *Builder) Test(ctx context.Context, opts build.TestOptions) error {
 	return nil
 }
 
-func (b *Builder) Run(ctx context.Context, opts build.RunOptions) error {
+func (b *Builder) Run(opts build.RunOptions) error {
 	// Get project name from CMakeLists.txt (optional, for display only)
 	projectName := common.GetProjectNameFromCMakeLists()
 	if projectName == "" {
@@ -527,7 +526,7 @@ func (b *Builder) Run(ctx context.Context, opts build.RunOptions) error {
 		Verbose:   opts.Verbose,
 	}
 
-	if err := b.Build(ctx, buildOpts); err != nil {
+	if err := b.Build(buildOpts); err != nil {
 		return err
 	}
 
@@ -593,7 +592,7 @@ func (b *Builder) Run(ctx context.Context, opts build.RunOptions) error {
 	return runCmd.Run()
 }
 
-func (b *Builder) Bench(ctx context.Context, opts build.BenchOptions) error {
+func (b *Builder) Bench(opts build.BenchOptions) error {
 	projectName := common.GetProjectNameFromCMakeLists()
 	if projectName == "" {
 		return fmt.Errorf("failed to get project name from CMakeLists.txt")
@@ -611,7 +610,7 @@ func (b *Builder) Bench(ctx context.Context, opts build.BenchOptions) error {
 		Verbose:          opts.Verbose,
 	}
 
-	if err := b.Build(ctx, buildOpts); err != nil {
+	if err := b.Build(buildOpts); err != nil {
 		return fmt.Errorf("failed to build benchmarks: %w", err)
 	}
 
@@ -651,7 +650,7 @@ func (b *Builder) Bench(ctx context.Context, opts build.BenchOptions) error {
 	return nil
 }
 
-func (b *Builder) Clean(ctx context.Context, opts build.CleanOptions) error {
+func (b *Builder) Clean(opts build.CleanOptions) error {
 	fmt.Printf("%sCleaning CMake/vcpkg project...%s\n", colors.Cyan, colors.Reset)
 
 	// Remove bin directory (artifacts)
@@ -686,7 +685,9 @@ func (b *Builder) Clean(ctx context.Context, opts build.CleanOptions) error {
 	return nil
 }
 
-func (b *Builder) AddDependency(ctx context.Context, name string, version string) error {
+//TODO: implement version for vcpkg add
+
+func (b *Builder) AddDependency(name string, _ string) error {
 	// Set up environment
 	if err := b.SetupEnv(); err != nil {
 		return err
@@ -731,7 +732,7 @@ func (b *Builder) printUsageInfo(pkgName string) {
 	fmt.Printf("   https://cpx-dev.vercel.app/packages#package/%s\n\n", pkgName)
 }
 
-func (b *Builder) RemoveDependency(ctx context.Context, name string) error {
+func (b *Builder) RemoveDependency(name string) error {
 	// Check for vcpkg.json (Manifest mode)
 	if _, err := os.Stat("vcpkg.json"); err != nil {
 		return fmt.Errorf("vcpkg.json not found - manifest mode required")
@@ -802,7 +803,7 @@ func (b *Builder) RemoveDependency(ctx context.Context, name string) error {
 	return nil
 }
 
-func (b *Builder) ListDependencies(ctx context.Context) ([]build.Dependency, error) {
+func (b *Builder) ListDependencies() ([]build.Dependency, error) {
 	// Read vcpkg.json
 	data, err := os.ReadFile("vcpkg.json")
 	if err != nil {
@@ -851,7 +852,7 @@ func (b *Builder) ListDependencies(ctx context.Context) ([]build.Dependency, err
 	return deps, nil
 }
 
-func (b *Builder) SearchDependencies(ctx context.Context, query string) ([]build.Dependency, error) {
+func (b *Builder) SearchDependencies(query string) ([]build.Dependency, error) {
 	// Get vcpkg path
 	vcpkgPath, err := b.GetPath()
 	if err != nil {
@@ -903,7 +904,7 @@ func (b *Builder) Name() string {
 	return "vcpkg"
 }
 
-func (b *Builder) DependencyInfo(ctx context.Context, name string) (*build.DependencyInfo, error) {
+func (b *Builder) DependencyInfo(name string) (*build.DependencyInfo, error) {
 	// Use vcpkg x-package-info command
 	// Format: vcpkg x-package-info <name> --x-json
 	if err := b.ensureConfig(); err != nil {
@@ -1008,7 +1009,7 @@ func (b *Builder) DependencyInfo(ctx context.Context, name string) (*build.Depen
 
 var _ build.BuildSystem = (*Builder)(nil)
 
-func (b *Builder) ListTargets(ctx context.Context) ([]string, error) {
+func (b *Builder) ListTargets() ([]string, error) {
 	// Look for any configured build directory in .cache/native
 	cacheDir := filepath.Join(".cache", "native")
 	entries, err := os.ReadDir(cacheDir)

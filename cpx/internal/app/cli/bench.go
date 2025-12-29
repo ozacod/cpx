@@ -1,7 +1,6 @@
 package cli
 
 import (
-	"context"
 	"fmt"
 
 	"github.com/ozacod/cpx/internal/pkg/build/bazel"
@@ -22,7 +21,7 @@ func BenchCmd() *cobra.Command {
   cpx bench --verbose  # Show verbose output
   cpx bench --target //bench:myapp_bench  # Run specific benchmark (Bazel)`,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return runBenchCmd(cmd, args)
+			return runBenchCmd(cmd)
 		},
 	}
 
@@ -33,7 +32,7 @@ func BenchCmd() *cobra.Command {
 	return cmd
 }
 
-func runBenchCmd(cmd *cobra.Command, args []string) error {
+func runBenchCmd(cmd *cobra.Command) error {
 	verbose, _ := cmd.Flags().GetBool("verbose")
 	target, _ := cmd.Flags().GetString("target")
 	toolchain, _ := cmd.Flags().GetString("toolchain")
@@ -68,5 +67,5 @@ func runBenchCmd(cmd *cobra.Command, args []string) error {
 	default:
 		return fmt.Errorf("unsupported project type")
 	}
-	return builder.Bench(context.Background(), opts)
+	return builder.Bench(opts)
 }
