@@ -3,7 +3,6 @@ package cli
 import (
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"runtime"
 
@@ -12,12 +11,9 @@ import (
 	"github.com/ozacod/cpx/pkg/config"
 )
 
-var (
-	execLookPath = exec.LookPath
-)
-
 func CheckCommandExists(command string) bool {
-	return common.CheckCommandExists(command)
+	_, err := common.ExecLookPath(command)
+	return err == nil
 }
 
 func CheckFileExists(path string) bool {

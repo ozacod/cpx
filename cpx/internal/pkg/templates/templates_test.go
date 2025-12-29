@@ -743,5 +743,5 @@ func TestGenerateCpxCI(t *testing.T) {
 	result := GenerateCpxCI()
 
 	assert.Contains(t, result, "toolchains:")
-	assert.Contains(t, result, "build:")
+	assert.Contains(t, result, "runners:")
 }

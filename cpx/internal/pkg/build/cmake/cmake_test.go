@@ -288,7 +288,8 @@ project(myapp VERSION 1.0)
 `), 0644))
 
 	// Create output directory with mock benchmark executable
-	outputDir := filepath.Join(".bin", "native", "O3")
+	// The Bench function looks in .cache/native/bench/bench/ and .cache/native/bench/
+	outputDir := filepath.Join(".cache", "native", "bench")
 	require.NoError(t, os.MkdirAll(outputDir, 0755))
 	require.NoError(t, os.WriteFile(filepath.Join(outputDir, "myapp_bench"), []byte("#!/bin/sh\necho bench"), 0755))
 
