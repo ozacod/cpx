@@ -170,6 +170,12 @@ type BuildOptions struct {
 
 	// Toolchain specifies a custom toolchain to use.
 	Toolchain string
+
+	// EnableTesting enables building test targets (-DENABLE_TESTING=ON).
+	EnableTesting bool
+
+	// EnableBenchmarks enables building benchmark targets (-DENABLE_BENCHMARKS=ON).
+	EnableBenchmarks bool
 }
 
 // TestOptions contains options for running tests.

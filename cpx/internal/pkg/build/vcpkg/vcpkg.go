@@ -84,6 +84,97 @@ func (b *Builder) SetupEnv() error {
 	return nil
 }
 
+type configureOptions struct {
+	buildDir         string
+	buildType        string
+	cxxFlags         string
+	linkerFlags      string
+	enableTesting    bool
+	enableBenchmarks bool
+	verbose          bool
+}
+
+func (b *Builder) configureCMake(opts configureOptions) error {
+	// Determine absolute path for shared vcpkg_installed directory
+	cwd, _ := os.Getwd()
+	vcpkgInstalledDir := filepath.Join(cwd, ".cache", "native", "vcpkg_installed")
+	vcpkgInstallArg := "-DVCPKG_INSTALLED_DIR=" + vcpkgInstalledDir
+
+	var cmdArgs []string
+
+	hasPresets := false
+	if _, err := os.Stat("CMakePresets.json"); err == nil {
+		hasPresets = true
+		cmdArgs = []string{"--preset=default", "-B", opts.buildDir, vcpkgInstallArg}
+	} else {
+		cmdArgs = []string{"-B", opts.buildDir, "-DCMAKE_BUILD_TYPE=" + opts.buildType, vcpkgInstallArg}
+	}
+
+	if opts.cxxFlags != "" {
+		cmdArgs = append(cmdArgs, "-DCMAKE_CXX_FLAGS="+opts.cxxFlags, "-DCMAKE_C_FLAGS="+opts.cxxFlags)
+	}
+	if opts.linkerFlags != "" {
+		cmdArgs = append(cmdArgs, "-DCMAKE_EXE_LINKER_FLAGS="+opts.linkerFlags, "-DCMAKE_SHARED_LINKER_FLAGS="+opts.linkerFlags)
+	}
+
+	if opts.enableTesting {
+		cmdArgs = append(cmdArgs, "-DENABLE_TESTING=ON")
+	}
+	if opts.enableBenchmarks {
+		cmdArgs = append(cmdArgs, "-DENABLE_BENCHMARKS=ON")
+		// Force Release build type for benchmarks
+		if !hasPresets {
+			// Update build type to Release for benchmarks
+			for i, arg := range cmdArgs {
+				if strings.HasPrefix(arg, "-DCMAKE_BUILD_TYPE=") {
+					cmdArgs[i] = "-DCMAKE_BUILD_TYPE=Release"
+					break
+				}
+			}
+		} else {
+			cmdArgs = append(cmdArgs, "-DCMAKE_BUILD_TYPE=Release")
+		}
+	}
+
+	cmd := execCommand("cmake", cmdArgs...)
+	cmd.Env = os.Environ()
+
+	presetInfo := ""
+	if hasPresets {
+		presetInfo = " (preset 'default')"
+	}
+
+	if err := common.RunCMakeConfigure(cmd, opts.verbose); err != nil {
+		return fmt.Errorf("cmake configure failed%s: %w", presetInfo, err)
+	}
+
+	return nil
+}
+
+func (b *Builder) copyBuildArtifacts(cacheBuildDir, finalBuildDir string) error {
+	if err := os.MkdirAll(finalBuildDir, 0755); err != nil {
+		return fmt.Errorf("failed to create final build dir: %w", err)
+	}
+
+	executables, err := common.FindExecutables(cacheBuildDir)
+	if err == nil {
+		for _, exe := range executables {
+			dest := filepath.Join(finalBuildDir, filepath.Base(exe))
+			_ = common.CopyAndSign(exe, dest)
+		}
+	}
+
+	libraries, err := common.FindLibraries(cacheBuildDir)
+	if err == nil {
+		for _, lib := range libraries {
+			dest := filepath.Join(finalBuildDir, filepath.Base(lib))
+			_ = common.CopyAndSign(lib, dest)
+		}
+	}
+
+	return nil
+}
+
 func (b *Builder) GetPath() (string, error) {
 	if err := b.ensureConfig(); err != nil {
 		return "", err
@@ -223,7 +314,15 @@ func (b *Builder) Build(ctx context.Context, opts build.BuildOptions) error {
 	}
 
 	// Determine build output directory based on optimization/release/sanitizer
-	outDirName := build.GetOutputDir(opts.Release, opts.OptLevel, opts.Sanitizer)
+	// For test builds, use "test" directory; for benchmark builds, use "bench"
+	var outDirName string
+	if opts.EnableTesting {
+		outDirName = "test"
+	} else if opts.EnableBenchmarks {
+		outDirName = "bench"
+	} else {
+		outDirName = build.GetOutputDir(opts.Release, opts.OptLevel, opts.Sanitizer)
+	}
 
 	// Use hidden cache directory for build artifacts
 	// .cache/native/<variant>
@@ -235,8 +334,8 @@ func (b *Builder) Build(ctx context.Context, opts build.BuildOptions) error {
 		if opts.Verbose {
 			fmt.Printf("%s  Cleaning build directory...%s\n", colors.Cyan, colors.Reset)
 		}
-		os.RemoveAll(cacheBuildDir)
-		os.RemoveAll(finalBuildDir)
+		_ = os.RemoveAll(cacheBuildDir)
+		_ = os.RemoveAll(finalBuildDir)
 	}
 
 	// Ensure cache directory exists
@@ -245,7 +344,12 @@ func (b *Builder) Build(ctx context.Context, opts build.BuildOptions) error {
 	}
 
 	// Determine build type and optimization
-	buildType, cxxFlags := common.DetermineBuildType(opts.Release, opts.OptLevel)
+	// For benchmarks, force Release mode
+	release := opts.Release
+	if opts.EnableBenchmarks {
+		release = true
+	}
+	buildType, cxxFlags := common.DetermineBuildType(release, opts.OptLevel)
 
 	// Add sanitizer flags
 	sanCFlags, sanLFlags := common.GetSanitizerFlags(opts.Sanitizer)
@@ -253,7 +357,7 @@ func (b *Builder) Build(ctx context.Context, opts build.BuildOptions) error {
 	linkerFlags := sanLFlags
 
 	optLabel := "default (-O0)"
-	if opts.Release {
+	if release {
 		optLabel = "-O2 (Release)"
 	}
 	if opts.OptLevel != "" {
@@ -263,8 +367,16 @@ func (b *Builder) Build(ctx context.Context, opts build.BuildOptions) error {
 		optLabel += "+" + opts.Sanitizer
 	}
 
-	fmt.Printf("\n%s▸ Build%s %s %s(%s)%s %s[opt: %s]%s\n",
-		colors.Cyan, colors.Reset, projectName, colors.Gray, buildType, colors.Reset,
+	// Customize header based on build type
+	buildHeader := "Build"
+	if opts.EnableTesting {
+		buildHeader = "Build (tests)"
+	} else if opts.EnableBenchmarks {
+		buildHeader = "Build (bench)"
+	}
+
+	fmt.Printf("\n%s▸ %s%s %s %s(%s)%s %s[opt: %s]%s\n",
+		colors.Cyan, buildHeader, colors.Reset, projectName, colors.Gray, buildType, colors.Reset,
 		colors.Gray, optLabel, colors.Reset)
 
 	// Configure CMake if needed
@@ -282,50 +394,30 @@ func (b *Builder) Build(ctx context.Context, opts build.BuildOptions) error {
 
 	if needsConfigure {
 		currentStep++
+		configMsg := "Configuring CMake"
+		if opts.EnableTesting {
+			configMsg = "Configuring CMake (with testing enabled)"
+		} else if opts.EnableBenchmarks {
+			configMsg = "Configuring CMake (with benchmarks enabled)"
+		}
+
 		if opts.Verbose {
-			fmt.Printf("%s  • Configuring CMake%s\n", colors.Cyan, colors.Reset)
+			fmt.Printf("%s  • %s%s\n", colors.Cyan, configMsg, colors.Reset)
 		} else {
 			fmt.Printf("\r\033[2K%s[%d/%d]%s Configuring...", colors.Cyan, currentStep, totalSteps, colors.Reset)
 		}
 
-		// Determine absolute path for shared vcpkg_installed directory
-		cwd, _ := os.Getwd()
-		vcpkgInstalledDir := filepath.Join(cwd, ".cache", "native", "vcpkg_installed")
-		vcpkgInstallArg := "-DVCPKG_INSTALLED_DIR=" + vcpkgInstalledDir
-
-		// Check if CMakePresets.json exists, use preset if available
-		if _, err := os.Stat("CMakePresets.json"); err == nil {
-			// Use "default" preset (VCPKG_ROOT is now set from config)
-			// Pass -B explicitly to override preset binaryDir if needed, or ensure it goes to our cache
-			// Also pass VCPKG_INSTALLED_DIR to force shared vcpkg location
-			cmdArgs := []string{"--preset=default", "-B", cacheBuildDir, vcpkgInstallArg}
-			if cxxFlags != "" {
-				cmdArgs = append(cmdArgs, "-DCMAKE_CXX_FLAGS="+cxxFlags, "-DCMAKE_C_FLAGS="+cxxFlags)
-			}
-			if linkerFlags != "" {
-				cmdArgs = append(cmdArgs, "-DCMAKE_EXE_LINKER_FLAGS="+linkerFlags, "-DCMAKE_SHARED_LINKER_FLAGS="+linkerFlags)
-			}
-			cmd := execCommand("cmake", cmdArgs...)
-			cmd.Env = os.Environ()
-			if err := common.RunCMakeConfigure(cmd, opts.Verbose); err != nil {
-				fmt.Println()
-				return fmt.Errorf("cmake configure failed (preset 'default'): %w", err)
-			}
-		} else {
-			// Fallback to traditional cmake configure
-			cmdArgs := []string{"-B", cacheBuildDir, "-DCMAKE_BUILD_TYPE=" + buildType, vcpkgInstallArg}
-			if cxxFlags != "" {
-				cmdArgs = append(cmdArgs, "-DCMAKE_CXX_FLAGS="+cxxFlags, "-DCMAKE_C_FLAGS="+cxxFlags)
-			}
-			if linkerFlags != "" {
-				cmdArgs = append(cmdArgs, "-DCMAKE_EXE_LINKER_FLAGS="+linkerFlags, "-DCMAKE_SHARED_LINKER_FLAGS="+linkerFlags)
-			}
-			cmd := execCommand("cmake", cmdArgs...)
-			cmd.Env = os.Environ()
-			if err := common.RunCMakeConfigure(cmd, opts.Verbose); err != nil {
-				fmt.Println()
-				return fmt.Errorf("cmake configure failed: %w", err)
-			}
+		if err := b.configureCMake(configureOptions{
+			buildDir:         cacheBuildDir,
+			buildType:        buildType,
+			cxxFlags:         cxxFlags,
+			linkerFlags:      linkerFlags,
+			enableTesting:    opts.EnableTesting,
+			enableBenchmarks: opts.EnableBenchmarks,
+			verbose:          opts.Verbose,
+		}); err != nil {
+			fmt.Println()
+			return err
 		}
 
 		if !opts.Verbose {
@@ -359,115 +451,41 @@ func (b *Builder) Build(ctx context.Context, opts build.BuildOptions) error {
 		return fmt.Errorf("build failed: %w", err)
 	}
 
-	// Copy artifacts to final build directory
-	if err := os.MkdirAll(finalBuildDir, 0755); err != nil {
-		return fmt.Errorf("failed to create final build dir: %w", err)
-	}
-
-	executables, err := common.FindExecutables(cacheBuildDir)
-	if err == nil {
-		for _, exe := range executables {
-			dest := filepath.Join(finalBuildDir, filepath.Base(exe))
-			_ = common.CopyAndSign(exe, dest)
+	// Copy artifacts to final build directory (skip for test/bench builds)
+	if !opts.EnableTesting && !opts.EnableBenchmarks {
+		if err := b.copyBuildArtifacts(cacheBuildDir, finalBuildDir); err != nil {
+			return err
 		}
+		fmt.Printf("%s  ✔ Build complete%s %s[%s]%s\n", colors.Green, colors.Reset, colors.Gray, time.Since(buildStart).Round(10*time.Millisecond), colors.Reset)
+		fmt.Printf("  Artifacts in: %s/\n\n", finalBuildDir)
+	} else {
+		fmt.Printf("%s  ✔ Build complete%s %s[%s]%s\n", colors.Green, colors.Reset, colors.Gray, time.Since(buildStart).Round(10*time.Millisecond), colors.Reset)
 	}
 
-	libraries, err := common.FindLibraries(cacheBuildDir)
-	if err == nil {
-		for _, lib := range libraries {
-			dest := filepath.Join(finalBuildDir, filepath.Base(lib))
-			_ = common.CopyAndSign(lib, dest)
-		}
-	}
-
-	fmt.Printf("%s  ✔ Build complete%s %s[%s]%s\n", colors.Green, colors.Reset, colors.Gray, time.Since(buildStart).Round(10*time.Millisecond), colors.Reset)
-	fmt.Printf("  Artifacts in: %s/\n\n", finalBuildDir)
 	return nil
 }
 
 func (b *Builder) Test(ctx context.Context, opts build.TestOptions) error {
-	// Set VCPKG_ROOT from cpx config if not already set
-	if err := b.SetupEnv(); err != nil {
-		return err
-	}
-
 	projectName := common.GetProjectNameFromCMakeLists()
 	if projectName == "" {
 		return fmt.Errorf("failed to get project name from CMakeLists.txt")
 	}
-	fmt.Printf("%s Running tests for '%s'...%s\n", "\033[36m", projectName, "\033[0m")
 
-	// Default to debug for tests if no config specified
-	// Use .cache/native/test for building tests (separate from normal builds)
-	buildDir := filepath.Join(".cache", "native", "test")
-
-	// Check if configure is needed
-	needsConfigure := false
-	if _, err := os.Stat(filepath.Join(buildDir, "CMakeCache.txt")); os.IsNotExist(err) {
-		needsConfigure = true
+	// Use Build with EnableTesting to build tests
+	buildOpts := build.BuildOptions{
+		EnableTesting: true,
+		Target:        projectName + "_tests",
+		Verbose:       opts.Verbose,
 	}
 
-	// Determine total steps: configure (optional) + build + run
-	totalSteps := 2 // build + run
-	if needsConfigure {
-		totalSteps = 3 // configure + build + run
-	}
-	currentStep := 0
-
-	// Configure CMake if needed
-	if needsConfigure {
-		currentStep++
-		if opts.Verbose {
-			fmt.Printf("%s  Configuring CMake (with testing enabled)...%s\n", "\033[36m", "\033[0m")
-		} else {
-			fmt.Printf("\r\033[2K%s[%d/%d]%s Configuring...", colors.Cyan, currentStep, totalSteps, colors.Reset)
-		}
-
-		// Determine absolute path for shared vcpkg_installed directory
-		cwd, _ := os.Getwd()
-		vcpkgInstalledDir := filepath.Join(cwd, ".cache", "native", "vcpkg_installed")
-		vcpkgInstallArg := "-DVCPKG_INSTALLED_DIR=" + vcpkgInstalledDir
-
-		// Enable testing
-		enableTestingArg := "-DENABLE_TESTING=ON"
-
-		// Check if CMakePresets.json exists, use preset if available
-		if _, err := os.Stat("CMakePresets.json"); err == nil {
-			// Use "default" preset (VCPKG_ROOT is now set from config)
-			cmd := execCommand("cmake", "--preset=default", "-B", buildDir, vcpkgInstallArg, enableTestingArg)
-			cmd.Env = os.Environ()
-			if err := common.RunCMakeConfigure(cmd, opts.Verbose); err != nil {
-				fmt.Println()
-				return fmt.Errorf("cmake configure failed (preset 'default'): %w", err)
-			}
-		} else {
-			// Fallback to traditional cmake configure
-			cmd := execCommand("cmake", "-B", buildDir, vcpkgInstallArg, enableTestingArg)
-			if err := common.RunCMakeConfigure(cmd, opts.Verbose); err != nil {
-				fmt.Println()
-				return fmt.Errorf("cmake configure failed: %w", err)
-			}
-		}
-
-		if !opts.Verbose {
-			fmt.Printf("\r\033[2K%s[%d/%d]%s Configured ✓\n", colors.Cyan, currentStep, totalSteps, colors.Reset)
-		}
-	}
-
-	// Build tests
-	currentStep++
-	buildArgs := []string{"--build", buildDir, "--target", projectName + "_tests"}
-	if err := common.RunCMakeBuild(buildArgs, opts.Verbose, currentStep, totalSteps); err != nil {
+	if err := b.Build(ctx, buildOpts); err != nil {
 		return fmt.Errorf("failed to build tests: %w", err)
 	}
 
 	// Run tests with CTest
-	currentStep++
-	if !opts.Verbose {
-		fmt.Printf("%s[%d/%d]%s Running tests...\n", colors.Cyan, currentStep, totalSteps, colors.Reset)
-	} else {
-		fmt.Printf("%s Running tests...%s\n", "\033[36m", "\033[0m")
-	}
+	buildDir := filepath.Join(".cache", "native", "test")
+
+	fmt.Printf("%s▸ Running tests...%s\n", colors.Cyan, colors.Reset)
 
 	ctestArgs := []string{"--test-dir", buildDir}
 
@@ -489,142 +507,33 @@ func (b *Builder) Test(ctx context.Context, opts build.TestOptions) error {
 		return fmt.Errorf("tests failed: %w", err)
 	}
 
-	fmt.Printf("%s All tests passed!%s\n", "\033[32m", "\033[0m")
+	fmt.Printf("%s✓ All tests passed!%s\n", colors.Green, colors.Reset)
 	return nil
 }
 
 func (b *Builder) Run(ctx context.Context, opts build.RunOptions) error {
-	// Set VCPKG_ROOT from cpx config if not already set
-	if err := b.SetupEnv(); err != nil {
-		return err
-	}
-
 	// Get project name from CMakeLists.txt (optional, for display only)
 	projectName := common.GetProjectNameFromCMakeLists()
 	if projectName == "" {
 		projectName = "project"
 	}
 
-	buildType, cxxFlags := common.DetermineBuildType(opts.Release, opts.OptLevel)
-
-	// Add sanitizer flags
-	sanCFlags, sanLFlags := common.GetSanitizerFlags(opts.Sanitizer)
-	cxxFlags += sanCFlags
-	linkerFlags := sanLFlags
-
-	optLabel := "default (-O0)"
-	if opts.Release {
-		optLabel = "-O2 (Release)"
-	}
-	if opts.OptLevel != "" {
-		optLabel = "-O" + opts.OptLevel
-	}
-	if opts.Sanitizer != "" {
-		optLabel += "+" + opts.Sanitizer
+	// Use Build to compile the project
+	buildOpts := build.BuildOptions{
+		Release:   opts.Release,
+		OptLevel:  opts.OptLevel,
+		Sanitizer: opts.Sanitizer,
+		Target:    opts.Target,
+		Verbose:   opts.Verbose,
 	}
 
-	fmt.Printf("\n%s▸ Build%s %s %s(%s)%s %s[opt: %s]%s\n",
-		colors.Cyan, colors.Reset, projectName, colors.Gray, buildType, colors.Reset,
-		colors.Gray, optLabel, colors.Reset)
+	if err := b.Build(ctx, buildOpts); err != nil {
+		return err
+	}
 
-	// Configure CMake if needed
+	// Determine where artifacts are
 	outDirName := build.GetOutputDir(opts.Release, opts.OptLevel, opts.Sanitizer)
-	cacheBuildDir := filepath.Join(".cache", "native", outDirName)
 	finalBuildDir := filepath.Join(".bin", "native", outDirName)
-	needsConfigure := false
-	if _, err := os.Stat(filepath.Join(cacheBuildDir, "CMakeCache.txt")); os.IsNotExist(err) {
-		needsConfigure = true
-	}
-
-	// Determine total steps
-	totalSteps := 1
-	currentStep := 0
-	if needsConfigure {
-		totalSteps = 2
-	}
-
-	if needsConfigure {
-		currentStep++
-		if opts.Verbose {
-			fmt.Printf("%s  • Configuring CMake%s\n", colors.Cyan, colors.Reset)
-		} else {
-			fmt.Printf("\r\033[2K%s[%d/%d]%s Configuring...", colors.Cyan, currentStep, totalSteps, colors.Reset)
-		}
-
-		// Determine absolute path for shared vcpkg_installed directory
-		cwd, _ := os.Getwd()
-		vcpkgInstalledDir := filepath.Join(cwd, ".cache", "native", "vcpkg_installed")
-		vcpkgInstallArg := "-DVCPKG_INSTALLED_DIR=" + vcpkgInstalledDir
-
-		// Check if CMakePresets.json exists, use preset if available
-		if _, err := os.Stat("CMakePresets.json"); err == nil {
-			// Use "default" preset (VCPKG_ROOT is now set from config)
-			cmdArgs := []string{"--preset=default", "-B", cacheBuildDir, vcpkgInstallArg}
-			if cxxFlags != "" {
-				cmdArgs = append(cmdArgs, "-DCMAKE_CXX_FLAGS="+cxxFlags, "-DCMAKE_C_FLAGS="+cxxFlags)
-			}
-			if linkerFlags != "" {
-				cmdArgs = append(cmdArgs, "-DCMAKE_EXE_LINKER_FLAGS="+linkerFlags, "-DCMAKE_SHARED_LINKER_FLAGS="+linkerFlags)
-			}
-			cmd := execCommand("cmake", cmdArgs...)
-			cmd.Env = os.Environ()
-			if err := common.RunCMakeConfigure(cmd, opts.Verbose); err != nil {
-				fmt.Println()
-				return fmt.Errorf("cmake configure failed (preset 'default'): %w", err)
-			}
-		} else {
-			// Fallback to traditional cmake configure
-			cmdArgs := []string{"-B", cacheBuildDir, "-DCMAKE_BUILD_TYPE=" + buildType, vcpkgInstallArg}
-			if cxxFlags != "" {
-				cmdArgs = append(cmdArgs, "-DCMAKE_CXX_FLAGS="+cxxFlags, "-DCMAKE_C_FLAGS="+cxxFlags)
-			}
-			if linkerFlags != "" {
-				cmdArgs = append(cmdArgs, "-DCMAKE_EXE_LINKER_FLAGS="+linkerFlags, "-DCMAKE_SHARED_LINKER_FLAGS="+linkerFlags)
-			}
-			cmd := execCommand("cmake", cmdArgs...)
-			if err := common.RunCMakeConfigure(cmd, opts.Verbose); err != nil {
-				fmt.Println()
-				return fmt.Errorf("cmake configure failed: %w", err)
-			}
-		}
-
-		if !opts.Verbose {
-			fmt.Printf("\r\033[2K%s[%d/%d]%s Configured ✓\n", colors.Cyan, currentStep, totalSteps, colors.Reset)
-		}
-	}
-
-	// Build specific target if provided
-	buildStart := time.Now()
-	// Build in .cache directory
-	buildArgs := []string{"--build", cacheBuildDir, "--config", buildType}
-	if opts.Target != "" {
-		buildArgs = append(buildArgs, "--target", opts.Target)
-	}
-
-	currentStep++
-	if err := common.RunCMakeBuild(buildArgs, opts.Verbose, currentStep, totalSteps); err != nil {
-		return fmt.Errorf("build failed: %w", err)
-	}
-
-	// Copy artifacts to final build directory
-	if err := os.MkdirAll(finalBuildDir, 0755); err != nil {
-		return fmt.Errorf("failed to create final build dir: %w", err)
-	}
-
-	executables, err := common.FindExecutables(cacheBuildDir)
-	if err == nil {
-		for _, exe := range executables {
-			dest := filepath.Join(finalBuildDir, filepath.Base(exe))
-			_ = common.CopyAndSign(exe, dest)
-		}
-	}
-	libraries, err := common.FindLibraries(cacheBuildDir)
-	if err == nil {
-		for _, lib := range libraries {
-			dest := filepath.Join(finalBuildDir, filepath.Base(lib))
-			_ = common.CopyAndSign(lib, dest)
-		}
-	}
 
 	// Find executable to run (in finalBuildDir)
 	var execPath string
@@ -674,8 +583,7 @@ func (b *Builder) Run(ctx context.Context, opts build.RunOptions) error {
 		}
 	}
 
-	fmt.Printf("%s  ✔ Build complete%s %s[%s]%s\n", colors.Green, colors.Reset, colors.Gray, time.Since(buildStart).Round(10*time.Millisecond), colors.Reset)
-	fmt.Printf("%s  ▶ Run%s %s%s%s\n\n", colors.Cyan, colors.Reset, colors.Green, filepath.Base(execPath), colors.Reset)
+	fmt.Printf("%s▸ Run%s %s%s%s\n\n", colors.Cyan, colors.Reset, colors.Green, filepath.Base(execPath), colors.Reset)
 	fmt.Println(strings.Repeat("─", 40))
 
 	runCmd := execCommand(execPath, opts.Args...)
@@ -686,94 +594,33 @@ func (b *Builder) Run(ctx context.Context, opts build.RunOptions) error {
 }
 
 func (b *Builder) Bench(ctx context.Context, opts build.BenchOptions) error {
-	// Set VCPKG_ROOT from cpx config if not already set
-	if err := b.SetupEnv(); err != nil {
-		return err
-	}
-
 	projectName := common.GetProjectNameFromCMakeLists()
 	if projectName == "" {
 		return fmt.Errorf("failed to get project name from CMakeLists.txt")
 	}
-	fmt.Printf("%s Running benchmarks for '%s'...%s\n", "\033[36m", projectName, "\033[0m")
 
-	// Default to release for benchmarks (benchmarks should be optimized)
-	// Use .cache/native/bench for building benchmarks (separate from normal builds)
-	buildDir := filepath.Join(".cache", "native", "bench")
 	benchTarget := projectName + "_bench"
 	if opts.Target != "" {
 		benchTarget = opts.Target
 	}
 
-	// Check if configure is needed
-	needsConfigure := false
-	if _, err := os.Stat(filepath.Join(buildDir, "CMakeCache.txt")); os.IsNotExist(err) {
-		needsConfigure = true
+	// Use Build with EnableBenchmarks to build benchmarks (forces Release mode)
+	buildOpts := build.BuildOptions{
+		EnableBenchmarks: true,
+		Target:           benchTarget,
+		Verbose:          opts.Verbose,
 	}
 
-	// Determine total steps: configure (optional) + build + run
-	totalSteps := 2 // build + run
-	if needsConfigure {
-		totalSteps = 3 // configure + build + run
-	}
-	currentStep := 0
-
-	// Configure CMake if needed
-	if needsConfigure {
-		currentStep++
-		if opts.Verbose {
-			fmt.Printf("%s  Configuring CMake (with benchmarks enabled)...%s\n", "\033[36m", "\033[0m")
-		} else {
-			fmt.Printf("\r\033[2K%s[%d/%d]%s Configuring...", colors.Cyan, currentStep, totalSteps, colors.Reset)
-		}
-
-		// Determine absolute path for shared vcpkg_installed directory
-		cwd, _ := os.Getwd()
-		vcpkgInstalledDir := filepath.Join(cwd, ".cache", "native", "vcpkg_installed")
-		vcpkgInstallArg := "-DVCPKG_INSTALLED_DIR=" + vcpkgInstalledDir
-
-		// Enable benchmarks with Release build type for optimal performance
-		enableBenchArg := "-DENABLE_BENCHMARKS=ON"
-		buildTypeArg := "-DCMAKE_BUILD_TYPE=Release"
-
-		// Check if CMakePresets.json exists, use preset if available
-		if _, err := os.Stat("CMakePresets.json"); err == nil {
-			cmd := execCommand("cmake", "--preset=default", "-B", buildDir, vcpkgInstallArg, enableBenchArg, buildTypeArg)
-			cmd.Env = os.Environ()
-			if err := common.RunCMakeConfigure(cmd, opts.Verbose); err != nil {
-				fmt.Println()
-				return fmt.Errorf("cmake configure failed (preset 'default'): %w", err)
-			}
-		} else {
-			cmd := execCommand("cmake", "-B", buildDir, vcpkgInstallArg, enableBenchArg, buildTypeArg)
-			if err := common.RunCMakeConfigure(cmd, opts.Verbose); err != nil {
-				fmt.Println()
-				return fmt.Errorf("cmake configure failed: %w", err)
-			}
-		}
-
-		if !opts.Verbose {
-			fmt.Printf("\r\033[2K%s[%d/%d]%s Configured ✓\n", colors.Cyan, currentStep, totalSteps, colors.Reset)
-		}
-	}
-
-	// Build benchmarks
-	currentStep++
-	buildArgs := []string{"--build", buildDir, "--target", benchTarget}
-	if err := common.RunCMakeBuild(buildArgs, opts.Verbose, currentStep, totalSteps); err != nil {
+	if err := b.Build(ctx, buildOpts); err != nil {
 		return fmt.Errorf("failed to build benchmarks: %w", err)
 	}
 
 	// Run benchmarks
-	currentStep++
-	if !opts.Verbose {
-		fmt.Printf("%s[%d/%d]%s Running benchmarks...\n", colors.Cyan, currentStep, totalSteps, colors.Reset)
-	} else {
-		fmt.Printf("%s Running benchmarks...%s\n", "\033[36m", "\033[0m")
-	}
+	buildDir := filepath.Join(".cache", "native", "bench")
+
+	fmt.Printf("%s▸ Running benchmarks...%s\n", colors.Cyan, colors.Reset)
 
 	// Find the benchmark executable
-	// Try common locations
 	possiblePaths := []string{
 		filepath.Join(buildDir, "bench", benchTarget),
 		filepath.Join(buildDir, benchTarget),
@@ -800,7 +647,7 @@ func (b *Builder) Bench(ctx context.Context, opts build.BenchOptions) error {
 		return fmt.Errorf("benchmarks failed: %w", err)
 	}
 
-	fmt.Printf("\n%s✓ Benchmarks completed!%s\n", "\033[32m", "\033[0m")
+	fmt.Printf("\n%s✓ Benchmarks completed!%s\n", colors.Green, colors.Reset)
 	return nil
 }
 
