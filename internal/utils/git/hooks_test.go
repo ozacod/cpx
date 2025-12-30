@@ -230,7 +230,7 @@ func TestInstallHooksWithConfig(t *testing.T) {
 	tmpDir := t.TempDir()
 	oldWd, err := os.Getwd()
 	require.NoError(t, err)
-	defer func() { _ = os.Chdir(oldWd) }()
+	defer func() { assert.NoError(t, os.Chdir(oldWd)) }()
 	require.NoError(t, os.Chdir(tmpDir))
 
 	// Initialize git repo
@@ -284,8 +284,8 @@ func TestInstallHooksWithConfig(t *testing.T) {
 			hooksDir := filepath.Join(gitDir, "hooks")
 
 			// Clean up hooks before test
-			os.Remove(filepath.Join(hooksDir, "pre-commit"))
-			os.Remove(filepath.Join(hooksDir, "pre-push"))
+			_ = os.Remove(filepath.Join(hooksDir, "pre-commit"))
+			_ = os.Remove(filepath.Join(hooksDir, "pre-push"))
 
 			err = InstallHooksWithConfig(tt.preCommit, tt.prePush)
 			require.NoError(t, err)
@@ -316,7 +316,7 @@ func TestInstallHooksWithConfig_NotInGitRepo(t *testing.T) {
 	tmpDir := t.TempDir()
 	oldWd, err := os.Getwd()
 	require.NoError(t, err)
-	defer func() { _ = os.Chdir(oldWd) }()
+	defer func() { assert.NoError(t, os.Chdir(oldWd)) }()
 	require.NoError(t, os.Chdir(tmpDir))
 
 	err = InstallHooksWithConfig([]string{"fmt"}, []string{"test"})
@@ -362,7 +362,7 @@ func TestInstallHooksWithConfig_CreatesHooksDir(t *testing.T) {
 	tmpDir := t.TempDir()
 	oldWd, err := os.Getwd()
 	require.NoError(t, err)
-	defer func() { _ = os.Chdir(oldWd) }()
+	defer func() { assert.NoError(t, os.Chdir(oldWd)) }()
 	require.NoError(t, os.Chdir(tmpDir))
 
 	// Initialize git repo
@@ -372,7 +372,7 @@ func TestInstallHooksWithConfig_CreatesHooksDir(t *testing.T) {
 	// Remove hooks directory to test creation
 	gitDir := filepath.Join(tmpDir, ".git")
 	hooksDir := filepath.Join(gitDir, "hooks")
-	os.RemoveAll(hooksDir)
+	require.NoError(t, os.RemoveAll(hooksDir))
 
 	// Verify hooks dir doesn't exist
 	_, err = os.Stat(hooksDir)
@@ -393,7 +393,7 @@ func TestInstallHooksWithConfig_RemovesSampleFiles(t *testing.T) {
 	tmpDir := t.TempDir()
 	oldWd, err := os.Getwd()
 	require.NoError(t, err)
-	defer func() { _ = os.Chdir(oldWd) }()
+	defer func() { assert.NoError(t, os.Chdir(oldWd)) }()
 	require.NoError(t, os.Chdir(tmpDir))
 
 	// Initialize git repo

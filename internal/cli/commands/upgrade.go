@@ -49,7 +49,11 @@ func Upgrade(_ []string) {
 		fmt.Fprintf(os.Stderr, "%sError:%s Failed to check for updates: %v\n", colors.Red, colors.Reset, err)
 		os.Exit(1)
 	}
-	defer resp.Body.Close()
+	defer func() {
+		if err := resp.Body.Close(); err != nil {
+			_, _ = fmt.Fprintf(os.Stderr, "Error closing response body: %v\n", err)
+		}
+	}()
 
 	if resp.StatusCode == http.StatusNotFound {
 		fmt.Printf("%s  No releases found. This may be the first version.%s\n", colors.Yellow, colors.Reset)
@@ -106,10 +110,14 @@ func Upgrade(_ []string) {
 	// Download the new binary
 	resp, err = http.Get(downloadURL)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "%sError:%s Failed to download: %v\n", colors.Red, colors.Reset, err)
+		_, _ = fmt.Fprintf(os.Stderr, "%sError:%s Failed to download: %v\n", colors.Red, colors.Reset, err)
 		os.Exit(1)
 	}
-	defer resp.Body.Close()
+	defer func() {
+		if err := resp.Body.Close(); err != nil {
+			_, _ = fmt.Fprintf(os.Stderr, "Error closing response body: %v\n", err)
+		}
+	}()
 
 	if resp.StatusCode != 200 {
 		fmt.Fprintf(os.Stderr, "%sError:%s Download failed with status %d\n", colors.Red, colors.Reset, resp.StatusCode)
@@ -146,7 +154,9 @@ func Upgrade(_ []string) {
 	}
 
 	// Remove old binary and rename new one
-	os.Remove(execPath)
+	if err := os.Remove(execPath); err != nil && !os.IsNotExist(err) {
+		fmt.Printf("Warning: failed to remove old binary: %v\n", err)
+	}
 	if err := os.Rename(tempPath, execPath); err != nil {
 		fmt.Fprintf(os.Stderr, "%sError:%s Failed to replace binary: %v\n", colors.Red, colors.Reset, err)
 		fmt.Printf("\nTo complete manually, run:\n")

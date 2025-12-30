@@ -91,7 +91,11 @@ func RunFlawfinder(opts FlawfinderOptions) error {
 		if err != nil {
 			return fmt.Errorf("failed to create output file: %w", err)
 		}
-		defer file.Close()
+		defer func() {
+			if err := file.Close(); err != nil {
+				_, _ = fmt.Fprintf(os.Stderr, "Error closing file %s: %v\n", opts.Output, err)
+			}
+		}()
 		cmd.Stdout = file
 		fmt.Printf("%s Writing output to: %s%s\n", colors.Cyan, opts.Output, colors.Reset)
 	} else {

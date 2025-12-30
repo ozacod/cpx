@@ -117,8 +117,8 @@ add_executable(testproj src/main.cpp)
 			capturedArgs = nil
 
 			// Clean up any previous build artifacts
-			os.RemoveAll(".cache")
-			os.RemoveAll(".bin")
+			require.NoError(t, os.RemoveAll(".cache"))
+			require.NoError(t, os.RemoveAll(".bin"))
 
 			opts := build.BuildOptions{
 				Release:   tt.release,

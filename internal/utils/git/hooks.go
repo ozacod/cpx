@@ -44,7 +44,9 @@ func InstallHooksWithConfig(preCommit []string, prePush []string) error {
 	if len(preCommit) > 0 {
 		samplePath := filepath.Join(hooksDir, "pre-commit.sample")
 		if _, err := os.Stat(samplePath); err == nil {
-			os.Remove(samplePath)
+			if err := os.Remove(samplePath); err != nil {
+				fmt.Printf("Warning: failed to remove %s: %v\n", samplePath, err)
+			}
 		}
 		if err := InstallPreCommitHook(hooksDir, preCommit); err != nil {
 			return fmt.Errorf("failed to install pre-commit hook: %w", err)
@@ -56,7 +58,9 @@ func InstallHooksWithConfig(preCommit []string, prePush []string) error {
 	if len(prePush) > 0 {
 		samplePath := filepath.Join(hooksDir, "pre-push.sample")
 		if _, err := os.Stat(samplePath); err == nil {
-			os.Remove(samplePath)
+			if err := os.Remove(samplePath); err != nil {
+				fmt.Printf("Warning: failed to remove %s: %v\n", samplePath, err)
+			}
 		}
 		if err := InstallPrePushHook(hooksDir, prePush); err != nil {
 			return fmt.Errorf("failed to install pre-push hook: %w", err)
@@ -261,7 +265,9 @@ func writeHook(hookPath, content string) error {
 	// Remove any existing .sample file for the same hook
 	samplePath := hookPath + ".sample"
 	if _, err := os.Stat(samplePath); err == nil {
-		os.Remove(samplePath)
+		if err := os.Remove(samplePath); err != nil {
+			fmt.Printf("Warning: failed to remove %s: %v\n", samplePath, err)
+		}
 	}
 
 	if err := os.WriteFile(hookPath, []byte(content), 0755); err != nil {

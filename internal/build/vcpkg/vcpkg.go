@@ -713,7 +713,11 @@ func (b *Builder) printUsageInfo(pkgName string) {
 	if err != nil || resp.StatusCode != 200 {
 		return
 	}
-	defer resp.Body.Close()
+	defer func() {
+		if err := resp.Body.Close(); err != nil {
+			fmt.Fprintf(os.Stderr, "Error closing response body: %v\n", err)
+		}
+	}()
 
 	data, err := io.ReadAll(resp.Body)
 	if err != nil {

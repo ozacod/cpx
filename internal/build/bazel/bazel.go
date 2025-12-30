@@ -260,7 +260,9 @@ func (b *Builder) Build(opts build.BuildOptions) error {
 
 	// Copy artifacts to build/<config>/ directory
 	// Remove existing build artifacts for this config first
-	os.RemoveAll(outputDir)
+	if err := os.RemoveAll(outputDir); err != nil {
+		fmt.Printf("Warning: failed to remove %s: %v\n", outputDir, err)
+	}
 	if err := os.MkdirAll(outputDir, 0755); err != nil {
 		return fmt.Errorf("failed to create build directory: %w", err)
 	}
@@ -548,7 +550,9 @@ func (b *Builder) Clean(opts build.CleanOptions) error {
 	for _, symlink := range bazelSymlinks {
 		if _, err := os.Lstat(symlink); err == nil {
 			fmt.Printf("%s  Removing %s...%s\n", colors.Cyan, symlink, colors.Reset)
-			os.RemoveAll(symlink)
+			if err := os.RemoveAll(symlink); err != nil {
+				fmt.Printf("Warning: failed to remove %s: %v\n", symlink, err)
+			}
 		}
 	}
 

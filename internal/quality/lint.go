@@ -226,7 +226,9 @@ func LintCode(fix bool, vcpkg VcpkgSetup) error {
 	output, err := cmd.CombinedOutput()
 
 	// Write output to stderr (warnings/errors) and stdout (info)
-	os.Stderr.Write(output)
+	if _, err := os.Stderr.Write(output); err != nil {
+		fmt.Printf("Error writing to stderr: %v\n", err)
+	}
 
 	// Check if output contains warnings or errors
 	outputStr := string(output)
@@ -264,7 +266,11 @@ func GetSystemIncludePaths() []string {
 	if err != nil {
 		return includes
 	}
-	defer nullFile.Close()
+	defer func() {
+		if err := nullFile.Close(); err != nil {
+			fmt.Printf("Error closing /dev/null: %v\n", err)
+		}
+	}()
 	cmd.Stdin = nullFile
 	output, err := cmd.CombinedOutput()
 	if err != nil {
@@ -274,7 +280,11 @@ func GetSystemIncludePaths() []string {
 		if err2 != nil {
 			return includes
 		}
-		defer nullFile2.Close()
+		defer func() {
+			if err := nullFile2.Close(); err != nil {
+				fmt.Printf("Error closing /dev/null: %v\n", err)
+			}
+		}()
 		cmd.Stdin = nullFile2
 		output, err = cmd.CombinedOutput()
 		if err != nil {

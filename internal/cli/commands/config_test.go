@@ -38,8 +38,8 @@ func TestConfigShow(t *testing.T) {
 			// Use temp directory for isolation
 			tmpDir := t.TempDir()
 			oldHome := os.Getenv("HOME")
-			defer os.Setenv("HOME", oldHome)
-			os.Setenv("HOME", tmpDir)
+			defer func() { assert.NoError(t, os.Setenv("HOME", oldHome)) }()
+			require.NoError(t, os.Setenv("HOME", tmpDir))
 
 			// Save test config
 			require.NoError(t, config.SaveGlobal(tt.config))
@@ -116,8 +116,8 @@ func TestConfigGet(t *testing.T) {
 			// Use temp directory for isolation
 			tmpDir := t.TempDir()
 			oldHome := os.Getenv("HOME")
-			defer os.Setenv("HOME", oldHome)
-			os.Setenv("HOME", tmpDir)
+			defer func() { assert.NoError(t, os.Setenv("HOME", oldHome)) }()
+			require.NoError(t, os.Setenv("HOME", tmpDir))
 
 			// Save test config
 			require.NoError(t, config.SaveGlobal(tt.config))
@@ -178,8 +178,8 @@ func TestSetVcpkgRoot(t *testing.T) {
 			// Use temp directory for isolation
 			tmpDir := t.TempDir()
 			oldHome := os.Getenv("HOME")
-			defer os.Setenv("HOME", oldHome)
-			os.Setenv("HOME", tmpDir)
+			defer func() { assert.NoError(t, os.Setenv("HOME", oldHome)) }()
+			require.NoError(t, os.Setenv("HOME", tmpDir))
 
 			if tt.createPath {
 				// Create the path
@@ -200,7 +200,7 @@ func TestSetVcpkgRoot(t *testing.T) {
 			err := setVcpkgRoot(tt.path)
 
 			// Restore stdout
-			w.Close()
+			assert.NoError(t, w.Close())
 			os.Stdout = old
 
 			// Read captured output
@@ -247,8 +247,8 @@ func TestSetBcrRoot(t *testing.T) {
 			// Use temp directory for isolation
 			tmpDir := t.TempDir()
 			oldHome := os.Getenv("HOME")
-			defer os.Setenv("HOME", oldHome)
-			os.Setenv("HOME", tmpDir)
+			defer func() { assert.NoError(t, os.Setenv("HOME", oldHome)) }()
+			require.NoError(t, os.Setenv("HOME", tmpDir))
 
 			if tt.createPath {
 				// Create the path
@@ -269,7 +269,7 @@ func TestSetBcrRoot(t *testing.T) {
 			runErr := setBcrRoot(tt.path)
 
 			// Restore stdout
-			w.Close()
+			assert.NoError(t, w.Close())
 			os.Stdout = old
 
 			// Read captured output

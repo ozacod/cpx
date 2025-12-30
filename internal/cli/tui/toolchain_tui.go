@@ -91,11 +91,8 @@ func (m ToolchainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "enter":
 			return m.handleEnter()
 		case "up", "k":
-			if m.step == ToolchainStepRunner {
-				if m.cursor > 0 {
-					m.cursor--
-				}
-			} else if m.step == ToolchainStepBuildType {
+			switch m.step {
+			case ToolchainStepRunner, ToolchainStepBuildType:
 				if m.cursor > 0 {
 					m.cursor--
 				}

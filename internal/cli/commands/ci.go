@@ -228,7 +228,7 @@ func findProjectRoot() (string, error) {
 // resolveDockerImageNew verifies the Docker image exists locally
 func resolveDockerImageNew(runner *config.Runner) (string, error) {
 	if runner.Image == "" {
-		return "", fmt.Errorf("Docker runner '%s' has no image specified", runner.Name)
+		return "", fmt.Errorf("docker runner '%s' has no image specified", runner.Name)
 	}
 	imageName := runner.Image
 
@@ -236,7 +236,7 @@ func resolveDockerImageNew(runner *config.Runner) (string, error) {
 	cmd := exec.Command("docker", "images", "-q", imageName)
 	output, err := cmd.Output()
 	if err != nil || len(output) == 0 {
-		return "", fmt.Errorf("Docker image '%s' not found locally. Use 'docker pull %s' to download it first", imageName, imageName)
+		return "", fmt.Errorf("docker image '%s' not found locally. Use 'docker pull %s' to download it first", imageName, imageName)
 	}
 
 	fmt.Printf("  %s Using Docker image: %s%s\n", colors.Green, imageName, colors.Reset)

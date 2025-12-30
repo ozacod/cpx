@@ -399,7 +399,9 @@ func (b *Builder) RemoveDependency(name string) error {
 	// Also try to remove the extracted directory
 	extractedDir := filepath.Join("subprojects", name)
 	if _, err := os.Stat(extractedDir); err == nil {
-		os.RemoveAll(extractedDir)
+		if err := os.RemoveAll(extractedDir); err != nil {
+			fmt.Printf("%sWarning: failed to remove extracted directory %s: %v%s\n", colors.Yellow, extractedDir, err, colors.Reset)
+		}
 	}
 
 	fmt.Printf("%s✓ Removed %s%s\n", colors.Green, name, colors.Reset)

@@ -20,11 +20,12 @@ func TestPrintError(t *testing.T) {
 
 	PrintError("test error %s", "message")
 
-	w.Close()
+	assert.NoError(t, w.Close())
 	os.Stderr = oldStderr
 
 	var buf bytes.Buffer
-	buf.ReadFrom(r)
+	_, err := buf.ReadFrom(r)
+	assert.NoError(t, err)
 	output := buf.String()
 
 	assert.Contains(t, output, "test error message")
@@ -130,11 +131,12 @@ func TestSpinner(t *testing.T) {
 		s.Tick()
 		assert.Equal(t, 0, s.current) // Should wrap around
 
-		w.Close()
+		assert.NoError(t, w.Close())
 		os.Stdout = oldStdout
 
 		var buf bytes.Buffer
-		buf.ReadFrom(r)
+		_, err := buf.ReadFrom(r)
+		assert.NoError(t, err)
 		output := buf.String()
 
 		assert.Contains(t, output, "test")
@@ -154,11 +156,12 @@ func TestSpinner(t *testing.T) {
 
 		s.Done("completed!")
 
-		w.Close()
+		assert.NoError(t, w.Close())
 		os.Stdout = oldStdout
 
 		var buf bytes.Buffer
-		buf.ReadFrom(r)
+		_, err := buf.ReadFrom(r)
+		assert.NoError(t, err)
 		output := buf.String()
 
 		assert.Contains(t, output, "completed!")
@@ -178,11 +181,12 @@ func TestSpinner(t *testing.T) {
 
 		s.Fail("failed!")
 
-		w.Close()
+		assert.NoError(t, w.Close())
 		os.Stdout = oldStdout
 
 		var buf bytes.Buffer
-		buf.ReadFrom(r)
+		_, err := buf.ReadFrom(r)
+		assert.NoError(t, err)
 		output := buf.String()
 
 		assert.Contains(t, output, "failed!")
@@ -324,11 +328,12 @@ func TestWarnMissingBuildTools(t *testing.T) {
 
 		missing := WarnMissingBuildTools(ProjectTypeBazel)
 
-		w.Close()
+		assert.NoError(t, w.Close())
 		os.Stdout = oldStdout
 
 		var buf bytes.Buffer
-		buf.ReadFrom(r)
+		_, err := buf.ReadFrom(r)
+		assert.NoError(t, err)
 		output := buf.String()
 
 		assert.NotEmpty(t, missing)
@@ -347,11 +352,12 @@ func TestWarnMissingBuildTools(t *testing.T) {
 
 		missing := WarnMissingBuildTools(ProjectTypeBazel)
 
-		w.Close()
+		assert.NoError(t, w.Close())
 		os.Stdout = oldStdout
 
 		var buf bytes.Buffer
-		buf.ReadFrom(r)
+		_, err := buf.ReadFrom(r)
+		assert.NoError(t, err)
 		output := buf.String()
 
 		assert.Empty(t, missing)

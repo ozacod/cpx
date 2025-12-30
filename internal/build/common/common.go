@@ -183,7 +183,9 @@ func FindLibraries(buildDir string) ([]string, error) {
 
 func CopyAndSign(src, dest string) error {
 	// Remove destination to ensure clean copy
-	os.Remove(dest)
+	if err := os.Remove(dest); err != nil && !os.IsNotExist(err) {
+		fmt.Printf("Warning: failed to remove %s: %v\n", dest, err)
+	}
 
 	// Simple copy for Windows
 	if runtime.GOOS == "windows" {
@@ -262,7 +264,9 @@ func RunCMakeBuild(buildArgs []string, verbose bool, currentStep, totalSteps int
 	waitCh := make(chan error, 1)
 	go func() {
 		waitCh <- cmd.Wait()
-		pw.Close()
+		if err := pw.Close(); err != nil {
+			_, _ = fmt.Fprintf(os.Stderr, "Error closing pipe writer: %v\n", err)
+		}
 	}()
 
 	sc := bufio.NewScanner(pr)

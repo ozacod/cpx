@@ -46,8 +46,8 @@ vcpkg_root: /tmp/test_vcpkg
 
 			// Set HOME to temp dir so config goes there
 			oldHome := os.Getenv("HOME")
-			defer os.Setenv("HOME", oldHome)
-			os.Setenv("HOME", tmpDir)
+			defer func() { assert.NoError(t, os.Setenv("HOME", oldHome)) }()
+			require.NoError(t, os.Setenv("HOME", tmpDir))
 
 			if tt.hasFile {
 				configDir := filepath.Join(tmpDir, ".config", "cpx")
@@ -100,8 +100,8 @@ func TestSaveGlobalConfig(t *testing.T) {
 
 			// Set HOME to temp dir so config goes there
 			oldHome := os.Getenv("HOME")
-			defer os.Setenv("HOME", oldHome)
-			os.Setenv("HOME", tmpDir)
+			defer func() { assert.NoError(t, os.Setenv("HOME", oldHome)) }()
+			require.NoError(t, os.Setenv("HOME", tmpDir))
 
 			err := config.SaveGlobal(tt.config)
 

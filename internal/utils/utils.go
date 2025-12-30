@@ -10,7 +10,9 @@ import (
 // copyAndSign copies a file and signs it on macOS to prevent signal: killed
 func copyAndSign(src, dest string) error {
 	// Remove destination to ensure clean copy
-	os.Remove(dest)
+	if err := os.Remove(dest); err != nil && !os.IsNotExist(err) {
+		fmt.Printf("Warning: failed to remove %s: %v\n", dest, err)
+	}
 
 	// Simple copy for Windows
 	if runtime.GOOS == "windows" {
