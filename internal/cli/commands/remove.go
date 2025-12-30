@@ -9,6 +9,7 @@ import (
 	"github.com/ozacod/cpx/internal/build/interfaces"
 	"github.com/ozacod/cpx/internal/build/meson"
 	"github.com/ozacod/cpx/internal/build/vcpkg"
+	"github.com/ozacod/cpx/internal/utils"
 	"github.com/ozacod/cpx/internal/utils/colors"
 	"github.com/spf13/cobra"
 )
@@ -33,19 +34,19 @@ func runRemove(_ *cobra.Command, args []string) error {
 		return fmt.Errorf("argument required (pkg1 pkg2 ...)")
 	}
 
-	projectType := DetectProjectType()
+	projectType := utils.DetectProjectType()
 
 	// Get the appropriate builder for the project type
 	var builder build.BuildSystem
 
 	switch projectType {
-	case ProjectTypeVcpkg:
+	case utils.ProjectTypeVcpkg:
 		builder = vcpkg.New()
-	case ProjectTypeBazel:
+	case utils.ProjectTypeBazel:
 		builder = bazel.New()
-	case ProjectTypeMeson:
+	case utils.ProjectTypeMeson:
 		builder = meson.New()
-	case ProjectTypeCMake:
+	case utils.ProjectTypeCMake:
 		builder = cmake.New()
 	default:
 		return fmt.Errorf("unsupported project type")
@@ -62,7 +63,7 @@ func runRemove(_ *cobra.Command, args []string) error {
 		}
 	}
 
-	if projectType == ProjectTypeVcpkg {
+	if projectType == utils.ProjectTypeVcpkg {
 		fmt.Printf("Run 'cpx install' or 'cpx build' to update installed packages.\n")
 	}
 

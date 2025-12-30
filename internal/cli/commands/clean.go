@@ -8,6 +8,7 @@ import (
 	"github.com/ozacod/cpx/internal/build/interfaces"
 	"github.com/ozacod/cpx/internal/build/meson"
 	"github.com/ozacod/cpx/internal/build/vcpkg"
+	"github.com/ozacod/cpx/internal/utils"
 	"github.com/spf13/cobra"
 )
 
@@ -35,22 +36,22 @@ Use --all to also remove additional generated files.`,
 func runClean(cmd *cobra.Command, _ []string) error {
 	all, _ := cmd.Flags().GetBool("all")
 
-	projectType := DetectProjectType()
+	projectType := utils.DetectProjectType()
 	opts := build.CleanOptions{
 		All: all,
 	}
 
 	switch projectType {
-	case ProjectTypeBazel:
+	case utils.ProjectTypeBazel:
 		builder := bazel.New()
 		return builder.Clean(opts)
-	case ProjectTypeMeson:
+	case utils.ProjectTypeMeson:
 		builder := meson.New()
 		return builder.Clean(opts)
-	case ProjectTypeCMake:
+	case utils.ProjectTypeCMake:
 		builder := cmake.New()
 		return builder.Clean(opts)
-	case ProjectTypeVcpkg:
+	case utils.ProjectTypeVcpkg:
 		builder := vcpkg.New()
 		return builder.Clean(opts)
 	default:

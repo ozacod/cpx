@@ -8,6 +8,7 @@ import (
 	"github.com/ozacod/cpx/internal/build/interfaces"
 	"github.com/ozacod/cpx/internal/build/meson"
 	"github.com/ozacod/cpx/internal/build/vcpkg"
+	"github.com/ozacod/cpx/internal/utils"
 	"github.com/ozacod/cpx/internal/utils/colors"
 	"github.com/spf13/cobra"
 )
@@ -113,9 +114,9 @@ func runBuild(cmd *cobra.Command, _ []string) error {
 		return fmt.Errorf("only one sanitizer can be used at a time (got %d)", sanitizerCount)
 	}
 
-	projectType := DetectProjectType()
+	projectType := utils.DetectProjectType()
 
-	WarnMissingBuildTools(projectType)
+	utils.WarnMissingBuildTools(projectType)
 
 	list, _ := cmd.Flags().GetBool("list")
 
@@ -147,13 +148,13 @@ func runBuild(cmd *cobra.Command, _ []string) error {
 
 	var builder build.BuildSystem
 	switch projectType {
-	case ProjectTypeBazel:
+	case utils.ProjectTypeBazel:
 		builder = bazel.New()
-	case ProjectTypeMeson:
+	case utils.ProjectTypeMeson:
 		builder = meson.New()
-	case ProjectTypeCMake:
+	case utils.ProjectTypeCMake:
 		builder = cmake.New()
-	case ProjectTypeVcpkg:
+	case utils.ProjectTypeVcpkg:
 		builder = vcpkg.New()
 	default:
 		return fmt.Errorf("unsupported project type")

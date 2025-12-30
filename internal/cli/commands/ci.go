@@ -13,6 +13,7 @@ import (
 	"github.com/ozacod/cpx/internal/build/meson"
 	"github.com/ozacod/cpx/internal/build/vcpkg"
 	"github.com/ozacod/cpx/internal/config"
+	"github.com/ozacod/cpx/internal/utils"
 	"github.com/ozacod/cpx/internal/utils/colors"
 )
 
@@ -252,8 +253,8 @@ func runNativeBuildNew(opts NativeBuildOptions) error {
 	runBenchmarks := opts.RunBenchmarks
 	executeAfterBuild := opts.ExecuteAfterBuild
 
-	projectType := DetectProjectType()
-	missing := WarnMissingBuildTools(projectType)
+	projectType := utils.DetectProjectType()
+	missing := utils.WarnMissingBuildTools(projectType)
 	if len(missing) > 0 {
 		fmt.Printf("  %sNote: Native build may fail due to missing tools%s\n", colors.Yellow, colors.Reset)
 	}

@@ -8,6 +8,7 @@ import (
 	"github.com/ozacod/cpx/internal/build/interfaces"
 	"github.com/ozacod/cpx/internal/build/meson"
 	"github.com/ozacod/cpx/internal/build/vcpkg"
+	"github.com/ozacod/cpx/internal/utils"
 	"github.com/spf13/cobra"
 )
 
@@ -85,9 +86,9 @@ func runRun(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("only one sanitizer can be used at a time (got %d)", sanitizerCount)
 	}
 
-	projectType := DetectProjectType()
+	projectType := utils.DetectProjectType()
 
-	WarnMissingBuildTools(projectType)
+	utils.WarnMissingBuildTools(projectType)
 
 	opts := build.RunOptions{
 		Release:   release,
@@ -99,16 +100,16 @@ func runRun(cmd *cobra.Command, args []string) error {
 	}
 
 	switch projectType {
-	case ProjectTypeBazel:
+	case utils.ProjectTypeBazel:
 		builder := bazel.New()
 		return builder.Run(opts)
-	case ProjectTypeMeson:
+	case utils.ProjectTypeMeson:
 		builder := meson.New()
 		return builder.Run(opts)
-	case ProjectTypeCMake:
+	case utils.ProjectTypeCMake:
 		builder := cmake.New()
 		return builder.Run(opts)
-	case ProjectTypeVcpkg:
+	case utils.ProjectTypeVcpkg:
 		builder := vcpkg.New()
 		return builder.Run(opts)
 	default:

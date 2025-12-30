@@ -7,7 +7,7 @@ import (
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/ozacod/cpx/internal/utils/common"
+	"github.com/ozacod/cpx/internal/utils"
 )
 
 type DockerImage struct {
@@ -105,16 +105,16 @@ func getImageArchitectures(imageIDs []string) map[string]string {
 }
 
 func detectProjectType() string {
-	if common.CheckFileExists("vcpkg.json") {
+	if utils.CheckFileExists("vcpkg.json") {
 		return "vcpkg"
 	}
-	if common.CheckFileExists("BUILD.bazel") || common.CheckFileExists("WORKSPACE") || common.CheckFileExists("MODULE.bazel") {
+	if utils.CheckFileExists("BUILD.bazel") || utils.CheckFileExists("WORKSPACE") || utils.CheckFileExists("MODULE.bazel") {
 		return "bazel"
 	}
-	if common.CheckFileExists("meson.build") {
+	if utils.CheckFileExists("meson.build") {
 		return "meson"
 	}
-	if common.CheckFileExists("CMakeLists.txt") {
+	if utils.CheckFileExists("CMakeLists.txt") {
 		return "cmake"
 	}
 	return "unknown"

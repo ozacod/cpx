@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/ozacod/cpx/internal/utils"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -13,32 +14,32 @@ func TestDetectProjectType(t *testing.T) {
 	tests := []struct {
 		name     string
 		files    map[string]string // filename -> content
-		expected ProjectType
+		expected utils.ProjectType
 	}{
 		{
 			name:     "Bazel project",
 			files:    map[string]string{"MODULE.bazel": "# test bazel module"},
-			expected: ProjectTypeBazel,
+			expected: utils.ProjectTypeBazel,
 		},
 		{
 			name:     "Vcpkg project",
 			files:    map[string]string{"vcpkg.json": "{}"},
-			expected: ProjectTypeVcpkg,
+			expected: utils.ProjectTypeVcpkg,
 		},
 		{
 			name:     "Unknown project",
 			files:    nil,
-			expected: ProjectTypeUnknown,
+			expected: utils.ProjectTypeUnknown,
 		},
 		{
 			name:     "Meson project",
 			files:    map[string]string{"meson.build": "project('test', 'cpp')"},
-			expected: ProjectTypeMeson,
+			expected: utils.ProjectTypeMeson,
 		},
 		{
 			name:     "Vcpkg takes priority over Bazel",
 			files:    map[string]string{"MODULE.bazel": "# bazel", "vcpkg.json": "{}"},
-			expected: ProjectTypeVcpkg,
+			expected: utils.ProjectTypeVcpkg,
 		},
 	}
 
@@ -56,7 +57,7 @@ func TestDetectProjectType(t *testing.T) {
 				require.NoError(t, os.WriteFile(filepath.Join(tmpDir, filename), []byte(content), 0644))
 			}
 
-			result := DetectProjectType()
+			result := utils.DetectProjectType()
 			assert.Equal(t, tt.expected, result)
 		})
 	}
@@ -68,28 +69,28 @@ func TestRequireProject(t *testing.T) {
 		files        map[string]string
 		cmdName      string
 		expectsError bool
-		expectedType ProjectType
+		expectedType utils.ProjectType
 	}{
 		{
 			name:         "Valid vcpkg project",
 			files:        map[string]string{"vcpkg.json": "{}"},
 			cmdName:      "test",
 			expectsError: false,
-			expectedType: ProjectTypeVcpkg,
+			expectedType: utils.ProjectTypeVcpkg,
 		},
 		{
 			name:         "Valid bazel project",
 			files:        map[string]string{"MODULE.bazel": "# test"},
 			cmdName:      "build",
 			expectsError: false,
-			expectedType: ProjectTypeBazel,
+			expectedType: utils.ProjectTypeBazel,
 		},
 		{
 			name:         "Invalid project",
 			files:        nil,
 			cmdName:      "build",
 			expectsError: true,
-			expectedType: ProjectTypeUnknown,
+			expectedType: utils.ProjectTypeUnknown,
 		},
 	}
 
@@ -107,7 +108,7 @@ func TestRequireProject(t *testing.T) {
 				require.NoError(t, os.WriteFile(filepath.Join(tmpDir, filename), []byte(content), 0644))
 			}
 
-			result, err := RequireProject(tt.cmdName)
+			result, err := utils.RequireProject(tt.cmdName)
 
 			if tt.expectsError {
 				assert.Error(t, err)
@@ -155,7 +156,7 @@ func TestRequireVcpkgProject(t *testing.T) {
 				require.NoError(t, os.WriteFile(filepath.Join(tmpDir, filename), []byte(content), 0644))
 			}
 
-			err = requireVcpkgProject(tt.cmdName)
+			err = utils.RequireVcpkgProject(tt.cmdName)
 
 			if tt.expectsError {
 				assert.Error(t, err)

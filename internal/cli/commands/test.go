@@ -8,6 +8,7 @@ import (
 	"github.com/ozacod/cpx/internal/build/interfaces"
 	"github.com/ozacod/cpx/internal/build/meson"
 	"github.com/ozacod/cpx/internal/build/vcpkg"
+	"github.com/ozacod/cpx/internal/utils"
 	"github.com/ozacod/cpx/internal/utils/colors"
 	"github.com/spf13/cobra"
 )
@@ -51,18 +52,18 @@ func runTest(cmd *cobra.Command) error {
 		})
 	}
 
-	projectType := DetectProjectType()
+	projectType := utils.DetectProjectType()
 
 	var builder build.BuildSystem
 
 	switch projectType {
-	case ProjectTypeBazel:
+	case utils.ProjectTypeBazel:
 		builder = bazel.New()
-	case ProjectTypeMeson:
+	case utils.ProjectTypeMeson:
 		builder = meson.New()
-	case ProjectTypeCMake:
+	case utils.ProjectTypeCMake:
 		builder = cmake.New()
-	case ProjectTypeVcpkg:
+	case utils.ProjectTypeVcpkg:
 		builder = vcpkg.New()
 	default:
 		return fmt.Errorf("could not detect project type (no MODULE.bazel, meson.build, CMakeLists.txt, or vcpkg.json found)")

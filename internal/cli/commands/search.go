@@ -7,6 +7,7 @@ import (
 	"github.com/ozacod/cpx/internal/build/meson"
 	"github.com/ozacod/cpx/internal/build/vcpkg"
 	"github.com/ozacod/cpx/internal/cli/tui"
+	"github.com/ozacod/cpx/internal/utils"
 	"github.com/spf13/cobra"
 )
 
@@ -30,18 +31,18 @@ func runSearch(_ *cobra.Command, args []string) error {
 		query = args[0]
 	}
 
-	projectType := DetectProjectType()
+	projectType := utils.DetectProjectType()
 
 	var builder build.BuildSystem
 
 	switch projectType {
-	case ProjectTypeBazel:
+	case utils.ProjectTypeBazel:
 		builder = bazel.New()
-	case ProjectTypeMeson:
+	case utils.ProjectTypeMeson:
 		builder = meson.New()
-	case ProjectTypeCMake:
+	case utils.ProjectTypeCMake:
 		builder = cmake.New()
-	case ProjectTypeVcpkg:
+	case utils.ProjectTypeVcpkg:
 		builder = vcpkg.New()
 	default:
 		builder = vcpkg.New()

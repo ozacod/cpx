@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/ozacod/cpx/internal/utils"
 	"github.com/ozacod/cpx/internal/utils/colors"
 	"github.com/spf13/cobra"
 )
@@ -18,7 +19,7 @@ func UpdateCmd() *cobra.Command {
 		Args:  cobra.MaximumNArgs(1),
 	}
 
-	cmd.Flags().StringP("server", "s", DefaultServer, "Server URL")
+	cmd.Flags().StringP("server", "s", utils.DefaultServer, "Server URL")
 
 	return cmd
 }

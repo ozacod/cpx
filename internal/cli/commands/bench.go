@@ -8,6 +8,7 @@ import (
 	"github.com/ozacod/cpx/internal/build/interfaces"
 	"github.com/ozacod/cpx/internal/build/meson"
 	"github.com/ozacod/cpx/internal/build/vcpkg"
+	"github.com/ozacod/cpx/internal/utils"
 	"github.com/spf13/cobra"
 )
 
@@ -46,7 +47,7 @@ func runBenchCmd(cmd *cobra.Command) error {
 			Verbose:           verbose,
 		})
 	}
-	projectType := DetectProjectType()
+	projectType := utils.DetectProjectType()
 
 	opts := build.BenchOptions{
 		Verbose: verbose,
@@ -56,13 +57,13 @@ func runBenchCmd(cmd *cobra.Command) error {
 	var builder build.BuildSystem
 
 	switch projectType {
-	case ProjectTypeBazel:
+	case utils.ProjectTypeBazel:
 		builder = bazel.New()
-	case ProjectTypeMeson:
+	case utils.ProjectTypeMeson:
 		builder = meson.New()
-	case ProjectTypeCMake:
+	case utils.ProjectTypeCMake:
 		builder = cmake.New()
-	case ProjectTypeVcpkg:
+	case utils.ProjectTypeVcpkg:
 		builder = vcpkg.New()
 	default:
 		return fmt.Errorf("unsupported project type")

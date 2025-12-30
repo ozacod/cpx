@@ -9,6 +9,7 @@ import (
 	"github.com/ozacod/cpx/internal/build/meson"
 	"github.com/ozacod/cpx/internal/build/vcpkg"
 	"github.com/ozacod/cpx/internal/config"
+	"github.com/ozacod/cpx/internal/utils"
 	"github.com/spf13/cobra"
 )
 
@@ -41,7 +42,7 @@ For Meson projects: uses 'meson wrap install' to add from WrapDB.`,
 }
 
 func runAdd(_ *cobra.Command, args []string) error {
-	projectType, err := RequireProject("cpx add")
+	projectType, err := utils.RequireProject("cpx add")
 	if err != nil {
 		return err
 	}
@@ -54,13 +55,13 @@ func runAdd(_ *cobra.Command, args []string) error {
 
 	var builder build.BuildSystem
 	switch projectType {
-	case ProjectTypeVcpkg:
+	case utils.ProjectTypeVcpkg:
 		builder = vcpkg.New()
-	case ProjectTypeBazel:
+	case utils.ProjectTypeBazel:
 		builder = bazel.New()
-	case ProjectTypeMeson:
+	case utils.ProjectTypeMeson:
 		builder = meson.New()
-	case ProjectTypeCMake:
+	case utils.ProjectTypeCMake:
 		builder = cmake.New()
 	default:
 		return fmt.Errorf("unsupported project type")

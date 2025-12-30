@@ -1,4 +1,4 @@
-package commands
+package utils
 
 import (
 	"bytes"
@@ -7,7 +7,6 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/ozacod/cpx/internal/utils/common"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -33,8 +32,8 @@ func TestPrintError(t *testing.T) {
 
 func TestCheckCommandExists(t *testing.T) {
 	// Save and restore the original execLookPath
-	oldExecLookPath := common.ExecLookPath
-	defer func() { common.ExecLookPath = oldExecLookPath }()
+	oldExecLookPath := ExecLookPath
+	defer func() { ExecLookPath = oldExecLookPath }()
 
 	tests := []struct {
 		name     string
@@ -58,7 +57,7 @@ func TestCheckCommandExists(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			common.ExecLookPath = func(file string) (string, error) {
+			ExecLookPath = func(file string) (string, error) {
 				if tt.mockErr != nil {
 					return "", tt.mockErr
 				}
@@ -195,8 +194,8 @@ func TestSpinner(t *testing.T) {
 
 func TestCheckBuildToolsForProject(t *testing.T) {
 	// Save and restore the original execLookPath
-	oldExecLookPath := common.ExecLookPath
-	defer func() { common.ExecLookPath = oldExecLookPath }()
+	oldExecLookPath := ExecLookPath
+	defer func() { ExecLookPath = oldExecLookPath }()
 
 	tests := []struct {
 		name         string
@@ -271,7 +270,7 @@ func TestCheckBuildToolsForProject(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			common.ExecLookPath = func(file string) (string, error) {
+			ExecLookPath = func(file string) (string, error) {
 				if tt.availableCmd[file] {
 					return "/usr/bin/" + file, nil
 				}
@@ -313,11 +312,11 @@ func containsSubstring(s, substr string) bool {
 
 func TestWarnMissingBuildTools(t *testing.T) {
 	// Save and restore the original execLookPath
-	oldExecLookPath := common.ExecLookPath
-	defer func() { common.ExecLookPath = oldExecLookPath }()
+	oldExecLookPath := ExecLookPath
+	defer func() { ExecLookPath = oldExecLookPath }()
 
 	t.Run("Prints warning when tools missing", func(t *testing.T) {
-		common.ExecLookPath = func(file string) (string, error) {
+		ExecLookPath = func(file string) (string, error) {
 			return "", exec.ErrNotFound
 		}
 
@@ -341,7 +340,7 @@ func TestWarnMissingBuildTools(t *testing.T) {
 	})
 
 	t.Run("No warning when all tools present", func(t *testing.T) {
-		common.ExecLookPath = func(file string) (string, error) {
+		ExecLookPath = func(file string) (string, error) {
 			return "/usr/bin/" + file, nil
 		}
 
@@ -385,8 +384,8 @@ func TestDefaultServerConstant(t *testing.T) {
 
 func TestCheckBuildToolsForVcpkgProject(t *testing.T) {
 	// Save original function
-	oldExecLookPath := common.ExecLookPath
-	defer func() { common.ExecLookPath = oldExecLookPath }()
+	oldExecLookPath := ExecLookPath
+	defer func() { ExecLookPath = oldExecLookPath }()
 
 	tmpDir := t.TempDir()
 	oldWd, err := os.Getwd()
@@ -395,7 +394,7 @@ func TestCheckBuildToolsForVcpkgProject(t *testing.T) {
 	require.NoError(t, os.Chdir(tmpDir))
 
 	t.Run("Vcpkg project missing cmake", func(t *testing.T) {
-		common.ExecLookPath = func(file string) (string, error) {
+		ExecLookPath = func(file string) (string, error) {
 			switch file {
 			case "make", "gcc", "g++":
 				return "/usr/bin/" + file, nil
@@ -418,7 +417,7 @@ func TestCheckBuildToolsForVcpkgProject(t *testing.T) {
 	})
 
 	t.Run("Vcpkg project missing compilers", func(t *testing.T) {
-		common.ExecLookPath = func(file string) (string, error) {
+		ExecLookPath = func(file string) (string, error) {
 			switch file {
 			case "cmake", "make":
 				return "/usr/bin/" + file, nil
@@ -446,11 +445,11 @@ func TestCheckBuildToolsForVcpkgProject(t *testing.T) {
 }
 
 func TestCheckBuildToolsForMesonProject_WithClang(t *testing.T) {
-	oldExecLookPath := common.ExecLookPath
-	defer func() { common.ExecLookPath = oldExecLookPath }()
+	oldExecLookPath := ExecLookPath
+	defer func() { ExecLookPath = oldExecLookPath }()
 
 	t.Run("Meson with clang compilers", func(t *testing.T) {
-		common.ExecLookPath = func(file string) (string, error) {
+		ExecLookPath = func(file string) (string, error) {
 			switch file {
 			case "meson", "ninja", "clang", "clang++":
 				return "/usr/bin/" + file, nil

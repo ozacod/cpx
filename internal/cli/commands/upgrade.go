@@ -12,6 +12,7 @@ import (
 	"strings"
 
 	"github.com/ozacod/cpx/internal/config"
+	"github.com/ozacod/cpx/internal/utils"
 	"github.com/ozacod/cpx/internal/utils/colors"
 	"github.com/spf13/cobra"
 )
@@ -77,7 +78,7 @@ func Upgrade(_ []string) {
 	}
 
 	latestVersion := strings.TrimPrefix(release.TagName, "v")
-	currentVersion := Version
+	currentVersion := utils.Version
 
 	if latestVersion == currentVersion {
 		fmt.Printf("%s You're already running the latest version (%s)%s\n", colors.Green, currentVersion, colors.Reset)

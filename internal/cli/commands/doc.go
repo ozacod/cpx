@@ -8,6 +8,7 @@ import (
 	"regexp"
 	"runtime"
 
+	"github.com/ozacod/cpx/internal/utils"
 	"github.com/ozacod/cpx/internal/utils/colors"
 	"github.com/spf13/cobra"
 )
@@ -66,7 +67,7 @@ func getProjectInfo() (name string, version string) {
 }
 
 func generateDocs(openBrowser bool) error {
-	if !CheckCommandExists("doxygen") {
+	if !utils.CheckCommandExists("doxygen") {
 		return fmt.Errorf("doxygen not found. Please install it first:\n  macOS: brew install doxygen\n  Ubuntu: sudo apt install doxygen")
 	}
 

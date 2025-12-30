@@ -1,23 +1,28 @@
-package commands
+package utils
 
 import (
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"runtime"
 
 	"github.com/ozacod/cpx/internal/config"
 	"github.com/ozacod/cpx/internal/utils/colors"
-	"github.com/ozacod/cpx/internal/utils/common"
+)
+
+var (
+	ExecLookPath = exec.LookPath
 )
 
 func CheckCommandExists(command string) bool {
-	_, err := common.ExecLookPath(command)
+	_, err := ExecLookPath(command)
 	return err == nil
 }
 
 func CheckFileExists(path string) bool {
-	return common.CheckFileExists(path)
+	_, err := os.Stat(path)
+	return err == nil
 }
 
 const Version = "1.3.1"
@@ -29,7 +34,7 @@ func PrintError(format string, args ...interface{}) {
 	fmt.Fprintf(os.Stderr, "%s✗ %s%s\n", colors.Red, msg, colors.Reset)
 }
 
-func requireVcpkgProject(cmdName string) error {
+func RequireVcpkgProject(cmdName string) error {
 	if _, err := os.Stat("vcpkg.json"); err != nil {
 		if os.IsNotExist(err) {
 			return fmt.Errorf("%s requires a vcpkg project (vcpkg.json not found)\n  hint: run inside a vcpkg manifest project or create one with cpx new", cmdName)
