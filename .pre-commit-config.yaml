@@ -11,7 +11,7 @@ repos:
     hooks:
       - id: go-test
         name: Run Go tests
-        entry: cd cpx && go test ./...
+        entry: go test ./...
         language: system
         pass_filenames: false
         always_run: true
@@ -19,7 +19,7 @@ repos:
 
       - id: go-mod-tidy
         name: Run go mod tidy
-        entry: cd cpx && go mod tidy
+        entry: go mod tidy
         language: system
         pass_filenames: false
         always_run: true
@@ -27,7 +27,7 @@ repos:
 
       - id: go-build
         name: Check Go build
-        entry: cd cpx && go build ./...
+        entry: go build ./...
         language: system
         pass_filenames: false
         always_run: true

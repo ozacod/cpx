@@ -32,7 +32,6 @@ type AddRunnerModel struct {
 	textInput textinput.Model
 	spinner   spinner.Model
 	cursor    int
-	err       error
 	errorMsg  string // Displayed error message
 	cancelled bool
 
@@ -53,8 +52,6 @@ type AddRunnerModel struct {
 	imageFilter      string
 	imageScrollStart int
 	maxVisibleImages int
-
-	currentQuestion string
 }
 
 type AddRunnerResult struct {
@@ -114,10 +111,11 @@ func (m AddRunnerModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "enter":
 			return m.handleEnter()
 		case "up", "down":
-			if m.step == RunnerStepDockerImage {
+			switch m.step {
+			case RunnerStepDockerImage:
 				m.handleImageListNav(msg.String())
 				return m, nil
-			} else if m.step == RunnerStepType {
+			case RunnerStepType:
 				if msg.String() == "up" && m.cursor > 0 {
 					m.cursor--
 				} else if msg.String() == "down" && m.cursor < len(m.typeOptions)-1 {
@@ -251,14 +249,15 @@ func (m *AddRunnerModel) handleImageListNav(key string) {
 	if len(m.filteredImages) == 0 {
 		return
 	}
-	if key == "up" {
+	switch key {
+	case "up":
 		if m.cursor > 0 {
 			m.cursor--
 		}
 		if m.cursor < m.imageScrollStart {
 			m.imageScrollStart--
 		}
-	} else if key == "down" {
+	case "down":
 		if m.cursor < len(m.filteredImages)-1 {
 			m.cursor++
 		}

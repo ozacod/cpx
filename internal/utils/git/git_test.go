@@ -156,7 +156,9 @@ func TestFilterGitTrackedFiles_WithTargets(t *testing.T) {
 	assert.Equal(t, 2, len(files))
 	for _, file := range files {
 		absFile, _ := filepath.Abs(file)
-		assert.True(t, filepath.HasPrefix(absFile, srcAbs) || absFile == srcAbs,
+		rel, err := filepath.Rel(srcAbs, absFile)
+		assert.NoError(t, err)
+		assert.False(t, rel == ".." || len(rel) > 2 && rel[:3] == ".."+string(filepath.Separator),
 			"File %s should be in src directory", file)
 	}
 }

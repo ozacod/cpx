@@ -101,16 +101,18 @@ func (m ToolchainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 			}
 		case "down", "j":
-			if m.step == ToolchainStepRunner {
+			switch m.step {
+			case ToolchainStepRunner:
 				if m.cursor < len(m.runnerOptions)-1 {
 					m.cursor++
 				}
-			} else if m.step == ToolchainStepBuildType {
+			case ToolchainStepBuildType:
 				if m.cursor < len(m.buildTypeOptions)-1 {
 					m.cursor++
 				}
 			}
 		}
+
 	}
 
 	if m.step == ToolchainStepName || m.step == ToolchainStepCompilerCC || m.step == ToolchainStepCompilerCXX || m.step == ToolchainStepCMakeToolchain {
