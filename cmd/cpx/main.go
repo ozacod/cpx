@@ -43,14 +43,14 @@ func main() {
 	rootCmd.AddCommand(commands.AddRunnerCmd())
 	rootCmd.AddCommand(commands.RmToolchainCmd())
 	rootCmd.AddCommand(commands.RmRunnerCmd())
+	rootCmd.AddCommand(commands.VersionCmd())
 
 	// Handle vcpkg passthrough for specific commands only,
 	// Only forward: install, remove, add-port
 	if len(os.Args) > 1 {
 		command := os.Args[1]
-		// Skip version/help flags - cobra handles these
-		if command != "-v" && command != "--version" && command != "version" &&
-			command != "-h" && command != "--help" && command != "help" {
+		// Skip help flags - cobra handles these
+		if command != "-h" && command != "--help" && command != "help" {
 			// Check if it's a known command
 			found := false
 			for _, c := range rootCmd.Commands() {

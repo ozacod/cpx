@@ -13,7 +13,6 @@ var rootCmd = &cobra.Command{
 	Long: `cpx - Cargo-like DX for modern C++
 
 Generate, build, lint, test, and ship CMake/vcpkg-based C++ projects with sensible defaults and cross-compilation ready Docker targets.`,
-	Version: utils.Version,
 	// Don't show usage on errors by default
 	SilenceUsage:  true,
 	SilenceErrors: true, // handle printing ourselves in Execute
