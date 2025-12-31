@@ -593,6 +593,14 @@ func (b *Builder) GenerateReadme(config build.InitConfig) string {
 	return templates.GenerateMesonReadme(config.Name, config.CppStandard, config.IsLibrary)
 }
 
+func (b *Builder) Update() error {
+	return fmt.Errorf("update command not implemented for Meson projects")
+}
+
+func (b *Builder) Upgrade() error {
+	return fmt.Errorf("upgrade command not implemented for Meson projects")
+}
+
 func (b *Builder) downloadWrap(projectPath, wrapName string) error {
 	// Ensure meson is available (already checked usually)
 

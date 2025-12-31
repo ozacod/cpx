@@ -631,4 +631,12 @@ func (b *Builder) GenerateReadme(config build.InitConfig) string {
 	return templates.GenerateCMakeReadme(config.Name, config.CppStandard, config.IsLibrary)
 }
 
+func (b *Builder) Update() error {
+	return fmt.Errorf("update command not implemented for CMake projects")
+}
+
+func (b *Builder) Upgrade() error {
+	return fmt.Errorf("upgrade command not implemented for CMake projects")
+}
+
 var _ build.BuildSystem = (*Builder)(nil)

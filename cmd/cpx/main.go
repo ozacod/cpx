@@ -32,11 +32,12 @@ func main() {
 
 	rootCmd.AddCommand(commands.DocCmd())
 	rootCmd.AddCommand(commands.ReleaseCmd())
-	rootCmd.AddCommand(commands.UpgradeCmd())
+	rootCmd.AddCommand(commands.SelfUpgradeCmd())
 	rootCmd.AddCommand(commands.ConfigCmd())
 	rootCmd.AddCommand(commands.WorkflowCmd())
 	rootCmd.AddCommand(commands.HooksCmd())
 	rootCmd.AddCommand(commands.UpdateCmd())
+	rootCmd.AddCommand(commands.UpgradeCmd())
 
 	// Toolchain, Runner management (simplified design)
 	rootCmd.AddCommand(commands.AddToolchainCmd())

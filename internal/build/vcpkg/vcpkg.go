@@ -293,6 +293,94 @@ func (b *Builder) GenerateReadme(config build.InitConfig) string {
 	return templates.GenerateVcpkgReadme(config.Name, config.CppStandard, config.IsLibrary)
 }
 
+func (b *Builder) Update() error {
+	if err := b.SetupEnv(); err != nil {
+		return err
+	}
+
+	vcpkgPath, err := b.GetPath()
+	if err != nil {
+		return fmt.Errorf("vcpkg not configured: %w", err)
+	}
+
+	// Check if we're in manifest mode (vcpkg.json exists)
+	if _, err := os.Stat(common.VcpkgManifest); err == nil {
+		fmt.Printf("%s Checking baseline status...%s\n", colors.Cyan, colors.Reset)
+		fmt.Printf("\nIn manifest mode, packages are pinned to a baseline in vcpkg.json.\n")
+		fmt.Printf("To update to latest versions, run: %scpx upgrade%s\n\n", colors.Cyan, colors.Reset)
+
+		// Show current dependencies
+		deps, err := b.ListDependencies()
+		if err == nil && len(deps) > 0 {
+			fmt.Printf("Current dependencies:\n")
+			for _, dep := range deps {
+				if dep.Version != "" {
+					fmt.Printf("  %s%s%s @ %s\n", colors.Green, dep.Name, colors.Reset, dep.Version)
+				} else {
+					fmt.Printf("  %s%s%s\n", colors.Green, dep.Name, colors.Reset)
+				}
+			}
+		}
+		return nil
+	}
+
+	// Classic mode - use vcpkg update
+	fmt.Printf("%s Checking for outdated packages...%s\n", colors.Cyan, colors.Reset)
+
+	cmd := execCommand(vcpkgPath, "update")
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("vcpkg update failed: %w", err)
+	}
+
+	return nil
+}
+
+func (b *Builder) Upgrade() error {
+	if err := b.SetupEnv(); err != nil {
+		return err
+	}
+
+	vcpkgPath, err := b.GetPath()
+	if err != nil {
+		return fmt.Errorf("vcpkg not configured: %w", err)
+	}
+
+	// Check if we're in manifest mode (vcpkg.json exists)
+	if _, err := os.Stat(common.VcpkgManifest); err == nil {
+		fmt.Printf("%s Updating baseline to latest...%s\n", colors.Cyan, colors.Reset)
+
+		// Use x-update-baseline to update the baseline in vcpkg.json
+		cmd := execCommand(vcpkgPath, "x-update-baseline", "--add-initial-baseline")
+		cmd.Stdout = os.Stdout
+		cmd.Stderr = os.Stderr
+
+		if err := cmd.Run(); err != nil {
+			return fmt.Errorf("vcpkg x-update-baseline failed: %w", err)
+		}
+
+		fmt.Printf("\n%s Baseline updated! Run %scpx build%s to install updated packages.%s\n",
+			colors.Green, colors.Cyan, colors.Green, colors.Reset)
+		return nil
+	}
+
+	// Classic mode - use vcpkg upgrade
+	fmt.Printf("%s Upgrading packages...%s\n", colors.Cyan, colors.Reset)
+
+	cmd := execCommand(vcpkgPath, "upgrade", "--no-dry-run")
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("vcpkg upgrade failed: %w", err)
+	}
+
+	fmt.Printf("%s Packages upgraded successfully!%s\n", colors.Green, colors.Reset)
+	return nil
+}
+
 func (b *Builder) Build(opts build.BuildOptions) error {
 	// Set VCPKG_ROOT from cpx config if not already set
 	if err := b.SetupEnv(); err != nil {

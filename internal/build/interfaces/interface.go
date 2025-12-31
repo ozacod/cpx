@@ -125,6 +125,12 @@ type BuildSystem interface {
 
 	// GenerateReadme generates the README.md content for the project.
 	GenerateReadme(config InitConfig) string
+
+	// Update checks for outdated dependencies.
+	Update() error
+
+	// Upgrade upgrades dependencies to newer versions.
+	Upgrade() error
 }
 
 // InitConfig contains configuration for initializing a new project.

@@ -162,12 +162,13 @@ Google's multi-language build system. `cpx` manages `MODULE.bazel` (Bzlmod).
 | `search`                   | Search for libraries interactively                                     |
 | `info <pkg>`               | Show detailed library information                                      |
 | `list`                     | List available libraries                                               |
-| `update`                   | Update dependencies to latest versions                                 |
+| `update`                   | Check for outdated dependencies                                        |
+| `upgrade`                  | Upgrade dependencies to newer versions                                 |
 | `doc`                      | Generate documentation                                                 |
 | `release`                  | Bump version number                                                    |
 | `hooks`                    | Install git hooks                                                      |
 | `workflow`                 | Generate CI/CD workflow files                                          |
-| `upgrade`                  | Self-update to the latest version                                      |
+| `self-upgrade`             | Self-update cpx to the latest version                                  |
 
 ### Cross-Compilation & Toolchains
 
@@ -215,12 +216,19 @@ toolchains:
 |-------------------------|--------------------------|
 | `config set-vcpkg-root` | Set vcpkg root directory |
 
-### Upgrade Commands (`cpx upgrade`)
+### Self-Upgrade Commands (`cpx self-upgrade`)
 
-| Command         | Description                           |
-|-----------------|---------------------------------------|
-| `upgrade`       | Self-update cpx to the latest version |
-| `upgrade vcpkg` | Update vcpkg via git pull + bootstrap |
+| Command              | Description                           |
+|----------------------|---------------------------------------|
+| `self-upgrade`       | Self-update cpx to the latest version |
+| `self-upgrade vcpkg` | Update vcpkg via git pull + bootstrap |
+
+### Dependency Commands
+
+| Command   | Description                                      |
+|-----------|--------------------------------------------------|
+| `update`  | Check for outdated packages (like `vcpkg update`)|
+| `upgrade` | Upgrade packages to newer versions               |
 
 ## Shortcuts Cheat Sheet
 
