@@ -25,7 +25,7 @@ func CheckFileExists(path string) bool {
 	return err == nil
 }
 
-const Version = "1.3.2"
+const Version = "1.3.3"
 
 const DefaultServer = "https://cpx-dev.vercel.app"
 
