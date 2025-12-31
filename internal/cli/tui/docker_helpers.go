@@ -104,22 +104,6 @@ func getImageArchitectures(imageIDs []string) map[string]string {
 	return archMap
 }
 
-func detectProjectType() string {
-	if utils.CheckFileExists("vcpkg.json") {
-		return "vcpkg"
-	}
-	if utils.CheckFileExists("BUILD.bazel") || utils.CheckFileExists("WORKSPACE") || utils.CheckFileExists("MODULE.bazel") {
-		return "bazel"
-	}
-	if utils.CheckFileExists("meson.build") {
-		return "meson"
-	}
-	if utils.CheckFileExists("CMakeLists.txt") {
-		return "cmake"
-	}
-	return "unknown"
-}
-
 func checkDockerImageHasCommand(image, command string) bool {
 	cmd := exec.Command("docker", "run", "--rm", "--entrypoint", "which", image, command)
 	done := make(chan error, 1)
@@ -136,11 +120,11 @@ func checkDockerImageHasCommand(image, command string) bool {
 	}
 }
 
-func checkBuildToolsInDockerImage(image string, projectType string) []string {
+func checkBuildToolsInDockerImage(image string, projectType utils.ProjectType) []string {
 	var missing []string
 
 	switch projectType {
-	case "vcpkg", "cmake":
+	case utils.ProjectTypeVcpkg, utils.ProjectTypeCMake:
 		if !checkDockerImageHasCommand(image, "cmake") {
 			missing = append(missing, "cmake")
 		}
@@ -159,13 +143,13 @@ func checkBuildToolsInDockerImage(image string, projectType string) []string {
 		if !hasGPP && !hasClangPP {
 			missing = append(missing, "C++ compiler")
 		}
-	case "bazel":
+	case utils.ProjectTypeBazel:
 		hasBazel := checkDockerImageHasCommand(image, "bazel")
 		hasBazelisk := checkDockerImageHasCommand(image, "bazelisk")
 		if !hasBazel && !hasBazelisk {
 			missing = append(missing, "bazel or bazelisk")
 		}
-	case "meson":
+	case utils.ProjectTypeMeson:
 		if !checkDockerImageHasCommand(image, "meson") {
 			missing = append(missing, "meson")
 		}
@@ -189,8 +173,8 @@ func checkBuildToolsInDockerImage(image string, projectType string) []string {
 
 func checkImageToolsCmd(image string) tea.Cmd {
 	return func() tea.Msg {
-		projectType := detectProjectType()
-		if projectType != "unknown" {
+		projectType := utils.DetectProjectType()
+		if projectType != utils.ProjectTypeUnknown {
 			missingTools := checkBuildToolsInDockerImage(image, projectType)
 			if len(missingTools) > 0 {
 				return ImageCheckResult{
