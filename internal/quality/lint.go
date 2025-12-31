@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/ozacod/cpx/internal/build/common"
 	"github.com/ozacod/cpx/internal/utils/colors"
 	"github.com/ozacod/cpx/internal/utils/git"
 )
@@ -68,7 +69,7 @@ func LintCode(fix bool, vcpkg VcpkgSetup) error {
 		}
 
 		// Use .cache/native/debug for consistency with build command
-		buildDir = filepath.Join(".cache", "native", "debug")
+		buildDir = filepath.Join(common.NativeCacheDir(), "debug")
 		compileDb = filepath.Join(buildDir, "compile_commands.json")
 		needsRegenerate := false
 
@@ -100,7 +101,7 @@ func LintCode(fix bool, vcpkg VcpkgSetup) error {
 			// Configure CMake with vcpkg toolchain
 			// Use shared vcpkg_installed directory
 			cwd, _ := os.Getwd()
-			vcpkgInstalledDir := filepath.Join(cwd, ".cache", "native", "vcpkg_installed")
+			vcpkgInstalledDir := filepath.Join(cwd, common.NativeCacheDir(), "vcpkg_installed")
 			vcpkgInstallArg := "-DVCPKG_INSTALLED_DIR=" + vcpkgInstalledDir
 
 			cmakeArgs := []string{

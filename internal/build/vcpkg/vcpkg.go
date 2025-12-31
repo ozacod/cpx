@@ -96,7 +96,7 @@ type configureOptions struct {
 func (b *Builder) configureCMake(opts configureOptions) error {
 	// Determine absolute path for shared vcpkg_installed directory
 	cwd, _ := os.Getwd()
-	vcpkgInstalledDir := filepath.Join(cwd, ".cache", "native", "vcpkg_installed")
+	vcpkgInstalledDir := filepath.Join(cwd, common.NativeCacheDir(), "vcpkg_installed")
 	vcpkgInstallArg := "-DVCPKG_INSTALLED_DIR=" + vcpkgInstalledDir
 
 	// Get vcpkg toolchain file path
@@ -314,9 +314,9 @@ func (b *Builder) Build(opts build.BuildOptions) error {
 
 	// Use hidden cache directory for build artifacts
 	// .cache/native/<variant>
-	cacheBuildDir := filepath.Join(".cache", "native", outDirName)
+	cacheBuildDir := filepath.Join(common.NativeCacheDir(), outDirName)
 	// Final executables go to .bin/native/<variant>
-	finalBuildDir := filepath.Join(".bin", "native", outDirName)
+	finalBuildDir := filepath.Join(common.NativeOutputDir(), outDirName)
 
 	if opts.Clean {
 		if opts.Verbose {
@@ -471,7 +471,7 @@ func (b *Builder) Test(opts build.TestOptions) error {
 	}
 
 	// Run tests with CTest
-	buildDir := filepath.Join(".cache", "native", "test")
+	buildDir := filepath.Join(common.NativeCacheDir(), "test")
 
 	fmt.Printf("%s▸ Running tests...%s\n", colors.Cyan, colors.Reset)
 
@@ -521,7 +521,7 @@ func (b *Builder) Run(opts build.RunOptions) error {
 
 	// Determine where artifacts are
 	outDirName := build.GetOutputDir(opts.Release, opts.OptLevel, opts.Sanitizer)
-	finalBuildDir := filepath.Join(".bin", "native", outDirName)
+	finalBuildDir := filepath.Join(common.NativeOutputDir(), outDirName)
 
 	// Find executable to run (in finalBuildDir)
 	var execPath string
@@ -604,7 +604,7 @@ func (b *Builder) Bench(opts build.BenchOptions) error {
 	}
 
 	// Run benchmarks
-	buildDir := filepath.Join(".cache", "native", "bench")
+	buildDir := filepath.Join(common.NativeCacheDir(), "bench")
 
 	fmt.Printf("%s▸ Running benchmarks...%s\n", colors.Cyan, colors.Reset)
 
@@ -643,21 +643,21 @@ func (b *Builder) Clean(opts build.CleanOptions) error {
 	fmt.Printf("%sCleaning CMake/vcpkg project...%s\n", colors.Cyan, colors.Reset)
 
 	// Remove bin directory (artifacts)
-	common.RemoveDir(filepath.Join(".bin", "native"))
+	common.RemoveDir(common.NativeOutputDir())
 
 	// Remove intermediate build directories (keep vcpkg_installed unless --all)
 	// We iterate common variants instead of blowing away .cache/native
 	variants := []string{"debug", "release", "O0", "O1", "O2", "O3", "Os", "Ofast", "test", "bench"}
 	for _, v := range variants {
-		common.RemoveDir(filepath.Join(".cache", "native", v))
+		common.RemoveDir(filepath.Join(common.NativeCacheDir(), v))
 	}
 
 	if opts.All {
 		// Clean everything including vcpkg dependencies and CI artifacts
 		dirsToRemove := []string{
-			filepath.Join(".cache", "native"),
-			filepath.Join(".cache", "ci"),
-			filepath.Join(".bin", "ci"),
+			common.NativeCacheDir(),
+			filepath.Join(common.CacheDir, "ci"),
+			filepath.Join(common.OutputDir, "ci"),
 			"out",
 			"cmake-build-debug",
 			"cmake-build-release",
@@ -1004,7 +1004,7 @@ var _ build.BuildSystem = (*Builder)(nil)
 
 func (b *Builder) ListTargets() ([]string, error) {
 	// Look for any configured build directory in .cache/native
-	cacheDir := filepath.Join(".cache", "native")
+	cacheDir := common.NativeCacheDir()
 	entries, err := os.ReadDir(cacheDir)
 	if err != nil {
 		if os.IsNotExist(err) {

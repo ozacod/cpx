@@ -132,7 +132,7 @@ func (b *Builder) Build(opts build.BuildOptions) error {
 
 	// Determine output directory based on config
 	outDirName := build.GetOutputDir(opts.Release, opts.OptLevel, opts.Sanitizer)
-	outputDir := filepath.Join(".bin", "native", outDirName)
+	outputDir := filepath.Join(common.NativeOutputDir(), outDirName)
 
 	// Copy artifacts to output directory
 	if err := os.MkdirAll(outputDir, 0755); err != nil {

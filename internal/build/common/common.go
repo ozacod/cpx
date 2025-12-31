@@ -20,6 +20,23 @@ import (
 	"github.com/schollz/progressbar/v3"
 )
 
+// Build directory constants
+const (
+	CacheDir  = ".cache"
+	OutputDir = ".bin"
+	NativeDir = "native"
+)
+
+// NativeCacheDir returns the path to the native cache directory (.cache/native)
+func NativeCacheDir() string {
+	return filepath.Join(CacheDir, NativeDir)
+}
+
+// NativeOutputDir returns the path to the native output directory (.bin/native)
+func NativeOutputDir() string {
+	return filepath.Join(OutputDir, NativeDir)
+}
+
 // ExecCommand is a variable that points to exec.Command by default.
 // It can be overridden in tests to mock command execution.
 var ExecCommand = exec.Command

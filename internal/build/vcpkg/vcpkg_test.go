@@ -41,20 +41,20 @@ func TestClean(t *testing.T) {
 		{
 			name:          "Clean without all flag",
 			all:           false,
-			expectRemoved: []string{".bin/native"},
+			expectRemoved: []string{common.NativeOutputDir()},
 		},
 		{
 			name:          "Clean with all flag",
 			all:           true,
-			expectRemoved: []string{".bin/native", ".bin/ci", "out", "cmake-build-debug", "build-release"},
+			expectRemoved: []string{common.NativeOutputDir(), filepath.Join(common.OutputDir, "ci"), "out", "cmake-build-debug", "build-release"},
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// Recreate dirs for each test
-			_ = os.MkdirAll(".bin/native", 0755)
-			_ = os.MkdirAll(".bin/ci", 0755)
+			_ = os.MkdirAll(common.NativeOutputDir(), 0755)
+			_ = os.MkdirAll(filepath.Join(common.OutputDir, "ci"), 0755)
 			_ = os.MkdirAll("out", 0755)
 			_ = os.MkdirAll("cmake-build-debug", 0755)
 			_ = os.MkdirAll("build-release", 0755)
@@ -119,7 +119,7 @@ func TestBuild(t *testing.T) {
 
 	// Build dir and dummy cache to avoid configure failing
 	outDir := build.GetOutputDir(true, "", "")
-	cacheDir := filepath.Join(".cache", "native", outDir)
+	cacheDir := filepath.Join(common.NativeCacheDir(), outDir)
 	_ = os.MkdirAll(cacheDir, 0755)
 	_ = os.WriteFile(filepath.Join(cacheDir, "CMakeCache.txt"), []byte(""), 0644)
 
@@ -166,7 +166,7 @@ func TestTest(t *testing.T) {
 	_ = os.WriteFile("CMakeLists.txt", []byte("project(test)"), 0644)
 
 	// Ensure cache build dir exists for TestTest and has cache
-	testCacheDir := ".cache/native/test"
+	testCacheDir := filepath.Join(common.NativeCacheDir(), "test")
 	_ = os.MkdirAll(testCacheDir, 0755)
 	_ = os.WriteFile(filepath.Join(testCacheDir, "CMakeCache.txt"), []byte(""), 0644)
 
@@ -212,11 +212,11 @@ func TestRun(t *testing.T) {
 
 	// Mock build output and cache
 	outDir := build.GetOutputDir(false, "", "")
-	cacheDir := filepath.Join(".cache", "native", outDir)
+	cacheDir := filepath.Join(common.NativeCacheDir(), outDir)
 	_ = os.MkdirAll(cacheDir, 0755)
 	_ = os.WriteFile(filepath.Join(cacheDir, "CMakeCache.txt"), []byte(""), 0644)
 
-	binDir := filepath.Join(".bin", "native", outDir)
+	binDir := filepath.Join(common.NativeOutputDir(), outDir)
 	_ = os.MkdirAll(binDir, 0755)
 	exePath := filepath.Join(binDir, "test")
 	_ = os.WriteFile(exePath, []byte(""), 0755)

@@ -289,7 +289,7 @@ project(myapp VERSION 1.0)
 
 	// Create output directory with mock benchmark executable
 	// The Bench function looks in .cache/native/bench/bench/ and .cache/native/bench/
-	outputDir := filepath.Join(".cache", "native", "bench")
+	outputDir := filepath.Join(common.NativeCacheDir(), "bench")
 	require.NoError(t, os.MkdirAll(outputDir, 0755))
 	require.NoError(t, os.WriteFile(filepath.Join(outputDir, "myapp_bench"), []byte("#!/bin/sh\necho bench"), 0755))
 
@@ -326,20 +326,20 @@ func TestClean(t *testing.T) {
 		{
 			name:          "Clean without all flag",
 			all:           false,
-			expectRemoved: []string{".cache/native", ".bin/native"},
+			expectRemoved: []string{common.NativeCacheDir(), common.NativeOutputDir()},
 		},
 		{
 			name:          "Clean with all flag",
 			all:           true,
-			expectRemoved: []string{".cache/native", ".bin/native", "build", "build-release"},
+			expectRemoved: []string{common.NativeCacheDir(), common.NativeOutputDir(), "build", "build-release"},
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// Recreate dirs for each test
-			_ = os.MkdirAll(".cache/native/debug", 0755)
-			_ = os.MkdirAll(".bin/native/debug", 0755)
+			_ = os.MkdirAll(filepath.Join(common.NativeCacheDir(), "debug"), 0755)
+			_ = os.MkdirAll(filepath.Join(common.NativeOutputDir(), "debug"), 0755)
 			_ = os.MkdirAll("build", 0755)
 			_ = os.MkdirAll("build-release", 0755)
 
@@ -423,7 +423,7 @@ func TestListTargets(t *testing.T) {
 	_ = os.Chdir(tmpDir)
 
 	// Create build directory
-	_ = os.MkdirAll(".cache/native/debug", 0755)
+	_ = os.MkdirAll(filepath.Join(common.NativeCacheDir(), "debug"), 0755)
 
 	// Create CMakeLists.txt with targets
 	require.NoError(t, os.WriteFile("CMakeLists.txt", []byte(`
@@ -457,7 +457,7 @@ func TestListTargetsFallback(t *testing.T) {
 	_ = os.Chdir(tmpDir)
 
 	// Create build directory
-	_ = os.MkdirAll(".cache/native/debug", 0755)
+	_ = os.MkdirAll(filepath.Join(common.NativeCacheDir(), "debug"), 0755)
 
 	// Create CMakeLists.txt with targets
 	require.NoError(t, os.WriteFile("CMakeLists.txt", []byte(`

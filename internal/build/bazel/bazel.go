@@ -250,7 +250,7 @@ func (b *Builder) Build(opts build.BuildOptions) error {
 
 	// Determine output directory based on config
 	outDirName := build.GetOutputDir(opts.Release, opts.OptLevel, opts.Sanitizer)
-	outputDir := filepath.Join(".bin", "native", outDirName)
+	outputDir := filepath.Join(common.NativeOutputDir(), outDirName)
 
 	// Copy artifacts to build/<config>/ directory
 	// Remove existing build artifacts for this config first

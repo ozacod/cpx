@@ -37,8 +37,8 @@ func (b *Builder) Build(opts build.BuildOptions) error {
 
 	// Determine output directory based on options
 	outputDir := build.GetOutputDir(opts.Release, opts.OptLevel, opts.Sanitizer)
-	buildDir := filepath.Join(".cache", "native", outputDir)
-	finalDir := filepath.Join(".bin", "native", outputDir)
+	buildDir := filepath.Join(common.NativeCacheDir(), outputDir)
+	finalDir := filepath.Join(common.NativeOutputDir(), outputDir)
 
 	// Determine build type and flags
 	buildType, cxxFlags := common.DetermineBuildType(opts.Release, opts.OptLevel)
@@ -174,7 +174,7 @@ func (b *Builder) Test(opts build.TestOptions) error {
 
 	fmt.Printf("%s Running tests for '%s'...%s\n", colors.Cyan, projectName, colors.Reset)
 
-	buildDir := filepath.Join(".cache", "native", "test")
+	buildDir := filepath.Join(common.NativeCacheDir(), "test")
 
 	// Check if configure is needed
 	needsConfigure := false
@@ -267,7 +267,7 @@ func (b *Builder) Run(opts build.RunOptions) error {
 
 	// Find executable
 	outputDir := build.GetOutputDir(opts.Release, opts.OptLevel, opts.Sanitizer)
-	binDir := filepath.Join(".bin", "native", outputDir)
+	binDir := filepath.Join(common.NativeOutputDir(), outputDir)
 
 	var exePath string
 	if opts.Target != "" {
@@ -317,7 +317,7 @@ func (b *Builder) Bench(opts build.BenchOptions) error {
 	fmt.Printf("%s Running benchmarks for '%s'...%s\n", colors.Cyan, projectName, colors.Reset)
 
 	// Use .cache/native/bench for building benchmarks (separate from normal builds)
-	buildDir := filepath.Join(".cache", "native", "bench")
+	buildDir := filepath.Join(common.NativeCacheDir(), "bench")
 	benchTarget := projectName + "_bench"
 	if opts.Target != "" {
 		benchTarget = opts.Target
@@ -425,11 +425,11 @@ func (b *Builder) Bench(opts build.BenchOptions) error {
 func (b *Builder) Clean(opts build.CleanOptions) error {
 	fmt.Printf("%sCleaning CMake project...%s\n", colors.Cyan, colors.Reset)
 
-	// Remove cache directory
-	common.RemoveDir(".cache/native")
+	// Remove the cache directory
+	common.RemoveDir(common.NativeCacheDir())
 
-	// Remove build output directory
-	common.RemoveDir(".bin/native")
+	// Remove the build output directory
+	common.RemoveDir(common.NativeOutputDir())
 
 	if opts.All {
 		// Remove any build directories
@@ -494,7 +494,11 @@ func (b *Builder) DependencyInfo(_ string) (*build.DependencyInfo, error) {
 
 func (b *Builder) ListTargets() ([]string, error) {
 	// Try to find a build directory
-	buildDirs := []string{".cache/native/debug", ".cache/native/release", "build"}
+	buildDirs := []string{
+		filepath.Join(common.NativeCacheDir(), "debug"),
+		filepath.Join(common.NativeCacheDir(), "release"),
+		"build",
+	}
 	var buildDir string
 
 	for _, dir := range buildDirs {
