@@ -29,9 +29,7 @@ func NewCmd() *cobra.Command {
 		Long:  "Create a new C++ project using an interactive TUI. This will guide you through the project configuration.",
 		Example: `  cpx new            # launch the interactive creator
   cpx new --help    # view options`,
-		RunE: func(cmd *cobra.Command, args []string) error {
-			return runNew(cmd, args)
-		},
+		RunE: runNew,
 		Args: cobra.NoArgs,
 	}
 
