@@ -124,8 +124,8 @@ cpx lint             # Run linter
 ## Supported Build Systems
 
 ### CMake + vcpkg (Default)
-The gold standard for modern C++. `cpx` generates `CMakePresets.json` and manages `vcpkg.json` for you.
-- **Add deps**: `cpx add nlohmann-json` updates `vcpkg.json`.- **Build**: Uses CMake Presets (`debug`, `release`).
+The gold standard for modern C++. `cpx` manages `vcpkg.json` and cmake configuration for you.
+- **Add deps**: `cpx add nlohmann-json` updates `vcpkg.json`.- **Build**: Uses CMake with vcpkg toolchain file.
 
 #### Standalone CMake
 `cpx` also supports standard CMake projects without vcpkg. If `vcpkg.json` is missing but `CMakeLists.txt` is present, `cpx` will treat it as a standalone CMake project.

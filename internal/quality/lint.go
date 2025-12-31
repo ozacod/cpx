@@ -105,20 +105,10 @@ func LintCode(fix bool, vcpkg VcpkgSetup) error {
 
 			cmakeArgs := []string{
 				"-B", buildDir,
+				"-G", "Ninja",
 				"-DCMAKE_EXPORT_COMPILE_COMMANDS=ON",
 				"-DCMAKE_TOOLCHAIN_FILE=" + toolchainFile,
 				vcpkgInstallArg,
-			}
-
-			// Check if CMakePresets.json exists and use it
-			if _, err := os.Stat("CMakePresets.json"); err == nil {
-				// Use preset if available
-				cmakeArgs = []string{
-					"--preset", "default",
-					"-B", buildDir,
-					"-DCMAKE_EXPORT_COMPILE_COMMANDS=ON",
-					vcpkgInstallArg,
-				}
 			}
 
 			cmd := exec.Command("cmake", cmakeArgs...)

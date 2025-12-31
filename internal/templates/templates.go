@@ -261,26 +261,6 @@ endif()
 	return sb.String()
 }
 
-func GenerateCMakePresets() string {
-	return `{
-  "version": 2,
-  "configurePresets": [
-    {
-      "name": "default",
-      "generator": "Ninja",
-      "binaryDir": "${sourceDir}/build",
-      "environment": {
-        "VCPKG_DISABLE_REGISTRY_UPDATE": "1"
-      },
-      "cacheVariables": {
-        "CMAKE_TOOLCHAIN_FILE": "$env{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake"
-      }
-    }
-  ]
-}
-`
-}
-
 func GenerateTestCMake(projectName string, testingFramework string) string {
 	hasGtest := testingFramework == "googletest"
 	hasCatch2 := testingFramework == "catch2"
@@ -628,7 +608,6 @@ A C++ library using vcpkg for dependency management.
 ## Building
 
 %sbash
-cmake --preset=default
 cmake --build build
 %s
 
@@ -671,7 +650,6 @@ A C++ project using vcpkg for dependency management.
 ## Building
 
 %sbash
-cmake --preset=default
 cmake --build build
 %s
 

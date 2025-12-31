@@ -99,14 +99,19 @@ func (b *Builder) configureCMake(opts configureOptions) error {
 	vcpkgInstalledDir := filepath.Join(cwd, ".cache", "native", "vcpkg_installed")
 	vcpkgInstallArg := "-DVCPKG_INSTALLED_DIR=" + vcpkgInstalledDir
 
-	var cmdArgs []string
+	// Get vcpkg toolchain file path
+	vcpkgRoot := os.Getenv("VCPKG_ROOT")
+	if vcpkgRoot == "" {
+		return fmt.Errorf("VCPKG_ROOT not set. Run: cpx config set-vcpkg-root <path>")
+	}
+	toolchainFile := filepath.Join(vcpkgRoot, "scripts", "buildsystems", "vcpkg.cmake")
 
-	hasPresets := false
-	if _, err := os.Stat("CMakePresets.json"); err == nil {
-		hasPresets = true
-		cmdArgs = []string{"--preset=default", "-B", opts.buildDir, vcpkgInstallArg}
-	} else {
-		cmdArgs = []string{"-B", opts.buildDir, "-DCMAKE_BUILD_TYPE=" + opts.buildType, vcpkgInstallArg}
+	cmdArgs := []string{
+		"-B", opts.buildDir,
+		"-G", "Ninja",
+		"-DCMAKE_BUILD_TYPE=" + opts.buildType,
+		"-DCMAKE_TOOLCHAIN_FILE=" + toolchainFile,
+		vcpkgInstallArg,
 	}
 
 	if opts.cxxFlags != "" {
@@ -122,29 +127,19 @@ func (b *Builder) configureCMake(opts configureOptions) error {
 	if opts.enableBenchmarks {
 		cmdArgs = append(cmdArgs, "-DENABLE_BENCHMARKS=ON")
 		// Force Release build type for benchmarks
-		if !hasPresets {
-			// Update build type to Release for benchmarks
-			for i, arg := range cmdArgs {
-				if strings.HasPrefix(arg, "-DCMAKE_BUILD_TYPE=") {
-					cmdArgs[i] = "-DCMAKE_BUILD_TYPE=Release"
-					break
-				}
+		for i, arg := range cmdArgs {
+			if strings.HasPrefix(arg, "-DCMAKE_BUILD_TYPE=") {
+				cmdArgs[i] = "-DCMAKE_BUILD_TYPE=Release"
+				break
 			}
-		} else {
-			cmdArgs = append(cmdArgs, "-DCMAKE_BUILD_TYPE=Release")
 		}
 	}
 
 	cmd := execCommand("cmake", cmdArgs...)
 	cmd.Env = os.Environ()
 
-	presetInfo := ""
-	if hasPresets {
-		presetInfo = " (preset 'default')"
-	}
-
 	if err := common.RunCMakeConfigure(cmd, opts.verbose); err != nil {
-		return fmt.Errorf("cmake configure failed%s: %w", presetInfo, err)
+		return fmt.Errorf("cmake configure failed: %w", err)
 	}
 
 	return nil
@@ -255,12 +250,6 @@ func (b *Builder) GenerateBuildSrc(projectPath string, config build.InitConfig) 
 	})
 	if err := os.WriteFile(filepath.Join(projectPath, "CMakeLists.txt"), []byte(cmakeLists), 0644); err != nil {
 		return fmt.Errorf("failed to write CMakeLists.txt: %w", err)
-	}
-
-	// Generate CMakePresets.json
-	cmakePresets := templates.GenerateCMakePresets()
-	if err := os.WriteFile(filepath.Join(projectPath, "CMakePresets.json"), []byte(cmakePresets), 0644); err != nil {
-		return fmt.Errorf("failed to write CMakePresets.json: %w", err)
 	}
 
 	return nil

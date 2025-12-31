@@ -650,14 +650,6 @@ func TestGenerateVcpkgCMakeLists(t *testing.T) {
 	}
 }
 
-func TestGenerateCMakePresets(t *testing.T) {
-	result := GenerateCMakePresets()
-
-	assert.Contains(t, result, "configurePresets")
-	assert.Contains(t, result, "VCPKG_ROOT")
-	assert.Contains(t, result, "vcpkg.cmake")
-}
-
 func TestGenerateTestMain(t *testing.T) {
 	tests := []struct {
 		name          string

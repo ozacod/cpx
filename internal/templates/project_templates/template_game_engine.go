@@ -85,10 +85,6 @@ func (t *GameEngineTemplate) Generate(config TemplateConfig) error {
 	if err := t.WriteFile(projectName, "CMakeLists.txt", cmakeLists); err != nil {
 		return err
 	}
-	cmakePresets := templates.GenerateCMakePresets()
-	if err := t.WriteFile(projectName, "CMakePresets.json", cmakePresets); err != nil {
-		return err
-	}
 	if err := t.SetupVcpkg(projectName, t.Dependencies()); err != nil {
 		return fmt.Errorf("failed to setup vcpkg: %w", err)
 	}

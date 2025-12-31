@@ -34,8 +34,6 @@ Desktop.ini
 
 # Build output
 bin/
-cpx-client/cpx
-cpx-server/server
 
 # =========================
 # Misc
@@ -51,8 +49,6 @@ temp/
 setup_env.sh
 .sql
 .db
-cpx/cpx-bin
-cpx/cpx_tool
 
 # Build artifacts (CI cache)
 build-*
@@ -66,8 +62,6 @@ content/
 aim.md
 
 .cursorrules
-
-cpx/test_all_commands.sh
 
 IMPROVEMENTS.md
 examples/

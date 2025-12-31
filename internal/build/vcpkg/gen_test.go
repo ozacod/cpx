@@ -43,7 +43,6 @@ func TestGenerate(t *testing.T) {
 	err = builder.GenerateBuildSrc(projectPath, initConfig)
 	assert.NoError(t, err)
 	assert.FileExists(t, filepath.Join(projectPath, "CMakeLists.txt"))
-	assert.FileExists(t, filepath.Join(projectPath, "CMakePresets.json"))
 
 	// Test GenerateBuildTest
 	err = builder.GenerateBuildTest(projectPath, initConfig)
