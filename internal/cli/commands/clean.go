@@ -41,20 +41,19 @@ func runClean(cmd *cobra.Command, _ []string) error {
 		All: all,
 	}
 
+	var builder build.BuildSystem
 	switch projectType {
 	case utils.ProjectTypeBazel:
-		builder := bazel.New()
-		return builder.Clean(opts)
+		builder = bazel.New()
 	case utils.ProjectTypeMeson:
-		builder := meson.New()
-		return builder.Clean(opts)
+		builder = meson.New()
 	case utils.ProjectTypeCMake:
-		builder := cmake.New()
-		return builder.Clean(opts)
+		builder = cmake.New()
 	case utils.ProjectTypeVcpkg:
-		builder := vcpkg.New()
-		return builder.Clean(opts)
+		builder = vcpkg.New()
 	default:
 		return fmt.Errorf("unsupported project type")
 	}
+
+	return builder.Clean(opts)
 }
