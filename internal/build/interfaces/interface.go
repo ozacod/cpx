@@ -122,6 +122,9 @@ type BuildSystem interface {
 
 	// GenerateBuildBench generates the build files for benchmarks.
 	GenerateBuildBench(projectPath string, config InitConfig) error
+
+	// GenerateReadme generates the README.md content for the project.
+	GenerateReadme(config InitConfig) string
 }
 
 // InitConfig contains configuration for initializing a new project.

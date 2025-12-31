@@ -289,6 +289,10 @@ func (b *Builder) GenerateBuildBench(projectPath string, config build.InitConfig
 	return nil
 }
 
+func (b *Builder) GenerateReadme(config build.InitConfig) string {
+	return templates.GenerateVcpkgReadme(config.Name, config.CppStandard, config.IsLibrary)
+}
+
 func (b *Builder) Build(opts build.BuildOptions) error {
 	// Set VCPKG_ROOT from cpx config if not already set
 	if err := b.SetupEnv(); err != nil {

@@ -839,4 +839,8 @@ func (b *Builder) GenerateBuildBench(projectPath string, config build.InitConfig
 	return nil
 }
 
+func (b *Builder) GenerateReadme(config build.InitConfig) string {
+	return templates.GenerateBazelReadme(config.Name, config.CppStandard, config.IsLibrary)
+}
+
 var _ build.BuildSystem = (*Builder)(nil)

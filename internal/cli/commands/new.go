@@ -12,10 +12,11 @@ import (
 	"github.com/ozacod/cpx/internal/build/bazel"
 	"github.com/ozacod/cpx/internal/build/cmake"
 	"github.com/ozacod/cpx/internal/build/common"
-	"github.com/ozacod/cpx/internal/build/interfaces"
+	build "github.com/ozacod/cpx/internal/build/interfaces"
 	"github.com/ozacod/cpx/internal/build/meson"
 	"github.com/ozacod/cpx/internal/build/vcpkg"
 	"github.com/ozacod/cpx/internal/cli/tui"
+	cpxconfig "github.com/ozacod/cpx/internal/config"
 	"github.com/ozacod/cpx/internal/templates"
 	"github.com/ozacod/cpx/internal/templates/project_templates"
 	"github.com/ozacod/cpx/internal/utils/colors"
@@ -74,7 +75,7 @@ func createProjectFromTUI(config tui.ProjectConfig) error {
 
 		cppStandard := config.CppStandard
 		if cppStandard == 0 {
-			cppStandard = 17
+			cppStandard = cpxconfig.DefaultCppStandard
 		}
 
 		templateConfig := project_templates.TemplateConfig{
@@ -120,12 +121,12 @@ func createProjectFromTUI(config tui.ProjectConfig) error {
 
 	// Set VCS configuration defaults
 	if cfg.VCS == "" {
-		cfg.VCS = "git"
+		cfg.VCS = cpxconfig.DefaultVCS
 	}
 
 	// Set PackageManager configuration defaults
 	if cfg.PackageManager == "" {
-		cfg.PackageManager = "vcpkg"
+		cfg.PackageManager = cpxconfig.DefaultPackageManager
 	}
 
 	// Initialize git repository only if VCS is set to git
@@ -138,10 +139,10 @@ func createProjectFromTUI(config tui.ProjectConfig) error {
 	// Set C++ standard default
 	cppStandard := cfg.CppStandard
 	if cppStandard == 0 {
-		cppStandard = 17
+		cppStandard = cpxconfig.DefaultCppStandard
 	}
 
-	projectVersion := "0.1.0"
+	projectVersion := cpxconfig.DefaultVersion
 
 	benchSources, _ := templates.GenerateBenchmarkSources(projectName, cfg.Benchmark)
 
@@ -220,19 +221,7 @@ func createProjectFromTUI(config tui.ProjectConfig) error {
 		}
 	}
 
-	var readme string
-	switch cfg.PackageManager {
-	case "bazel":
-		readme = templates.GenerateBazelReadme(projectName, cppStandard, cfg.IsLibrary)
-	case "meson":
-		readme = templates.GenerateMesonReadme(projectName, cppStandard, cfg.IsLibrary)
-	case "cmake":
-		readme = templates.GenerateCMakeReadme(projectName, cppStandard, cfg.IsLibrary)
-	case "vcpkg":
-		readme = templates.GenerateVcpkgReadme(projectName, cppStandard, cfg.IsLibrary)
-	default:
-		fmt.Printf("unknown package manager '%s'\n", cfg.PackageManager)
-	}
+	readme := builder.GenerateReadme(initConfig)
 	if err := os.WriteFile(filepath.Join(projectName, "README.md"), []byte(readme), 0644); err != nil {
 		return fmt.Errorf("failed to write README: %w", err)
 	}
@@ -245,7 +234,7 @@ func createProjectFromTUI(config tui.ProjectConfig) error {
 
 	clangFormatStyle := cfg.ClangFormat
 	if clangFormatStyle == "" {
-		clangFormatStyle = "Google"
+		clangFormatStyle = cpxconfig.DefaultClangFormat
 	}
 	clangFormat := templates.GenerateClangFormat(clangFormatStyle)
 	if err := os.WriteFile(filepath.Join(projectName, common.ClangFormatFile), []byte(clangFormat), 0644); err != nil {

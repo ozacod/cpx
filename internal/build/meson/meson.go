@@ -589,6 +589,10 @@ func (b *Builder) GenerateBuildBench(projectPath string, config build.InitConfig
 	return nil
 }
 
+func (b *Builder) GenerateReadme(config build.InitConfig) string {
+	return templates.GenerateMesonReadme(config.Name, config.CppStandard, config.IsLibrary)
+}
+
 func (b *Builder) downloadWrap(projectPath, wrapName string) error {
 	// Ensure meson is available (already checked usually)
 
