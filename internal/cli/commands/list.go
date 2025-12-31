@@ -18,10 +18,8 @@ func ListCmd() *cobra.Command {
 		Use:   "list",
 		Short: "List project dependencies or targets",
 		Long:  "List the dependencies declared in the project or available build targets.",
-		RunE: func(cmd *cobra.Command, args []string) error {
-			return runList(cmd, args)
-		},
-		Args: cobra.NoArgs,
+		RunE:  runList,
+		Args:  cobra.NoArgs,
 	}
 
 	cmd.Flags().Bool("targets", false, "List build targets instead of dependencies")

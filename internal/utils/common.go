@@ -34,16 +34,6 @@ func PrintError(format string, args ...interface{}) {
 	fmt.Fprintf(os.Stderr, "%s✗ %s%s\n", colors.Red, msg, colors.Reset)
 }
 
-func RequireVcpkgProject(cmdName string) error {
-	if _, err := os.Stat("vcpkg.json"); err != nil {
-		if os.IsNotExist(err) {
-			return fmt.Errorf("%s requires a vcpkg project (vcpkg.json not found)\n  hint: run inside a vcpkg manifest project or create one with cpx new", cmdName)
-		}
-		return fmt.Errorf("failed to check vcpkg manifest: %w", err)
-	}
-	return nil
-}
-
 type ProjectType string
 
 const (
@@ -77,24 +67,6 @@ func RequireProject(cmdName string) (ProjectType, error) {
 		return pt, fmt.Errorf("%s requires a cpx project (vcpkg.json, MODULE.bazel, meson.build, or CMakeLists.txt not found)\n  hint: create one with cpx new", cmdName)
 	}
 	return pt, nil
-}
-
-type Spinner struct {
-	frames  []string
-	current int
-	message string
-}
-
-func (s *Spinner) Tick() {
-	fmt.Printf("\r%s%s%s %s", colors.Cyan, s.frames[s.current], colors.Reset, s.message)
-	s.current = (s.current + 1) % len(s.frames)
-}
-
-func (s *Spinner) Done(message string) {
-	fmt.Printf("\r%s✓ %s%s\n", colors.Green, message, colors.Reset)
-}
-func (s *Spinner) Fail(message string) {
-	fmt.Printf("\r%s✗ %s%s\n", colors.Red, message, colors.Reset)
 }
 
 func CheckBuildToolsForProject(projectType ProjectType) []string {

@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
-	"path/filepath"
 	"testing"
 
 	"github.com/ozacod/cpx/internal/build/interfaces"
@@ -439,19 +438,6 @@ bazel_dep(name = "com_google_googletest", version = "1.14.0")
 	assert.Contains(t, string(content), "rules_cc") // Other deps should remain
 }
 
-func setupMockBCR(t *testing.T) string {
-	tmpDir := t.TempDir()
-	modulesDir := filepath.Join(tmpDir, "modules")
-	require.NoError(t, os.MkdirAll(filepath.Join(modulesDir, "zlib"), 0755))
-	metadata := `{
-		"homepage": "https://zlib.net/",
-		"maintainers": [{"name": "zlib maintainer"}],
-		"versions": ["1.2.11", "1.2.12", "1.2.13"]
-	}`
-	require.NoError(t, os.WriteFile(filepath.Join(modulesDir, "zlib", "metadata.json"), []byte(metadata), 0644))
-	return tmpDir
-}
-
 func TestListDependencies(t *testing.T) {
 	tmpDir := t.TempDir()
 	oldWd, _ := os.Getwd()
@@ -471,31 +457,9 @@ bazel_dep(name = "gtest", version = "1.11.0")`
 	assert.Equal(t, "1.2.13", deps[0].Version)
 }
 
-func TestSearchDependencies(t *testing.T) {
-	bcrDir := setupMockBCR(t)
-	builder := NewWithBCR(bcrDir)
-
-	results, err := builder.SearchDependencies("zli")
-	assert.NoError(t, err)
-	assert.Len(t, results, 1)
-	assert.Equal(t, "zlib", results[0].Name)
-	assert.Equal(t, "1.2.13", results[0].Version)
-}
-
 func TestName(t *testing.T) {
 	builder := New()
 	assert.Equal(t, "bazel", builder.Name())
-}
-
-func TestDependencyInfo(t *testing.T) {
-	bcrDir := setupMockBCR(t)
-	builder := NewWithBCR(bcrDir)
-
-	info, err := builder.DependencyInfo("zlib")
-	assert.NoError(t, err)
-	assert.Equal(t, "zlib", info.Name)
-	assert.Equal(t, "1.2.13", info.Version)
-	assert.Equal(t, "https://zlib.net/", info.Homepage)
 }
 
 func TestListTargets(t *testing.T) {

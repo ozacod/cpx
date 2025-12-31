@@ -20,10 +20,8 @@ func RemoveCmd() *cobra.Command {
 		Short:   "Remove a dependency",
 		Long:    "Remove a dependency from your project.",
 		Aliases: []string{"rm"},
-		RunE: func(cmd *cobra.Command, args []string) error {
-			return runRemove(cmd, args)
-		},
-		Args: cobra.MinimumNArgs(1),
+		RunE:    runRemove,
+		Args:    cobra.MinimumNArgs(1),
 	}
 
 	return cmd

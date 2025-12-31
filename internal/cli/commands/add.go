@@ -32,9 +32,7 @@ func AddCmd() *cobra.Command {
 For vcpkg projects: passes through to 'vcpkg add port' and prints usage info.
 For Bazel projects: fetches the latest version from BCR and updates MODULE.bazel.
 For Meson projects: uses 'meson wrap install' to add from WrapDB.`,
-		RunE: func(cmd *cobra.Command, args []string) error {
-			return runAdd(cmd, args)
-		},
+		RunE: runAdd,
 		Args: cobra.MinimumNArgs(1),
 	}
 

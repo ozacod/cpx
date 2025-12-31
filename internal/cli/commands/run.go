@@ -26,9 +26,7 @@ Arguments after -- are passed to the binary.`,
   cpx run --release        # Release build, then run
   cpx run --asan           # Run with AddressSanitizer
   cpx run --target app -- --flag value`,
-		RunE: func(cmd *cobra.Command, args []string) error {
-			return runRun(cmd, args)
-		},
+		RunE: runRun,
 	}
 
 	cmd.Flags().BoolP("release", "r", false, "Build in release mode (-O2). Default is debug")

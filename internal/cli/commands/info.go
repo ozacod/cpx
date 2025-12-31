@@ -21,10 +21,8 @@ func InfoCmd() *cobra.Command {
 		Use:   "info <package>",
 		Short: "Show detailed library information",
 		Long:  "Show detailed library information for a vcpkg package.",
-		RunE: func(cmd *cobra.Command, args []string) error {
-			return runInfo(cmd, args)
-		},
-		Args: cobra.MinimumNArgs(1),
+		RunE:  runInfo,
+		Args:  cobra.MinimumNArgs(1),
 	}
 
 	cmd.Flags().Bool("json", false, "Output in JSON format")

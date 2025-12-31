@@ -36,12 +36,6 @@ func New() *Builder {
 	return &Builder{}
 }
 
-func NewWithBCR(bcrPath string) *Builder {
-	return &Builder{
-		bcrPath: bcrPath,
-	}
-}
-
 type Module struct {
 	Name        string   `json:"name"`
 	Versions    []string `json:"versions"`

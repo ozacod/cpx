@@ -16,10 +16,8 @@ func SearchCmd() *cobra.Command {
 		Use:   "search [query]",
 		Short: "Search for libraries interactively",
 		Long:  "Search for libraries using an interactive TUI. Select packages to add them to your project.",
-		RunE: func(cmd *cobra.Command, args []string) error {
-			return runSearch(cmd, args)
-		},
-		Args: cobra.MaximumNArgs(1),
+		RunE:  runSearch,
+		Args:  cobra.MaximumNArgs(1),
 	}
 
 	return cmd

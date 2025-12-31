@@ -29,9 +29,7 @@ func BuildCmd() *cobra.Command {
   cpx build --asan       # Build with AddressSanitizer
   cpx build --tsan       # Build with ThreadSanitizer
   cpx build all          # Build all toolchains (Docker)`,
-		RunE: func(cmd *cobra.Command, args []string) error {
-			return runBuild(cmd, args)
-		},
+		RunE: runBuild,
 	}
 
 	cmd.Flags().BoolP("release", "r", false, "Release build (-O2). Default is debug")
