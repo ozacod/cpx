@@ -422,9 +422,9 @@ func (b *Builder) Run(opts build.RunOptions) error {
 
 func findBazelMainTarget() (string, error) {
 	// Read BUILD.bazel
-	content, err := os.ReadFile("BUILD.bazel")
+	content, err := os.ReadFile(common.BazelBuildFile)
 	if err != nil {
-		return "", fmt.Errorf("could not read BUILD.bazel: %w", err)
+		return "", fmt.Errorf("could not read %s: %w", common.BazelBuildFile, err)
 	}
 
 	// Look for cc_binary declarations
@@ -579,10 +579,9 @@ func (b *Builder) AddDependency(name string, version string) error {
 	}
 
 	// Read MODULE.bazel
-	modulePath := "MODULE.bazel"
-	content, err := os.ReadFile(modulePath)
+	content, err := os.ReadFile(common.BazelModuleFile)
 	if err != nil {
-		return fmt.Errorf("failed to read MODULE.bazel: %w", err)
+		return fmt.Errorf("failed to read %s: %w", common.BazelModuleFile, err)
 	}
 
 	// Check if dependency already exists
@@ -591,23 +590,23 @@ func (b *Builder) AddDependency(name string, version string) error {
 		// Update existing dependency
 		updatePattern := regexp.MustCompile(fmt.Sprintf(`(bazel_dep\s*\(\s*name\s*=\s*"%s"\s*,\s*version\s*=\s*")[^"]*(")\)`, regexp.QuoteMeta(name)))
 		newContent := updatePattern.ReplaceAll(content, []byte(fmt.Sprintf(`${1}%s${2})`, version)))
-		if err := os.WriteFile(modulePath, newContent, 0644); err != nil {
-			return fmt.Errorf("failed to write MODULE.bazel: %w", err)
+		if err := os.WriteFile(common.BazelModuleFile, newContent, 0644); err != nil {
+			return fmt.Errorf("failed to write %s: %w", common.BazelModuleFile, err)
 		}
 	} else {
 		// Add new dependency at the end
 		newDep := fmt.Sprintf("\nbazel_dep(name = \"%s\", version = \"%s\")\n", name, version)
 		content = append(content, []byte(newDep)...)
-		if err := os.WriteFile(modulePath, content, 0644); err != nil {
-			return fmt.Errorf("failed to write MODULE.bazel: %w", err)
+		if err := os.WriteFile(common.BazelModuleFile, content, 0644); err != nil {
+			return fmt.Errorf("failed to write %s: %w", common.BazelModuleFile, err)
 		}
 	}
 
-	fmt.Printf("%s✓ Added %s@%s to MODULE.bazel%s\n", colors.Green, name, version, colors.Reset)
+	fmt.Printf("%s✓ Added %s@%s to %s%s\n", colors.Green, name, version, common.BazelModuleFile, colors.Reset)
 
 	// Print usage info
 	fmt.Printf("\n%sUSAGE INFO FOR %s:%s\n", colors.Cyan, name, colors.Reset)
-	fmt.Printf("Add this to your BUILD.bazel:\n\n")
+	fmt.Printf("Add this to your %s:\n\n", common.BazelBuildFile)
 	fmt.Printf("  deps = [\"@%s//:<target>\"]\n\n", name)
 	fmt.Printf("%s📦 Find more info at:%s\n", colors.Cyan, colors.Reset)
 	fmt.Printf("   https://registry.bazel.build/modules/%s\n\n", name)
@@ -616,29 +615,27 @@ func (b *Builder) AddDependency(name string, version string) error {
 }
 
 func (b *Builder) RemoveDependency(name string) error {
-	modulePath := "MODULE.bazel"
-	content, err := os.ReadFile(modulePath)
+	content, err := os.ReadFile(common.BazelModuleFile)
 	if err != nil {
-		return fmt.Errorf("failed to read MODULE.bazel: %w", err)
+		return fmt.Errorf("failed to read %s: %w", common.BazelModuleFile, err)
 	}
 
 	// Remove the dependency line
 	pattern := regexp.MustCompile(fmt.Sprintf(`\n?bazel_dep\s*\(\s*name\s*=\s*"%s"[^)]*\)\n?`, regexp.QuoteMeta(name)))
 	newContent := pattern.ReplaceAll(content, []byte(""))
 
-	if err := os.WriteFile(modulePath, newContent, 0644); err != nil {
-		return fmt.Errorf("failed to write MODULE.bazel: %w", err)
+	if err := os.WriteFile(common.BazelModuleFile, newContent, 0644); err != nil {
+		return fmt.Errorf("failed to write %s: %w", common.BazelModuleFile, err)
 	}
 
-	fmt.Printf("%s✓ Removed %s from MODULE.bazel%s\n", colors.Green, name, colors.Reset)
+	fmt.Printf("%s✓ Removed %s from %s%s\n", colors.Green, name, common.BazelModuleFile, colors.Reset)
 	return nil
 }
 
 func (b *Builder) ListDependencies() ([]build.Dependency, error) {
-	modulePath := "MODULE.bazel"
-	content, err := os.ReadFile(modulePath)
+	content, err := os.ReadFile(common.BazelModuleFile)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read MODULE.bazel: %w", err)
+		return nil, fmt.Errorf("failed to read %s: %w", common.BazelModuleFile, err)
 	}
 
 	// Match bazel_dep(name = "xxx", version = "yyy")
@@ -754,8 +751,8 @@ func (b *Builder) ListTargets() ([]string, error) {
 
 func (b *Builder) GenerateGitignore(projectPath string) error {
 	gitignore := templates.GenerateBazelGitignore()
-	if err := os.WriteFile(filepath.Join(projectPath, ".gitignore"), []byte(gitignore), 0644); err != nil {
-		return fmt.Errorf("failed to write .gitignore: %w", err)
+	if err := os.WriteFile(filepath.Join(projectPath, common.GitignoreFile), []byte(gitignore), 0644); err != nil {
+		return fmt.Errorf("failed to write %s: %w", common.GitignoreFile, err)
 	}
 	return nil
 }
@@ -763,14 +760,14 @@ func (b *Builder) GenerateGitignore(projectPath string) error {
 func (b *Builder) GenerateBuildSrc(projectPath string, config build.InitConfig) error {
 	// Generate MODULE.bazel
 	moduleBazel := templates.GenerateModuleBazel(config.Name, config.Version, config.TestFramework, config.Benchmark)
-	if err := os.WriteFile(filepath.Join(projectPath, "MODULE.bazel"), []byte(moduleBazel), 0644); err != nil {
-		return fmt.Errorf("failed to write MODULE.bazel: %w", err)
+	if err := os.WriteFile(filepath.Join(projectPath, common.BazelModuleFile), []byte(moduleBazel), 0644); err != nil {
+		return fmt.Errorf("failed to write %s: %w", common.BazelModuleFile, err)
 	}
 
 	// Generate root BUILD.bazel (aliases)
 	buildBazel := templates.GenerateBuildBazelRoot(config.Name, !config.IsLibrary)
-	if err := os.WriteFile(filepath.Join(projectPath, "BUILD.bazel"), []byte(buildBazel), 0644); err != nil {
-		return fmt.Errorf("failed to write BUILD.bazel: %w", err)
+	if err := os.WriteFile(filepath.Join(projectPath, common.BazelBuildFile), []byte(buildBazel), 0644); err != nil {
+		return fmt.Errorf("failed to write %s: %w", common.BazelBuildFile, err)
 	}
 
 	if err := os.MkdirAll(filepath.Join(projectPath, "src"), 0755); err != nil {
@@ -795,8 +792,8 @@ func (b *Builder) GenerateBuildSrc(projectPath string, config build.InitConfig) 
 
 	// Generate .bazelrc
 	bazelrc := templates.GenerateBazelrc(config.CppStandard)
-	if err := os.WriteFile(filepath.Join(projectPath, ".bazelrc"), []byte(bazelrc), 0644); err != nil {
-		return fmt.Errorf("failed to write .bazelrc: %w", err)
+	if err := os.WriteFile(filepath.Join(projectPath, common.BazelRcFile), []byte(bazelrc), 0644); err != nil {
+		return fmt.Errorf("failed to write %s: %w", common.BazelRcFile, err)
 	}
 
 	// Generate .bazelignore

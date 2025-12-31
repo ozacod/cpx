@@ -67,7 +67,7 @@ func (b *Builder) Build(opts build.BuildOptions) error {
 
 	// Check if configure is needed
 	needsConfigure := false
-	if _, err := os.Stat(filepath.Join(buildDir, "CMakeCache.txt")); os.IsNotExist(err) {
+	if _, err := os.Stat(filepath.Join(buildDir, common.CMakeCacheFile)); os.IsNotExist(err) {
 		needsConfigure = true
 	}
 
@@ -178,7 +178,7 @@ func (b *Builder) Test(opts build.TestOptions) error {
 
 	// Check if configure is needed
 	needsConfigure := false
-	if _, err := os.Stat(filepath.Join(buildDir, "CMakeCache.txt")); os.IsNotExist(err) {
+	if _, err := os.Stat(filepath.Join(buildDir, common.CMakeCacheFile)); os.IsNotExist(err) {
 		needsConfigure = true
 	}
 
@@ -325,7 +325,7 @@ func (b *Builder) Bench(opts build.BenchOptions) error {
 
 	// Check if configure is needed
 	needsConfigure := false
-	if _, err := os.Stat(filepath.Join(buildDir, "CMakeCache.txt")); os.IsNotExist(err) {
+	if _, err := os.Stat(filepath.Join(buildDir, common.CMakeCacheFile)); os.IsNotExist(err) {
 		needsConfigure = true
 	}
 
@@ -495,8 +495,8 @@ func (b *Builder) DependencyInfo(_ string) (*build.DependencyInfo, error) {
 func (b *Builder) ListTargets() ([]string, error) {
 	// Try to find a build directory
 	buildDirs := []string{
-		filepath.Join(common.NativeCacheDir(), "debug"),
-		filepath.Join(common.NativeCacheDir(), "release"),
+		filepath.Join(common.NativeCacheDir(), string(common.VariantDebug)),
+		filepath.Join(common.NativeCacheDir(), string(common.VariantRelease)),
 		"build",
 	}
 	var buildDir string
@@ -537,7 +537,7 @@ func (b *Builder) ListTargets() ([]string, error) {
 }
 
 func (b *Builder) parseTargetsFromCMakeLists() ([]string, error) {
-	data, err := os.ReadFile("CMakeLists.txt")
+	data, err := os.ReadFile(common.CMakeListsFile)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read CMakeLists.txt: %w", err)
 	}
@@ -568,8 +568,8 @@ func (b *Builder) parseTargetsFromCMakeLists() ([]string, error) {
 
 func (b *Builder) GenerateGitignore(projectPath string) error {
 	gitignore := templates.GenerateCMakeGitignore()
-	if err := os.WriteFile(filepath.Join(projectPath, ".gitignore"), []byte(gitignore), 0644); err != nil {
-		return fmt.Errorf("failed to write .gitignore: %w", err)
+	if err := os.WriteFile(filepath.Join(projectPath, common.GitignoreFile), []byte(gitignore), 0644); err != nil {
+		return fmt.Errorf("failed to write %s: %w", common.GitignoreFile, err)
 	}
 	return nil
 }
@@ -584,8 +584,8 @@ func (b *Builder) GenerateBuildSrc(projectPath string, config build.InitConfig) 
 		IncludeBench:       config.Benchmark != "" && config.Benchmark != "none",
 		ProjectVersion:     config.Version,
 	})
-	if err := os.WriteFile(filepath.Join(projectPath, "CMakeLists.txt"), []byte(cmakeLists), 0644); err != nil {
-		return fmt.Errorf("failed to write CMakeLists.txt: %w", err)
+	if err := os.WriteFile(filepath.Join(projectPath, common.CMakeListsFile), []byte(cmakeLists), 0644); err != nil {
+		return fmt.Errorf("failed to write %s: %w", common.CMakeListsFile, err)
 	}
 
 	return nil
@@ -602,8 +602,8 @@ func (b *Builder) GenerateBuildTest(projectPath string, config build.InitConfig)
 
 	// Generate tests/CMakeLists.txt
 	testCMake := templates.GenerateTestCMake(config.Name, config.TestFramework)
-	if err := os.WriteFile(filepath.Join(projectPath, "tests/CMakeLists.txt"), []byte(testCMake), 0644); err != nil {
-		return fmt.Errorf("failed to write tests/CMakeLists.txt: %w", err)
+	if err := os.WriteFile(filepath.Join(projectPath, "tests", common.CMakeListsFile), []byte(testCMake), 0644); err != nil {
+		return fmt.Errorf("failed to write tests/%s: %w", common.CMakeListsFile, err)
 	}
 
 	return nil
@@ -614,14 +614,14 @@ func (b *Builder) GenerateBuildBench(projectPath string, config build.InitConfig
 		return nil
 	}
 
-	if err := os.MkdirAll(filepath.Join(projectPath, "bench"), 0755); err != nil {
+	if err := os.MkdirAll(filepath.Join(projectPath, string(common.VariantBench)), 0755); err != nil {
 		return fmt.Errorf("failed to create bench directory: %w", err)
 	}
 
 	// Generate bench/CMakeLists.txt
 	benchCMake := templates.GenerateBenchCMake(config.Name, config.Benchmark)
-	if err := os.WriteFile(filepath.Join(projectPath, "bench/CMakeLists.txt"), []byte(benchCMake), 0644); err != nil {
-		return fmt.Errorf("failed to write bench/CMakeLists.txt: %w", err)
+	if err := os.WriteFile(filepath.Join(projectPath, string(common.VariantBench), common.CMakeListsFile), []byte(benchCMake), 0644); err != nil {
+		return fmt.Errorf("failed to write bench/%s: %w", common.CMakeListsFile, err)
 	}
 
 	return nil

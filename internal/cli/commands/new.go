@@ -11,6 +11,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/ozacod/cpx/internal/build/bazel"
 	"github.com/ozacod/cpx/internal/build/cmake"
+	"github.com/ozacod/cpx/internal/build/common"
 	"github.com/ozacod/cpx/internal/build/interfaces"
 	"github.com/ozacod/cpx/internal/build/meson"
 	"github.com/ozacod/cpx/internal/build/vcpkg"
@@ -247,8 +248,8 @@ func createProjectFromTUI(config tui.ProjectConfig) error {
 		clangFormatStyle = "Google"
 	}
 	clangFormat := templates.GenerateClangFormat(clangFormatStyle)
-	if err := os.WriteFile(filepath.Join(projectName, ".clang-format"), []byte(clangFormat), 0644); err != nil {
-		return fmt.Errorf("failed to write .clang-format: %w", err)
+	if err := os.WriteFile(filepath.Join(projectName, common.ClangFormatFile), []byte(clangFormat), 0644); err != nil {
+		return fmt.Errorf("failed to write %s: %w", common.ClangFormatFile, err)
 	}
 
 	if cfg.TestFramework != "" && cfg.TestFramework != "none" {

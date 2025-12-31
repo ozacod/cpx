@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"runtime"
 
+	"github.com/ozacod/cpx/internal/build/common"
 	"github.com/ozacod/cpx/internal/config"
 	"github.com/ozacod/cpx/internal/utils/colors"
 )
@@ -45,17 +46,17 @@ const (
 )
 
 func DetectProjectType() ProjectType {
-	if _, err := os.Stat("vcpkg.json"); err == nil {
+	if _, err := os.Stat(common.VcpkgManifest); err == nil {
 		return ProjectTypeVcpkg
 	}
-	if _, err := os.Stat("MODULE.bazel"); err == nil {
+	if _, err := os.Stat(common.BazelModuleFile); err == nil {
 		return ProjectTypeBazel
 	}
-	if _, err := os.Stat("meson.build"); err == nil {
+	if _, err := os.Stat(common.MesonBuildFile); err == nil {
 		return ProjectTypeMeson
 	}
 	// CMake-only: has CMakeLists.txt but no vcpkg.json
-	if _, err := os.Stat("CMakeLists.txt"); err == nil {
+	if _, err := os.Stat(common.CMakeListsFile); err == nil {
 		return ProjectTypeCMake
 	}
 	return ProjectTypeUnknown
@@ -64,7 +65,8 @@ func DetectProjectType() ProjectType {
 func RequireProject(cmdName string) (ProjectType, error) {
 	pt := DetectProjectType()
 	if pt == ProjectTypeUnknown {
-		return pt, fmt.Errorf("%s requires a cpx project (vcpkg.json, MODULE.bazel, meson.build, or CMakeLists.txt not found)\n  hint: create one with cpx new", cmdName)
+		return pt, fmt.Errorf("%s requires a cpx project (%s, %s, %s, or %s not found)\n  hint: create one with cpx new",
+			cmdName, common.VcpkgManifest, common.BazelModuleFile, common.MesonBuildFile, common.CMakeListsFile)
 	}
 	return pt, nil
 }

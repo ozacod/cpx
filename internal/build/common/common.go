@@ -27,6 +27,50 @@ const (
 	NativeDir = "native"
 )
 
+// BuildVariant represents a build configuration variant
+type BuildVariant string
+
+const (
+	VariantDebug   BuildVariant = "debug"
+	VariantRelease BuildVariant = "release"
+	VariantTest    BuildVariant = "test"
+	VariantBench   BuildVariant = "bench"
+)
+
+// CMake file constants
+const (
+	CMakeListsFile      = "CMakeLists.txt"
+	CMakeCacheFile      = "CMakeCache.txt"
+	CompileCommandsFile = "compile_commands.json"
+)
+
+// Vcpkg file constants
+const (
+	VcpkgManifest = "vcpkg.json"
+)
+
+// Meson file constants
+const (
+	MesonBuildFile   = "meson.build"
+	MesonOptionsFile = "meson_options.txt"
+	MesonBuildDir    = "builddir"
+)
+
+// Bazel file constants
+const (
+	BazelModuleFile = "MODULE.bazel"
+	BazelBuildFile  = "BUILD.bazel"
+	BazelRcFile     = ".bazelrc"
+	BazelWorkspace  = "WORKSPACE"
+)
+
+// Common project file constants
+const (
+	GitignoreFile   = ".gitignore"
+	ClangFormatFile = ".clang-format"
+	ClangTidyFile   = ".clang-tidy"
+)
+
 // NativeCacheDir returns the path to the native cache directory (.cache/native)
 func NativeCacheDir() string {
 	return filepath.Join(CacheDir, NativeDir)
@@ -42,8 +86,7 @@ func NativeOutputDir() string {
 var ExecCommand = exec.Command
 
 func GetProjectNameFromCMakeLists() string {
-	cmakeListsPath := "CMakeLists.txt"
-	data, err := os.ReadFile(cmakeListsPath)
+	data, err := os.ReadFile(CMakeListsFile)
 	if err != nil {
 		return ""
 	}

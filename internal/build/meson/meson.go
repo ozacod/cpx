@@ -25,7 +25,7 @@ func New() *Builder {
 }
 
 func (b *Builder) Build(opts build.BuildOptions) error {
-	buildDir := "builddir"
+	buildDir := common.MesonBuildDir
 
 	// Determine build type and optimization from flags
 	var buildType, optimization, optLabel string
@@ -142,20 +142,20 @@ func (b *Builder) Build(opts build.BuildOptions) error {
 	fmt.Printf("%sCopying artifacts to %s/...%s\n", colors.Cyan, outputDir, colors.Reset)
 	copyCmd := execCommand("bash", "-c", fmt.Sprintf(`
 		# Meson places executables in subdirectories (src/, bench/, etc.)
-		# Search in builddir/src/ first (main executables)
-		if [ -d "builddir/src" ]; then
-			find builddir/src -maxdepth 1 -type f -perm +111 ! -name "*.p" ! -name "*_test" -exec cp {} %[1]s/ \; 2>/dev/null || true
+		# Search in %[2]s/src/ first (main executables)
+		if [ -d "%[2]s/src" ]; then
+			find %[2]s/src -maxdepth 1 -type f -perm +111 ! -name "*.p" ! -name "*_test" -exec cp {} %[1]s/ \; 2>/dev/null || true
 		fi
 
-		# Also check builddir root for executables
-		find builddir -maxdepth 1 -type f -perm +111 ! -name "*.p" ! -name "*_test" -exec cp {} %[1]s/ \; 2>/dev/null || true
+		# Also check %[2]s root for executables
+		find %[2]s -maxdepth 1 -type f -perm +111 ! -name "*.p" ! -name "*_test" -exec cp {} %[1]s/ \; 2>/dev/null || true
 
-		# Copy libraries from builddir and subdirectories
-		find builddir -maxdepth 2 -type f \( -name "*.a" -o -name "*.so" -o -name "*.dylib" \) -exec cp {} %[1]s/ \; 2>/dev/null || true
+		# Copy libraries from %[2]s and subdirectories
+		find %[2]s -maxdepth 2 -type f \( -name "*.a" -o -name "*.so" -o -name "*.dylib" \) -exec cp {} %[1]s/ \; 2>/dev/null || true
 
 		# List what was copied
 		ls %[1]s/ 2>/dev/null || true
-	`, outputDir))
+	`, outputDir, common.MesonBuildDir))
 	copyCmd.Stdout = os.Stdout
 	copyCmd.Stderr = os.Stderr
 	_ = copyCmd.Run()
@@ -168,14 +168,14 @@ func (b *Builder) Build(opts build.BuildOptions) error {
 func (b *Builder) Test(opts build.TestOptions) error {
 	fmt.Printf("%sRunning Meson tests...%s\n", colors.Cyan, colors.Reset)
 
-	// Ensure builddir exists - need build first
-	if _, err := os.Stat("builddir"); os.IsNotExist(err) {
+	// Ensure common.MesonBuildDir exists - need build first
+	if _, err := os.Stat(common.MesonBuildDir); os.IsNotExist(err) {
 		if err := b.Build(build.BuildOptions{Verbose: opts.Verbose}); err != nil {
 			return fmt.Errorf("build failed: %w", err)
 		}
 	}
 
-	mesonArgs := []string{"test", "-C", "builddir"}
+	mesonArgs := []string{"test", "-C", common.MesonBuildDir}
 
 	// Exclude subproject tests (google-benchmark, gtest, etc.)
 	// Only run tests from the main project
@@ -221,16 +221,16 @@ func (b *Builder) Run(opts build.RunOptions) error {
 	// Find executable to run
 	var exePath string
 	if opts.Target != "" {
-		// Try in src/ subdirectory first, then builddir root
-		srcPath := filepath.Join("builddir", "src", opts.Target)
+		// Try in src/ subdirectory first, then common.MesonBuildDir root
+		srcPath := filepath.Join(common.MesonBuildDir, "src", opts.Target)
 		if _, err := os.Stat(srcPath); err == nil {
 			exePath = srcPath
 		} else {
-			exePath = filepath.Join("builddir", opts.Target)
+			exePath = filepath.Join(common.MesonBuildDir, opts.Target)
 		}
 	} else {
-		// Look for executables in builddir/src/ first (Meson puts main exe there)
-		searchDirs := []string{filepath.Join("builddir", "src"), "builddir"}
+		// Look for executables in common.MesonBuildDir/src/ first (Meson puts main exe there)
+		searchDirs := []string{filepath.Join(common.MesonBuildDir, "src"), common.MesonBuildDir}
 		for _, dir := range searchDirs {
 			entries, err := os.ReadDir(dir)
 			if err != nil {
@@ -263,7 +263,7 @@ func (b *Builder) Run(opts build.RunOptions) error {
 	}
 
 	if exePath == "" {
-		return fmt.Errorf("no executable found in builddir\n  hint: use --target to specify the executable")
+		return fmt.Errorf("no executable found in %s\n  hint: use --target to specify the executable", common.MesonBuildDir)
 	}
 
 	fmt.Printf("%sRunning %s...%s\n", colors.Cyan, exePath, colors.Reset)
@@ -279,7 +279,7 @@ func (b *Builder) Bench(opts build.BenchOptions) error {
 	fmt.Printf("%sRunning Meson benchmarks...%s\n", colors.Cyan, colors.Reset)
 
 	// Ensure builddir exists
-	if _, err := os.Stat("builddir"); os.IsNotExist(err) {
+	if _, err := os.Stat(common.MesonBuildDir); os.IsNotExist(err) {
 		if err := b.Build(build.BuildOptions{Verbose: opts.Verbose}); err != nil {
 			return fmt.Errorf("build failed: %w", err)
 		}
@@ -289,15 +289,15 @@ func (b *Builder) Bench(opts build.BenchOptions) error {
 	var benchPath string
 	if opts.Target != "" {
 		// Try in bench/ subdirectory first, then builddir root
-		benchDir := filepath.Join("builddir", "bench", opts.Target)
+		benchDir := filepath.Join(common.MesonBuildDir, string(common.VariantBench), opts.Target)
 		if _, err := os.Stat(benchDir); err == nil {
 			benchPath = benchDir
 		} else {
-			benchPath = filepath.Join("builddir", opts.Target)
+			benchPath = filepath.Join(common.MesonBuildDir, opts.Target)
 		}
 	} else {
 		// Look for *_bench executables in builddir/bench/ first
-		searchDirs := []string{filepath.Join("builddir", "bench"), "builddir"}
+		searchDirs := []string{filepath.Join(common.MesonBuildDir, string(common.VariantBench)), common.MesonBuildDir}
 		for _, dir := range searchDirs {
 			entries, err := os.ReadDir(dir)
 			if err != nil {
@@ -337,7 +337,7 @@ func (b *Builder) Clean(opts build.CleanOptions) error {
 	fmt.Printf("%sCleaning Meson project...%s\n", colors.Cyan, colors.Reset)
 
 	// Remove builddir
-	common.RemoveDir("builddir")
+	common.RemoveDir(common.MesonBuildDir)
 
 	// Remove common build output directory
 	common.RemoveDir("build")
@@ -448,13 +448,12 @@ func (b *Builder) DependencyInfo(_ string) (*build.DependencyInfo, error) {
 }
 
 func (b *Builder) ListTargets() ([]string, error) {
-	buildDir := "builddir"
-	if _, err := os.Stat(buildDir); os.IsNotExist(err) {
-		return nil, fmt.Errorf("build directory '%s' does not exist. Run 'cpx build' first", buildDir)
+	if _, err := os.Stat(common.MesonBuildDir); os.IsNotExist(err) {
+		return nil, fmt.Errorf("build directory '%s' does not exist. Run 'cpx build' first", common.MesonBuildDir)
 	}
 
 	// Use meson introspect to get targets as JSON
-	cmd := execCommand("meson", "introspect", "--targets", buildDir)
+	cmd := execCommand("meson", "introspect", "--targets", common.MesonBuildDir)
 	output, err := cmd.Output()
 	if err != nil {
 		return nil, fmt.Errorf("meson introspect failed: %w", err)
@@ -480,8 +479,8 @@ func (b *Builder) ListTargets() ([]string, error) {
 
 func (b *Builder) GenerateGitignore(projectPath string) error {
 	gitignore := templates.GenerateMesonGitignore()
-	if err := os.WriteFile(filepath.Join(projectPath, ".gitignore"), []byte(gitignore), 0644); err != nil {
-		return fmt.Errorf("failed to write .gitignore: %w", err)
+	if err := os.WriteFile(filepath.Join(projectPath, common.GitignoreFile), []byte(gitignore), 0644); err != nil {
+		return fmt.Errorf("failed to write %s: %w", common.GitignoreFile, err)
 	}
 	return nil
 }
@@ -495,8 +494,8 @@ func (b *Builder) GenerateBuildSrc(projectPath string, config build.InitConfig) 
 		TestFramework:      config.TestFramework,
 		BenchmarkFramework: config.Benchmark,
 	})
-	if err := os.WriteFile(filepath.Join(projectPath, "meson.build"), []byte(mesonBuild), 0644); err != nil {
-		return fmt.Errorf("failed to write meson.build: %w", err)
+	if err := os.WriteFile(filepath.Join(projectPath, common.MesonBuildFile), []byte(mesonBuild), 0644); err != nil {
+		return fmt.Errorf("failed to write %s: %w", common.MesonBuildFile, err)
 	}
 
 	if err := os.MkdirAll(filepath.Join(projectPath, "src"), 0755); err != nil {
@@ -505,14 +504,14 @@ func (b *Builder) GenerateBuildSrc(projectPath string, config build.InitConfig) 
 
 	// Generate src/meson.build
 	srcMeson := templates.GenerateMesonBuildSrc(config.Name, !config.IsLibrary)
-	if err := os.WriteFile(filepath.Join(projectPath, "src/meson.build"), []byte(srcMeson), 0644); err != nil {
-		return fmt.Errorf("failed to write src/meson.build: %w", err)
+	if err := os.WriteFile(filepath.Join(projectPath, "src", common.MesonBuildFile), []byte(srcMeson), 0644); err != nil {
+		return fmt.Errorf("failed to write src/%s: %w", common.MesonBuildFile, err)
 	}
 
 	// Generate meson_options.txt
 	mesonOptions := templates.GenerateMesonOptions()
-	if err := os.WriteFile(filepath.Join(projectPath, "meson_options.txt"), []byte(mesonOptions), 0644); err != nil {
-		return fmt.Errorf("failed to write meson_options.txt: %w", err)
+	if err := os.WriteFile(filepath.Join(projectPath, common.MesonOptionsFile), []byte(mesonOptions), 0644); err != nil {
+		return fmt.Errorf("failed to write %s: %w", common.MesonOptionsFile, err)
 	}
 
 	// Create subprojects directory
@@ -567,8 +566,8 @@ func (b *Builder) GenerateBuildTest(projectPath string, config build.InitConfig)
 
 	// Generate tests/meson.build
 	testsMeson := templates.GenerateMesonBuildTests(config.Name, config.TestFramework)
-	if err := os.WriteFile(filepath.Join(projectPath, "tests/meson.build"), []byte(testsMeson), 0644); err != nil {
-		return fmt.Errorf("failed to write tests/meson.build: %w", err)
+	if err := os.WriteFile(filepath.Join(projectPath, "tests", common.MesonBuildFile), []byte(testsMeson), 0644); err != nil {
+		return fmt.Errorf("failed to write tests/%s: %w", common.MesonBuildFile, err)
 	}
 	return nil
 }
@@ -578,14 +577,14 @@ func (b *Builder) GenerateBuildBench(projectPath string, config build.InitConfig
 		return nil
 	}
 
-	if err := os.MkdirAll(filepath.Join(projectPath, "bench"), 0755); err != nil {
+	if err := os.MkdirAll(filepath.Join(projectPath, string(common.VariantBench)), 0755); err != nil {
 		return fmt.Errorf("failed to create bench directory: %w", err)
 	}
 
 	// Generate bench/meson.build
 	benchMeson := templates.GenerateMesonBuildBench(config.Name, config.Benchmark)
-	if err := os.WriteFile(filepath.Join(projectPath, "bench/meson.build"), []byte(benchMeson), 0644); err != nil {
-		return fmt.Errorf("failed to write bench/meson.build: %w", err)
+	if err := os.WriteFile(filepath.Join(projectPath, string(common.VariantBench), common.MesonBuildFile), []byte(benchMeson), 0644); err != nil {
+		return fmt.Errorf("failed to write bench/%s: %w", common.MesonBuildFile, err)
 	}
 	return nil
 }

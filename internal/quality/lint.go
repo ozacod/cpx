@@ -26,9 +26,9 @@ func LintCode(fix bool, vcpkg VcpkgSetup) error {
 	var buildDir string
 
 	// Check for Meson project
-	if _, err := os.Stat("meson.build"); err == nil {
-		buildDir = "builddir"
-		compileDb = filepath.Join(buildDir, "compile_commands.json")
+	if _, err := os.Stat(common.MesonBuildFile); err == nil {
+		buildDir = common.MesonBuildDir
+		compileDb = filepath.Join(buildDir, common.CompileCommandsFile)
 
 		if _, err := os.Stat(compileDb); os.IsNotExist(err) {
 			// Try to generate compile_commands.json with meson
@@ -43,10 +43,10 @@ func LintCode(fix bool, vcpkg VcpkgSetup) error {
 				}
 			}
 		}
-	} else if _, err := os.Stat("MODULE.bazel"); err == nil {
+	} else if _, err := os.Stat(common.BazelModuleFile); err == nil {
 		// Bazel project - use bazel-compile-commands or hedron
 		buildDir = "."
-		compileDb = "compile_commands.json"
+		compileDb = common.CompileCommandsFile
 
 		if _, err := os.Stat(compileDb); os.IsNotExist(err) {
 			// Try to generate using refresh_compile_commands if available
@@ -70,7 +70,7 @@ func LintCode(fix bool, vcpkg VcpkgSetup) error {
 
 		// Use .cache/native/debug for consistency with build command
 		buildDir = filepath.Join(common.NativeCacheDir(), "debug")
-		compileDb = filepath.Join(buildDir, "compile_commands.json")
+		compileDb = filepath.Join(buildDir, common.CompileCommandsFile)
 		needsRegenerate := false
 
 		if _, err := os.Stat(compileDb); os.IsNotExist(err) {
@@ -78,7 +78,7 @@ func LintCode(fix bool, vcpkg VcpkgSetup) error {
 			fmt.Printf("%s  Generating compile_commands.json...%s\n", colors.Cyan, colors.Reset)
 		} else {
 			// Check if CMakeCache.txt exists - if not, we need to configure
-			if _, err := os.Stat(filepath.Join(buildDir, "CMakeCache.txt")); os.IsNotExist(err) {
+			if _, err := os.Stat(filepath.Join(buildDir, common.CMakeCacheFile)); os.IsNotExist(err) {
 				needsRegenerate = true
 				fmt.Printf("%s  Regenerating compile_commands.json (CMake not configured)...%s\n", colors.Cyan, colors.Reset)
 			}

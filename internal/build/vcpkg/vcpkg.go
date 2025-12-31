@@ -228,8 +228,8 @@ func (b *Builder) RunCommand(args []string) error {
 
 func (b *Builder) GenerateGitignore(projectPath string) error {
 	gitignore := templates.GenerateGitignore()
-	if err := os.WriteFile(filepath.Join(projectPath, ".gitignore"), []byte(gitignore), 0644); err != nil {
-		return fmt.Errorf("failed to write .gitignore: %w", err)
+	if err := os.WriteFile(filepath.Join(projectPath, common.GitignoreFile), []byte(gitignore), 0644); err != nil {
+		return fmt.Errorf("failed to write %s: %w", common.GitignoreFile, err)
 	}
 	return nil
 }
@@ -248,8 +248,8 @@ func (b *Builder) GenerateBuildSrc(projectPath string, config build.InitConfig) 
 		IncludeBench:       hasBench,
 		ProjectVersion:     config.Version,
 	})
-	if err := os.WriteFile(filepath.Join(projectPath, "CMakeLists.txt"), []byte(cmakeLists), 0644); err != nil {
-		return fmt.Errorf("failed to write CMakeLists.txt: %w", err)
+	if err := os.WriteFile(filepath.Join(projectPath, common.CMakeListsFile), []byte(cmakeLists), 0644); err != nil {
+		return fmt.Errorf("failed to write %s: %w", common.CMakeListsFile, err)
 	}
 
 	return nil
@@ -266,8 +266,8 @@ func (b *Builder) GenerateBuildTest(projectPath string, config build.InitConfig)
 
 	// Generate tests/CMakeLists.txt
 	testCMake := templates.GenerateTestCMake(config.Name, config.TestFramework)
-	if err := os.WriteFile(filepath.Join(projectPath, "tests/CMakeLists.txt"), []byte(testCMake), 0644); err != nil {
-		return fmt.Errorf("failed to write tests/CMakeLists.txt: %w", err)
+	if err := os.WriteFile(filepath.Join(projectPath, "tests", common.CMakeListsFile), []byte(testCMake), 0644); err != nil {
+		return fmt.Errorf("failed to write tests/%s: %w", common.CMakeListsFile, err)
 	}
 	return nil
 }
@@ -277,14 +277,14 @@ func (b *Builder) GenerateBuildBench(projectPath string, config build.InitConfig
 		return nil
 	}
 
-	if err := os.MkdirAll(filepath.Join(projectPath, "bench"), 0755); err != nil {
+	if err := os.MkdirAll(filepath.Join(projectPath, string(common.VariantBench)), 0755); err != nil {
 		return fmt.Errorf("failed to create bench directory: %w", err)
 	}
 
 	// Generate bench/CMakeLists.txt
 	benchCMake := templates.GenerateBenchCMake(config.Name, config.Benchmark)
-	if err := os.WriteFile(filepath.Join(projectPath, "bench/CMakeLists.txt"), []byte(benchCMake), 0644); err != nil {
-		return fmt.Errorf("failed to write bench/CMakeLists.txt: %w", err)
+	if err := os.WriteFile(filepath.Join(projectPath, string(common.VariantBench), common.CMakeListsFile), []byte(benchCMake), 0644); err != nil {
+		return fmt.Errorf("failed to write bench/%s: %w", common.CMakeListsFile, err)
 	}
 	return nil
 }
@@ -305,9 +305,9 @@ func (b *Builder) Build(opts build.BuildOptions) error {
 	// For test builds, use "test" directory; for benchmark builds, use "bench"
 	var outDirName string
 	if opts.EnableTesting {
-		outDirName = "test"
+		outDirName = string(common.VariantTest)
 	} else if opts.EnableBenchmarks {
-		outDirName = "bench"
+		outDirName = string(common.VariantBench)
 	} else {
 		outDirName = build.GetOutputDir(opts.Release, opts.OptLevel, opts.Sanitizer)
 	}
@@ -369,7 +369,7 @@ func (b *Builder) Build(opts build.BuildOptions) error {
 
 	// Configure CMake if needed
 	needsConfigure := false
-	if _, err := os.Stat(filepath.Join(cacheBuildDir, "CMakeCache.txt")); os.IsNotExist(err) {
+	if _, err := os.Stat(filepath.Join(cacheBuildDir, common.CMakeCacheFile)); os.IsNotExist(err) {
 		needsConfigure = true
 	}
 
@@ -471,7 +471,7 @@ func (b *Builder) Test(opts build.TestOptions) error {
 	}
 
 	// Run tests with CTest
-	buildDir := filepath.Join(common.NativeCacheDir(), "test")
+	buildDir := filepath.Join(common.NativeCacheDir(), string(common.VariantTest))
 
 	fmt.Printf("%s▸ Running tests...%s\n", colors.Cyan, colors.Reset)
 
@@ -604,13 +604,13 @@ func (b *Builder) Bench(opts build.BenchOptions) error {
 	}
 
 	// Run benchmarks
-	buildDir := filepath.Join(common.NativeCacheDir(), "bench")
+	buildDir := filepath.Join(common.NativeCacheDir(), string(common.VariantBench))
 
 	fmt.Printf("%s▸ Running benchmarks...%s\n", colors.Cyan, colors.Reset)
 
 	// Find the benchmark executable
 	possiblePaths := []string{
-		filepath.Join(buildDir, "bench", benchTarget),
+		filepath.Join(buildDir, string(common.VariantBench), benchTarget),
 		filepath.Join(buildDir, benchTarget),
 	}
 
@@ -647,7 +647,11 @@ func (b *Builder) Clean(opts build.CleanOptions) error {
 
 	// Remove intermediate build directories (keep vcpkg_installed unless --all)
 	// We iterate common variants instead of blowing away .cache/native
-	variants := []string{"debug", "release", "O0", "O1", "O2", "O3", "Os", "Ofast", "test", "bench"}
+	variants := []string{
+		string(common.VariantDebug), string(common.VariantRelease),
+		"O0", "O1", "O2", "O3", "Os", "Ofast",
+		string(common.VariantTest), string(common.VariantBench),
+	}
 	for _, v := range variants {
 		common.RemoveDir(filepath.Join(common.NativeCacheDir(), v))
 	}
@@ -727,31 +731,31 @@ func (b *Builder) printUsageInfo(pkgName string) {
 
 func (b *Builder) RemoveDependency(name string) error {
 	// Check for vcpkg.json (Manifest mode)
-	if _, err := os.Stat("vcpkg.json"); err != nil {
-		return fmt.Errorf("vcpkg.json not found - manifest mode required")
+	if _, err := os.Stat(common.VcpkgManifest); err != nil {
+		return fmt.Errorf("%s not found - manifest mode required", common.VcpkgManifest)
 	}
 
 	// Read manifest
-	data, err := os.ReadFile("vcpkg.json")
+	data, err := os.ReadFile(common.VcpkgManifest)
 	if err != nil {
-		return fmt.Errorf("failed to read vcpkg.json: %w", err)
+		return fmt.Errorf("failed to read %s: %w", common.VcpkgManifest, err)
 	}
 
 	// Parse JSON
 	var manifest map[string]interface{}
 	if err := json.Unmarshal(data, &manifest); err != nil {
-		return fmt.Errorf("failed to parse vcpkg.json: %w", err)
+		return fmt.Errorf("failed to parse %s: %w", common.VcpkgManifest, err)
 	}
 
 	// Get dependencies
 	deps, ok := manifest["dependencies"]
 	if !ok {
-		return fmt.Errorf("no dependencies found in vcpkg.json")
+		return fmt.Errorf("no dependencies found in %s", common.VcpkgManifest)
 	}
 
 	depList, ok := deps.([]interface{})
 	if !ok {
-		return fmt.Errorf("invalid dependencies format in vcpkg.json")
+		return fmt.Errorf("invalid dependencies format in %s", common.VcpkgManifest)
 	}
 
 	// Filter out the dependency
@@ -776,7 +780,7 @@ func (b *Builder) RemoveDependency(name string) error {
 	}
 
 	if !found {
-		return fmt.Errorf("dependency %s not found in vcpkg.json", name)
+		return fmt.Errorf("dependency %s not found in %s", name, common.VcpkgManifest)
 	}
 
 	// Update manifest
@@ -785,30 +789,30 @@ func (b *Builder) RemoveDependency(name string) error {
 	// Write back
 	newData, err := json.MarshalIndent(manifest, "", "  ")
 	if err != nil {
-		return fmt.Errorf("failed to encode vcpkg.json: %w", err)
+		return fmt.Errorf("failed to encode %s: %w", common.VcpkgManifest, err)
 	}
 
-	if err := os.WriteFile("vcpkg.json", newData, 0644); err != nil {
-		return fmt.Errorf("failed to write vcpkg.json: %w", err)
+	if err := os.WriteFile(common.VcpkgManifest, newData, 0644); err != nil {
+		return fmt.Errorf("failed to write %s: %w", common.VcpkgManifest, err)
 	}
 
-	fmt.Printf("%s✓ Removed %s from vcpkg.json%s\n", colors.Green, name, colors.Reset)
+	fmt.Printf("%s✓ Removed %s from %s%s\n", colors.Green, name, common.VcpkgManifest, colors.Reset)
 	return nil
 }
 
 func (b *Builder) ListDependencies() ([]build.Dependency, error) {
 	// Read vcpkg.json
-	data, err := os.ReadFile("vcpkg.json")
+	data, err := os.ReadFile(common.VcpkgManifest)
 	if err != nil {
 		if os.IsNotExist(err) {
 			return nil, nil // No vcpkg.json means no dependencies
 		}
-		return nil, fmt.Errorf("failed to read vcpkg.json: %w", err)
+		return nil, fmt.Errorf("failed to read %s: %w", common.VcpkgManifest, err)
 	}
 
 	var manifest map[string]interface{}
 	if err := json.Unmarshal(data, &manifest); err != nil {
-		return nil, fmt.Errorf("failed to parse vcpkg.json: %w", err)
+		return nil, fmt.Errorf("failed to parse %s: %w", common.VcpkgManifest, err)
 	}
 
 	depsRaw, ok := manifest["dependencies"]
@@ -818,7 +822,7 @@ func (b *Builder) ListDependencies() ([]build.Dependency, error) {
 
 	depList, ok := depsRaw.([]interface{})
 	if !ok {
-		return nil, fmt.Errorf("invalid dependencies format in vcpkg.json")
+		return nil, fmt.Errorf("invalid dependencies format in %s", common.VcpkgManifest)
 	}
 
 	var deps []build.Dependency
