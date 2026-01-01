@@ -11,7 +11,7 @@ import (
 	"github.com/ozacod/cpx/internal/utils/colors"
 )
 
-func (b *Builder) RunDockerBuild(opts build.DockerBuildOptions) error {
+func (b *BazelBuilder) RunDockerBuild(opts build.DockerBuildOptions) error {
 	absProjectRoot, err := filepath.Abs(opts.ProjectRoot)
 	if err != nil {
 		return fmt.Errorf("failed to get absolute path for project root: %w", err)
@@ -162,4 +162,4 @@ find "$BAZEL_OUTPUT_BASE" -path "*/bin/*" -type f \( -name "lib*.a" -o -name "li
 	return nil
 }
 
-var _ build.DockerBuilder = (*Builder)(nil)
+var _ build.DockerBuilder = (*BazelBuilder)(nil)

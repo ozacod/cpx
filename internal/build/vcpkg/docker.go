@@ -13,7 +13,7 @@ import (
 	"github.com/ozacod/cpx/internal/utils/colors"
 )
 
-func (b *Builder) RunDockerBuild(opts build.DockerBuildOptions) error {
+func (b *VcpkgBuilder) RunDockerBuild(opts build.DockerBuildOptions) error {
 	// Create target-specific output directory
 	targetOutputDir := filepath.Join(opts.OutputDir, opts.TargetName)
 	if err := os.MkdirAll(targetOutputDir, 0755); err != nil {
@@ -291,4 +291,4 @@ func detectProjectType(projectRoot string) (bool, error) {
 	return true, nil
 }
 
-var _ build.DockerBuilder = (*Builder)(nil)
+var _ build.DockerBuilder = (*VcpkgBuilder)(nil)

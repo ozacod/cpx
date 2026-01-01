@@ -18,8 +18,8 @@ import (
 
 var execCommand = exec.Command
 
-// Builder implements the.BuildSystem interface for Bazel.
-type Builder struct {
+// BazelBuilder implements the.BuildSystem interface for Bazel.
+type BazelBuilder struct {
 	bcrPath string // BCR path for lazy initialization
 }
 
@@ -32,8 +32,8 @@ func SetBCRPathProvider(fn BCRPathFunc) {
 	bcrPathProvider = fn
 }
 
-func New() *Builder {
-	return &Builder{}
+func New() *BazelBuilder {
+	return &BazelBuilder{}
 }
 
 type Module struct {
@@ -54,11 +54,11 @@ type ModuleMetadata struct {
 	YankedVersions map[string]string `json:"yanked_versions"`
 }
 
-func (b *Builder) SetBCRPath(bcrPath string) {
+func (b *BazelBuilder) SetBCRPath(bcrPath string) {
 	b.bcrPath = bcrPath
 }
 
-func (b *Builder) ensureBCRPath() error {
+func (b *BazelBuilder) ensureBCRPath() error {
 	if b.bcrPath != "" {
 		return nil
 	}
@@ -75,11 +75,11 @@ func (b *Builder) ensureBCRPath() error {
 	return fmt.Errorf("bazel Central Registry not configured\n  hint: run 'cpx config set-bcr-root <path>' or reinstall cpx")
 }
 
-func (b *Builder) getModulesDir() string {
+func (b *BazelBuilder) getModulesDir() string {
 	return filepath.Join(b.bcrPath, "modules")
 }
 
-func (b *Builder) listModules() ([]string, error) {
+func (b *BazelBuilder) listModules() ([]string, error) {
 	modulesDir := b.getModulesDir()
 	entries, err := os.ReadDir(modulesDir)
 	if err != nil {
@@ -95,7 +95,7 @@ func (b *Builder) listModules() ([]string, error) {
 	return modules, nil
 }
 
-func (b *Builder) searchModules(query string) ([]Module, error) {
+func (b *BazelBuilder) searchModules(query string) ([]Module, error) {
 	allModules, err := b.listModules()
 	if err != nil {
 		return nil, err
@@ -117,7 +117,7 @@ func (b *Builder) searchModules(query string) ([]Module, error) {
 	return results, nil
 }
 
-func (b *Builder) getModule(moduleName string) (*Module, error) {
+func (b *BazelBuilder) getModule(moduleName string) (*Module, error) {
 	metadataPath := filepath.Join(b.getModulesDir(), moduleName, "metadata.json")
 
 	data, err := os.ReadFile(metadataPath)
@@ -147,7 +147,7 @@ func (b *Builder) getModule(moduleName string) (*Module, error) {
 	return module, nil
 }
 
-func (b *Builder) getLatestVersion(moduleName string) (string, error) {
+func (b *BazelBuilder) getLatestVersion(moduleName string) (string, error) {
 	module, err := b.getModule(moduleName)
 	if err != nil {
 		return "", err
@@ -161,7 +161,7 @@ func (b *Builder) getLatestVersion(moduleName string) (string, error) {
 	return module.Versions[len(module.Versions)-1], nil
 }
 
-func (b *Builder) Build(opts build.BuildOptions) error {
+func (b *BazelBuilder) Build(opts build.BuildOptions) error {
 	// Clean if requested
 	if opts.Clean {
 		if err := b.Clean(build.CleanOptions{All: false}); err != nil {
@@ -307,7 +307,7 @@ func (b *Builder) Build(opts build.BuildOptions) error {
 	return nil
 }
 
-func (b *Builder) Test(opts build.TestOptions) error {
+func (b *BazelBuilder) Test(opts build.TestOptions) error {
 	fmt.Printf("%sRunning Bazel tests...%s\n", colors.Cyan, colors.Reset)
 
 	bazelArgs := []string{"test"}
@@ -340,7 +340,7 @@ func (b *Builder) Test(opts build.TestOptions) error {
 	return nil
 }
 
-func (b *Builder) Run(opts build.RunOptions) error {
+func (b *BazelBuilder) Run(opts build.RunOptions) error {
 	// Build bazel run args
 	bazelArgs := []string{"run"}
 
@@ -452,7 +452,7 @@ func findBazelMainTarget() (string, error) {
 	return "//:" + projectName, nil
 }
 
-func (b *Builder) Bench(opts build.BenchOptions) error {
+func (b *BazelBuilder) Bench(opts build.BenchOptions) error {
 	fmt.Printf("%sRunning Bazel benchmarks...%s\n", colors.Cyan, colors.Reset)
 
 	target := opts.Target
@@ -521,7 +521,7 @@ func findBenchTarget() string {
 	return ""
 }
 
-func (b *Builder) Clean(opts build.CleanOptions) error {
+func (b *BazelBuilder) Clean(opts build.CleanOptions) error {
 	fmt.Printf("%sCleaning Bazel project...%s\n", colors.Cyan, colors.Reset)
 
 	// Run bazel clean
@@ -563,7 +563,7 @@ func (b *Builder) Clean(opts build.CleanOptions) error {
 	return nil
 }
 
-func (b *Builder) AddDependency(name string, version string) error {
+func (b *BazelBuilder) AddDependency(name string, version string) error {
 	// If no version provided, get latest from BCR
 	if version == "" {
 		// Ensure BCR path is configured
@@ -614,7 +614,7 @@ func (b *Builder) AddDependency(name string, version string) error {
 	return nil
 }
 
-func (b *Builder) RemoveDependency(name string) error {
+func (b *BazelBuilder) RemoveDependency(name string) error {
 	content, err := os.ReadFile(common.BazelModuleFile)
 	if err != nil {
 		return fmt.Errorf("failed to read %s: %w", common.BazelModuleFile, err)
@@ -632,7 +632,7 @@ func (b *Builder) RemoveDependency(name string) error {
 	return nil
 }
 
-func (b *Builder) ListDependencies() ([]build.Dependency, error) {
+func (b *BazelBuilder) ListDependencies() ([]build.Dependency, error) {
 	content, err := os.ReadFile(common.BazelModuleFile)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read %s: %w", common.BazelModuleFile, err)
@@ -655,7 +655,7 @@ func (b *Builder) ListDependencies() ([]build.Dependency, error) {
 	return deps, nil
 }
 
-func (b *Builder) SearchDependencies(query string) ([]build.Dependency, error) {
+func (b *BazelBuilder) SearchDependencies(query string) ([]build.Dependency, error) {
 	if err := b.ensureBCRPath(); err != nil {
 		return nil, err
 	}
@@ -681,11 +681,11 @@ func (b *Builder) SearchDependencies(query string) ([]build.Dependency, error) {
 	return deps, nil
 }
 
-func (b *Builder) Name() string {
+func (b *BazelBuilder) Name() string {
 	return "bazel"
 }
 
-func (b *Builder) DependencyInfo(name string) (*build.DependencyInfo, error) {
+func (b *BazelBuilder) DependencyInfo(name string) (*build.DependencyInfo, error) {
 	// Use BCR client to get module info
 	if err := b.ensureBCRPath(); err != nil {
 		return nil, err
@@ -717,7 +717,7 @@ func (b *Builder) DependencyInfo(name string) (*build.DependencyInfo, error) {
 	return info, nil
 }
 
-func (b *Builder) ListTargets() ([]string, error) {
+func (b *BazelBuilder) ListTargets() ([]string, error) {
 	// Query for all targets of type rule
 	// We use label_kind to get type info: "kind rule //package:target"
 	cmd := execCommand("bazel", "query", "//...", "--output", "label_kind")
@@ -749,7 +749,7 @@ func (b *Builder) ListTargets() ([]string, error) {
 	return targets, nil
 }
 
-func (b *Builder) GenerateGitignore(projectPath string) error {
+func (b *BazelBuilder) GenerateGitignore(projectPath string) error {
 	gitignore := templates.GenerateBazelGitignore()
 	if err := os.WriteFile(filepath.Join(projectPath, common.GitignoreFile), []byte(gitignore), 0644); err != nil {
 		return fmt.Errorf("failed to write %s: %w", common.GitignoreFile, err)
@@ -757,7 +757,7 @@ func (b *Builder) GenerateGitignore(projectPath string) error {
 	return nil
 }
 
-func (b *Builder) GenerateBuildSrc(projectPath string, config build.InitConfig) error {
+func (b *BazelBuilder) GenerateBuildSrc(projectPath string, config build.InitConfig) error {
 	// Generate MODULE.bazel
 	moduleBazel := templates.GenerateModuleBazel(config.Name, config.Version, config.TestFramework, config.Benchmark)
 	if err := os.WriteFile(filepath.Join(projectPath, common.BazelModuleFile), []byte(moduleBazel), 0644); err != nil {
@@ -805,7 +805,7 @@ func (b *Builder) GenerateBuildSrc(projectPath string, config build.InitConfig) 
 	return nil
 }
 
-func (b *Builder) GenerateBuildTest(projectPath string, config build.InitConfig) error {
+func (b *BazelBuilder) GenerateBuildTest(projectPath string, config build.InitConfig) error {
 	if config.TestFramework == "" || config.TestFramework == "none" {
 		return nil
 	}
@@ -822,7 +822,7 @@ func (b *Builder) GenerateBuildTest(projectPath string, config build.InitConfig)
 	return nil
 }
 
-func (b *Builder) GenerateBuildBench(projectPath string, config build.InitConfig) error {
+func (b *BazelBuilder) GenerateBuildBench(projectPath string, config build.InitConfig) error {
 	if config.Benchmark == "" || config.Benchmark == "none" {
 		return nil
 	}
@@ -839,16 +839,16 @@ func (b *Builder) GenerateBuildBench(projectPath string, config build.InitConfig
 	return nil
 }
 
-func (b *Builder) GenerateReadme(config build.InitConfig) string {
+func (b *BazelBuilder) GenerateReadme(config build.InitConfig) string {
 	return templates.GenerateBazelReadme(config.Name, config.CppStandard, config.IsLibrary)
 }
 
-func (b *Builder) Update() error {
+func (b *BazelBuilder) Update() error {
 	return fmt.Errorf("update command not implemented for Bazel projects")
 }
 
-func (b *Builder) Upgrade() error {
+func (b *BazelBuilder) Upgrade() error {
 	return fmt.Errorf("upgrade command not implemented for Bazel projects")
 }
 
-var _ build.BuildSystem = (*Builder)(nil)
+var _ build.BuildSystem = (*BazelBuilder)(nil)

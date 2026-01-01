@@ -17,14 +17,14 @@ import (
 
 var execCommand = exec.Command
 
-// Builder implements the build.BuildSystem interface for Meson.
-type Builder struct{}
+// MesonBuilder implements the build.BuildSystem interface for Meson.
+type MesonBuilder struct{}
 
-func New() *Builder {
-	return &Builder{}
+func New() *MesonBuilder {
+	return &MesonBuilder{}
 }
 
-func (b *Builder) Build(opts build.BuildOptions) error {
+func (b *MesonBuilder) Build(opts build.BuildOptions) error {
 	buildDir := common.MesonBuildDir
 
 	// Determine build type and optimization from flags
@@ -165,7 +165,7 @@ func (b *Builder) Build(opts build.BuildOptions) error {
 	return nil
 }
 
-func (b *Builder) Test(opts build.TestOptions) error {
+func (b *MesonBuilder) Test(opts build.TestOptions) error {
 	fmt.Printf("%sRunning Meson tests...%s\n", colors.Cyan, colors.Reset)
 
 	// Ensure common.MesonBuildDir exists - need build first
@@ -206,7 +206,7 @@ func (b *Builder) Test(opts build.TestOptions) error {
 	return nil
 }
 
-func (b *Builder) Run(opts build.RunOptions) error {
+func (b *MesonBuilder) Run(opts build.RunOptions) error {
 	// Ensure project is built first
 	if err := b.Build(build.BuildOptions{
 		Release:   opts.Release,
@@ -275,7 +275,7 @@ func (b *Builder) Run(opts build.RunOptions) error {
 	return runCmd.Run()
 }
 
-func (b *Builder) Bench(opts build.BenchOptions) error {
+func (b *MesonBuilder) Bench(opts build.BenchOptions) error {
 	fmt.Printf("%sRunning Meson benchmarks...%s\n", colors.Cyan, colors.Reset)
 
 	// Ensure builddir exists
@@ -333,7 +333,7 @@ func (b *Builder) Bench(opts build.BenchOptions) error {
 	return nil
 }
 
-func (b *Builder) Clean(opts build.CleanOptions) error {
+func (b *MesonBuilder) Clean(opts build.CleanOptions) error {
 	fmt.Printf("%sCleaning Meson project...%s\n", colors.Cyan, colors.Reset)
 
 	// Remove builddir
@@ -354,7 +354,7 @@ func (b *Builder) Clean(opts build.CleanOptions) error {
 	return nil
 }
 
-func (b *Builder) AddDependency(name string, _ string) error {
+func (b *MesonBuilder) AddDependency(name string, _ string) error {
 	fmt.Printf("%sInstalling wrap for %s...%s\n", colors.Cyan, name, colors.Reset)
 
 	// Create subprojects dir if it doesn't exist
@@ -385,7 +385,7 @@ func (b *Builder) AddDependency(name string, _ string) error {
 	return nil
 }
 
-func (b *Builder) RemoveDependency(name string) error {
+func (b *MesonBuilder) RemoveDependency(name string) error {
 	// Remove the wrap file from subprojects
 	wrapFile := filepath.Join("subprojects", name+".wrap")
 	if _, err := os.Stat(wrapFile); os.IsNotExist(err) {
@@ -408,7 +408,7 @@ func (b *Builder) RemoveDependency(name string) error {
 	return nil
 }
 
-func (b *Builder) ListDependencies() ([]build.Dependency, error) {
+func (b *MesonBuilder) ListDependencies() ([]build.Dependency, error) {
 	subprojectsDir := "subprojects"
 	entries, err := os.ReadDir(subprojectsDir)
 	if err != nil {
@@ -433,21 +433,21 @@ func (b *Builder) ListDependencies() ([]build.Dependency, error) {
 	return deps, nil
 }
 
-func (b *Builder) SearchDependencies(_ string) ([]build.Dependency, error) {
+func (b *MesonBuilder) SearchDependencies(_ string) ([]build.Dependency, error) {
 	// WrapDB search would require HTTP calls to wrapdb.mesonbuild.com
 	// For now, return an error indicating this is not implemented
 	return nil, fmt.Errorf("SearchDependencies not implemented for Meson - use https://wrapdb.mesonbuild.com to search")
 }
 
-func (b *Builder) Name() string {
+func (b *MesonBuilder) Name() string {
 	return "meson"
 }
 
-func (b *Builder) DependencyInfo(_ string) (*build.DependencyInfo, error) {
+func (b *MesonBuilder) DependencyInfo(_ string) (*build.DependencyInfo, error) {
 	return nil, fmt.Errorf("dependency info not implemented for Meson")
 }
 
-func (b *Builder) ListTargets() ([]string, error) {
+func (b *MesonBuilder) ListTargets() ([]string, error) {
 	if _, err := os.Stat(common.MesonBuildDir); os.IsNotExist(err) {
 		return nil, fmt.Errorf("build directory '%s' does not exist. Run 'cpx build' first", common.MesonBuildDir)
 	}
@@ -477,7 +477,7 @@ func (b *Builder) ListTargets() ([]string, error) {
 	return result, nil
 }
 
-func (b *Builder) GenerateGitignore(projectPath string) error {
+func (b *MesonBuilder) GenerateGitignore(projectPath string) error {
 	gitignore := templates.GenerateMesonGitignore()
 	if err := os.WriteFile(filepath.Join(projectPath, common.GitignoreFile), []byte(gitignore), 0644); err != nil {
 		return fmt.Errorf("failed to write %s: %w", common.GitignoreFile, err)
@@ -485,7 +485,7 @@ func (b *Builder) GenerateGitignore(projectPath string) error {
 	return nil
 }
 
-func (b *Builder) GenerateBuildSrc(projectPath string, config build.InitConfig) error {
+func (b *MesonBuilder) GenerateBuildSrc(projectPath string, config build.InitConfig) error {
 	// Generate meson.build (root)
 	mesonBuild := templates.GenerateMesonBuildRoot(templates.MesonRootOptions{
 		ProjectName:        config.Name,
@@ -555,7 +555,7 @@ func (b *Builder) GenerateBuildSrc(projectPath string, config build.InitConfig) 
 	return nil
 }
 
-func (b *Builder) GenerateBuildTest(projectPath string, config build.InitConfig) error {
+func (b *MesonBuilder) GenerateBuildTest(projectPath string, config build.InitConfig) error {
 	if config.TestFramework == "" || config.TestFramework == "none" {
 		return nil
 	}
@@ -572,7 +572,7 @@ func (b *Builder) GenerateBuildTest(projectPath string, config build.InitConfig)
 	return nil
 }
 
-func (b *Builder) GenerateBuildBench(projectPath string, config build.InitConfig) error {
+func (b *MesonBuilder) GenerateBuildBench(projectPath string, config build.InitConfig) error {
 	if config.Benchmark == "" || config.Benchmark == "none" {
 		return nil
 	}
@@ -589,19 +589,19 @@ func (b *Builder) GenerateBuildBench(projectPath string, config build.InitConfig
 	return nil
 }
 
-func (b *Builder) GenerateReadme(config build.InitConfig) string {
+func (b *MesonBuilder) GenerateReadme(config build.InitConfig) string {
 	return templates.GenerateMesonReadme(config.Name, config.CppStandard, config.IsLibrary)
 }
 
-func (b *Builder) Update() error {
+func (b *MesonBuilder) Update() error {
 	return fmt.Errorf("update command not implemented for Meson projects")
 }
 
-func (b *Builder) Upgrade() error {
+func (b *MesonBuilder) Upgrade() error {
 	return fmt.Errorf("upgrade command not implemented for Meson projects")
 }
 
-func (b *Builder) downloadWrap(projectPath, wrapName string) error {
+func (b *MesonBuilder) downloadWrap(projectPath, wrapName string) error {
 	// Ensure meson is available (already checked usually)
 
 	cmd := execCommand("meson", "wrap", "install", wrapName)
@@ -616,4 +616,4 @@ func (b *Builder) downloadWrap(projectPath, wrapName string) error {
 	return nil
 }
 
-var _ build.BuildSystem = (*Builder)(nil)
+var _ build.BuildSystem = (*MesonBuilder)(nil)

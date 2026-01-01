@@ -85,7 +85,7 @@ func mockExecCommand(capturedArgs *[][]string) func(string, ...string) *exec.Cmd
 	}
 }
 
-func setupTestConfig(tmpDir string) *Builder {
+func setupTestConfig(tmpDir string) *VcpkgBuilder {
 	b := New()
 	cfg := &config.GlobalConfig{
 		VcpkgRoot: tmpDir,

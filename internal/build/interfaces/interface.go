@@ -74,7 +74,19 @@ type DependencyInfo struct {
 // BuildSystem defines the interface for all build system implementations.
 // Each build system (CMake, Bazel, Meson) implements this interface to provide
 // a unified way to build, test, run, and benchmark projects.
+//
+// The interface is composed of three smaller interfaces:
+//   - Builder: core build operations
+//   - DependencyManager: dependency management
+//   - ProjectGenerator: project initialization
 type BuildSystem interface {
+	Builder
+	DependencyManager
+	ProjectGenerator
+}
+
+// Builder defines the core build operations interface.
+type Builder interface {
 	// Build compiles the project with the given options.
 	Build(opts BuildOptions) error
 
@@ -90,11 +102,17 @@ type BuildSystem interface {
 	// Clean removes build artifacts.
 	Clean(opts CleanOptions) error
 
-	// ListDependencies returns the list of dependencies in the project.
-	ListDependencies() ([]Dependency, error)
-
 	// ListTargets returns the list of build targets (executables, libraries).
 	ListTargets() ([]string, error)
+
+	// Name returns the name of the build system (e.g., "cmake", "bazel", "meson").
+	Name() string
+}
+
+// DependencyManager defines the interface for dependency management operations.
+type DependencyManager interface {
+	// ListDependencies returns the list of dependencies in the project.
+	ListDependencies() ([]Dependency, error)
 
 	// SearchDependencies searches for available packages matching the query.
 	SearchDependencies(query string) ([]Dependency, error)
@@ -108,9 +126,15 @@ type BuildSystem interface {
 	// RemoveDependency removes a dependency from the project.
 	RemoveDependency(name string) error
 
-	// Name returns the name of the build system (e.g., "cmake", "bazel", "meson").
-	Name() string
+	// Update checks for outdated dependencies.
+	Update() error
 
+	// Upgrade upgrades dependencies to newer versions.
+	Upgrade() error
+}
+
+// ProjectGenerator defines the interface for project initialization operations.
+type ProjectGenerator interface {
 	// GenerateGitignore generates the .gitignore file.
 	GenerateGitignore(projectPath string) error
 
@@ -125,12 +149,6 @@ type BuildSystem interface {
 
 	// GenerateReadme generates the README.md content for the project.
 	GenerateReadme(config InitConfig) string
-
-	// Update checks for outdated dependencies.
-	Update() error
-
-	// Upgrade upgrades dependencies to newer versions.
-	Upgrade() error
 }
 
 // InitConfig contains configuration for initializing a new project.

@@ -260,7 +260,7 @@ func createProjectFromTUI(config tui.ProjectConfig) error {
 	// Setup vcpkg if enabled (skip for bazel)
 	if cfg.PackageManager == "vcpkg" {
 		// Use the existing builder if it's a vcpkg builder, or create a new one to query path (though we should just cast if possible)
-		vcpkgBuilder, ok := builder.(*vcpkg.Builder)
+		vcpkgBuilder, ok := builder.(*vcpkg.VcpkgBuilder)
 		if ok {
 			vcpkgPath, err := vcpkgBuilder.GetPath()
 			if err == nil && vcpkgPath != "" {
@@ -299,7 +299,7 @@ func createProjectFromTUI(config tui.ProjectConfig) error {
 	return nil
 }
 
-func setupVcpkgProject(builder *vcpkg.Builder, targetDir string, dependencies []string) error {
+func setupVcpkgProject(builder *vcpkg.VcpkgBuilder, targetDir string, dependencies []string) error {
 	vcpkgPath, err := builder.GetPath()
 	if err != nil {
 		return fmt.Errorf("vcpkg not configured: %w\n   Run: cpx config set-vcpkg-root <path>", err)

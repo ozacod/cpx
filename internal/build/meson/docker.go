@@ -12,7 +12,7 @@ import (
 	"github.com/ozacod/cpx/internal/utils/colors"
 )
 
-func (b *Builder) RunDockerBuild(opts build.DockerBuildOptions) error {
+func (b *MesonBuilder) RunDockerBuild(opts build.DockerBuildOptions) error {
 	absProjectRoot, err := filepath.Abs(opts.ProjectRoot)
 	if err != nil {
 		return fmt.Errorf("failed to get absolute path for project root: %w", err)
@@ -211,4 +211,4 @@ if [ "%[5]s" = "true" ]; then ls -la /output/%[8]s/ 2>/dev/null || echo "  (no a
 	return nil
 }
 
-var _ build.DockerBuilder = (*Builder)(nil)
+var _ build.DockerBuilder = (*MesonBuilder)(nil)

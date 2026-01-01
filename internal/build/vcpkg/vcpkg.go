@@ -22,17 +22,17 @@ import (
 
 var execCommand = exec.Command
 
-// Builder implements the build.BuildSystem interface for vcpkg.
-type Builder struct {
+// VcpkgBuilder implements the build.BuildSystem interface for vcpkg.
+type VcpkgBuilder struct {
 	globalConfig *config.GlobalConfig
 }
 
-func New() *Builder {
-	return &Builder{}
+func New() *VcpkgBuilder {
+	return &VcpkgBuilder{}
 }
 
 // ensureConfig ensures the global config is loaded
-func (b *Builder) ensureConfig() error {
+func (b *VcpkgBuilder) ensureConfig() error {
 	if b.globalConfig != nil {
 		return nil
 	}
@@ -44,7 +44,7 @@ func (b *Builder) ensureConfig() error {
 	return nil
 }
 
-func (b *Builder) SetupEnv() error {
+func (b *VcpkgBuilder) SetupEnv() error {
 	if err := b.ensureConfig(); err != nil {
 		return err
 	}
@@ -93,7 +93,7 @@ type configureOptions struct {
 	verbose          bool
 }
 
-func (b *Builder) configureCMake(opts configureOptions) error {
+func (b *VcpkgBuilder) configureCMake(opts configureOptions) error {
 	// Determine absolute path for shared vcpkg_installed directory
 	cwd, _ := os.Getwd()
 	vcpkgInstalledDir := filepath.Join(cwd, common.NativeCacheDir(), "vcpkg_installed")
@@ -145,7 +145,7 @@ func (b *Builder) configureCMake(opts configureOptions) error {
 	return nil
 }
 
-func (b *Builder) copyBuildArtifacts(cacheBuildDir, finalBuildDir string) error {
+func (b *VcpkgBuilder) copyBuildArtifacts(cacheBuildDir, finalBuildDir string) error {
 	if err := os.MkdirAll(finalBuildDir, 0755); err != nil {
 		return fmt.Errorf("failed to create final build dir: %w", err)
 	}
@@ -169,7 +169,7 @@ func (b *Builder) copyBuildArtifacts(cacheBuildDir, finalBuildDir string) error 
 	return nil
 }
 
-func (b *Builder) GetPath() (string, error) {
+func (b *VcpkgBuilder) GetPath() (string, error) {
 	if err := b.ensureConfig(); err != nil {
 		return "", err
 	}
@@ -205,7 +205,7 @@ func (b *Builder) GetPath() (string, error) {
 	return vcpkgPath, nil
 }
 
-func (b *Builder) RunCommand(args []string) error {
+func (b *VcpkgBuilder) RunCommand(args []string) error {
 	vcpkgPath, err := b.GetPath()
 	if err != nil {
 		return err
@@ -226,7 +226,7 @@ func (b *Builder) RunCommand(args []string) error {
 	return cmd.Run()
 }
 
-func (b *Builder) GenerateGitignore(projectPath string) error {
+func (b *VcpkgBuilder) GenerateGitignore(projectPath string) error {
 	gitignore := templates.GenerateGitignore()
 	if err := os.WriteFile(filepath.Join(projectPath, common.GitignoreFile), []byte(gitignore), 0644); err != nil {
 		return fmt.Errorf("failed to write %s: %w", common.GitignoreFile, err)
@@ -234,7 +234,7 @@ func (b *Builder) GenerateGitignore(projectPath string) error {
 	return nil
 }
 
-func (b *Builder) GenerateBuildSrc(projectPath string, config build.InitConfig) error {
+func (b *VcpkgBuilder) GenerateBuildSrc(projectPath string, config build.InitConfig) error {
 	hasTest := config.TestFramework != "" && config.TestFramework != "none"
 	hasBench := config.Benchmark != "" && config.Benchmark != "none"
 
@@ -255,7 +255,7 @@ func (b *Builder) GenerateBuildSrc(projectPath string, config build.InitConfig) 
 	return nil
 }
 
-func (b *Builder) GenerateBuildTest(projectPath string, config build.InitConfig) error {
+func (b *VcpkgBuilder) GenerateBuildTest(projectPath string, config build.InitConfig) error {
 	if config.TestFramework == "" || config.TestFramework == "none" {
 		return nil
 	}
@@ -272,7 +272,7 @@ func (b *Builder) GenerateBuildTest(projectPath string, config build.InitConfig)
 	return nil
 }
 
-func (b *Builder) GenerateBuildBench(projectPath string, config build.InitConfig) error {
+func (b *VcpkgBuilder) GenerateBuildBench(projectPath string, config build.InitConfig) error {
 	if config.Benchmark == "" || config.Benchmark == "none" {
 		return nil
 	}
@@ -289,11 +289,11 @@ func (b *Builder) GenerateBuildBench(projectPath string, config build.InitConfig
 	return nil
 }
 
-func (b *Builder) GenerateReadme(config build.InitConfig) string {
+func (b *VcpkgBuilder) GenerateReadme(config build.InitConfig) string {
 	return templates.GenerateVcpkgReadme(config.Name, config.CppStandard, config.IsLibrary)
 }
 
-func (b *Builder) Update() error {
+func (b *VcpkgBuilder) Update() error {
 	if err := b.SetupEnv(); err != nil {
 		return err
 	}
@@ -338,7 +338,7 @@ func (b *Builder) Update() error {
 	return nil
 }
 
-func (b *Builder) Upgrade() error {
+func (b *VcpkgBuilder) Upgrade() error {
 	if err := b.SetupEnv(); err != nil {
 		return err
 	}
@@ -381,7 +381,7 @@ func (b *Builder) Upgrade() error {
 	return nil
 }
 
-func (b *Builder) Build(opts build.BuildOptions) error {
+func (b *VcpkgBuilder) Build(opts build.BuildOptions) error {
 	// Set VCPKG_ROOT from cpx config if not already set
 	if err := b.SetupEnv(); err != nil {
 		return err
@@ -545,7 +545,7 @@ func (b *Builder) Build(opts build.BuildOptions) error {
 	return nil
 }
 
-func (b *Builder) Test(opts build.TestOptions) error {
+func (b *VcpkgBuilder) Test(opts build.TestOptions) error {
 	projectName := common.GetProjectNameFromCMakeLists()
 	if projectName == "" {
 		return fmt.Errorf("failed to get project name from CMakeLists.txt")
@@ -591,7 +591,7 @@ func (b *Builder) Test(opts build.TestOptions) error {
 	return nil
 }
 
-func (b *Builder) Run(opts build.RunOptions) error {
+func (b *VcpkgBuilder) Run(opts build.RunOptions) error {
 	// Get project name from CMakeLists.txt (optional, for display only)
 	projectName := common.GetProjectNameFromCMakeLists()
 	if projectName == "" {
@@ -673,7 +673,7 @@ func (b *Builder) Run(opts build.RunOptions) error {
 	return runCmd.Run()
 }
 
-func (b *Builder) Bench(opts build.BenchOptions) error {
+func (b *VcpkgBuilder) Bench(opts build.BenchOptions) error {
 	projectName := common.GetProjectNameFromCMakeLists()
 	if projectName == "" {
 		return fmt.Errorf("failed to get project name from CMakeLists.txt")
@@ -731,7 +731,7 @@ func (b *Builder) Bench(opts build.BenchOptions) error {
 	return nil
 }
 
-func (b *Builder) Clean(opts build.CleanOptions) error {
+func (b *VcpkgBuilder) Clean(opts build.CleanOptions) error {
 	fmt.Printf("%sCleaning CMake/vcpkg project...%s\n", colors.Cyan, colors.Reset)
 
 	// Remove bin directory (artifacts)
@@ -772,7 +772,7 @@ func (b *Builder) Clean(opts build.CleanOptions) error {
 
 //TODO: implement version for vcpkg add
 
-func (b *Builder) AddDependency(name string, _ string) error {
+func (b *VcpkgBuilder) AddDependency(name string, _ string) error {
 	// Set up environment
 	if err := b.SetupEnv(); err != nil {
 		return err
@@ -793,7 +793,7 @@ func (b *Builder) AddDependency(name string, _ string) error {
 }
 
 // printUsageInfo fetches and prints usage info from GitHub for vcpkg packages
-func (b *Builder) printUsageInfo(pkgName string) {
+func (b *VcpkgBuilder) printUsageInfo(pkgName string) {
 	resp, err := http.Get(fmt.Sprintf("https://raw.githubusercontent.com/microsoft/vcpkg/master/ports/%s/usage", pkgName))
 	if err != nil || resp.StatusCode != 200 {
 		return
@@ -821,7 +821,7 @@ func (b *Builder) printUsageInfo(pkgName string) {
 	fmt.Printf("   https://cpx-dev.vercel.app/packages#package/%s\n\n", pkgName)
 }
 
-func (b *Builder) RemoveDependency(name string) error {
+func (b *VcpkgBuilder) RemoveDependency(name string) error {
 	// Check for vcpkg.json (Manifest mode)
 	if _, err := os.Stat(common.VcpkgManifest); err != nil {
 		return fmt.Errorf("%s not found - manifest mode required", common.VcpkgManifest)
@@ -892,7 +892,7 @@ func (b *Builder) RemoveDependency(name string) error {
 	return nil
 }
 
-func (b *Builder) ListDependencies() ([]build.Dependency, error) {
+func (b *VcpkgBuilder) ListDependencies() ([]build.Dependency, error) {
 	// Read vcpkg.json
 	data, err := os.ReadFile(common.VcpkgManifest)
 	if err != nil {
@@ -941,7 +941,7 @@ func (b *Builder) ListDependencies() ([]build.Dependency, error) {
 	return deps, nil
 }
 
-func (b *Builder) SearchDependencies(query string) ([]build.Dependency, error) {
+func (b *VcpkgBuilder) SearchDependencies(query string) ([]build.Dependency, error) {
 	// Get vcpkg path
 	vcpkgPath, err := b.GetPath()
 	if err != nil {
@@ -989,11 +989,11 @@ func (b *Builder) SearchDependencies(query string) ([]build.Dependency, error) {
 	return deps, nil
 }
 
-func (b *Builder) Name() string {
+func (b *VcpkgBuilder) Name() string {
 	return "vcpkg"
 }
 
-func (b *Builder) DependencyInfo(name string) (*build.DependencyInfo, error) {
+func (b *VcpkgBuilder) DependencyInfo(name string) (*build.DependencyInfo, error) {
 	// Use vcpkg x-package-info command
 	// Format: vcpkg x-package-info <name> --x-json
 	if err := b.ensureConfig(); err != nil {
@@ -1096,9 +1096,9 @@ func (b *Builder) DependencyInfo(name string) (*build.DependencyInfo, error) {
 	return info, nil
 }
 
-var _ build.BuildSystem = (*Builder)(nil)
+var _ build.BuildSystem = (*VcpkgBuilder)(nil)
 
-func (b *Builder) ListTargets() ([]string, error) {
+func (b *VcpkgBuilder) ListTargets() ([]string, error) {
 	// Look for any configured build directory in .cache/native
 	cacheDir := common.NativeCacheDir()
 	entries, err := os.ReadDir(cacheDir)
@@ -1123,7 +1123,7 @@ func (b *Builder) ListTargets() ([]string, error) {
 }
 
 // listTargetsInDir lists user-defined targets in a specific build directory.
-func (b *Builder) listTargetsInDir(bDir string) ([]string, error) {
+func (b *VcpkgBuilder) listTargetsInDir(bDir string) ([]string, error) {
 	// Check for Ninja build
 	if _, err := os.Stat(filepath.Join(bDir, "build.ninja")); err == nil {
 		// Use ninja -t targets for complete target info

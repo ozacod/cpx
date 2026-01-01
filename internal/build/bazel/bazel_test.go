@@ -152,7 +152,7 @@ func TestBuild(t *testing.T) {
 			assert.True(t, foundBuild, "bazel build command should be called")
 
 			// If clean was requested, check for bazel clean
-			// In Builder.Clean (called by Build), it calls bazel clean.
+			// In BazelBuilder.Clean (called by Build), it calls bazel clean.
 			if tt.clean {
 				foundClean := false
 				for _, args := range capturedArgs {

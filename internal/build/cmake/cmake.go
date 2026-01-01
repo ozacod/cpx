@@ -17,18 +17,18 @@ import (
 
 var execCommand = exec.Command
 
-// Builder implements the build.BuildSystem interface for CMake-only projects.
-type Builder struct{}
+// CMakeBuilder implements the build.BuildSystem interface for CMake-only projects.
+type CMakeBuilder struct{}
 
-func New() *Builder {
-	return &Builder{}
+func New() *CMakeBuilder {
+	return &CMakeBuilder{}
 }
 
-func (b *Builder) Name() string {
+func (b *CMakeBuilder) Name() string {
 	return "cmake"
 }
 
-func (b *Builder) Build(opts build.BuildOptions) error {
+func (b *CMakeBuilder) Build(opts build.BuildOptions) error {
 	// Get project name
 	projectName := common.GetProjectNameFromCMakeLists()
 	if projectName == "" {
@@ -166,7 +166,7 @@ func (b *Builder) Build(opts build.BuildOptions) error {
 	return nil
 }
 
-func (b *Builder) Test(opts build.TestOptions) error {
+func (b *CMakeBuilder) Test(opts build.TestOptions) error {
 	projectName := common.GetProjectNameFromCMakeLists()
 	if projectName == "" {
 		projectName = "project"
@@ -253,7 +253,7 @@ func (b *Builder) Test(opts build.TestOptions) error {
 	return nil
 }
 
-func (b *Builder) Run(opts build.RunOptions) error {
+func (b *CMakeBuilder) Run(opts build.RunOptions) error {
 	// Build first
 	if err := b.Build(build.BuildOptions{
 		Release:   opts.Release,
@@ -308,7 +308,7 @@ func (b *Builder) Run(opts build.RunOptions) error {
 	return runCmd.Run()
 }
 
-func (b *Builder) Bench(opts build.BenchOptions) error {
+func (b *CMakeBuilder) Bench(opts build.BenchOptions) error {
 	projectName := common.GetProjectNameFromCMakeLists()
 	if projectName == "" {
 		projectName = "project"
@@ -422,7 +422,7 @@ func (b *Builder) Bench(opts build.BenchOptions) error {
 	return nil
 }
 
-func (b *Builder) Clean(opts build.CleanOptions) error {
+func (b *CMakeBuilder) Clean(opts build.CleanOptions) error {
 	fmt.Printf("%sCleaning CMake project...%s\n", colors.Cyan, colors.Reset)
 
 	// Remove the cache directory
@@ -441,7 +441,7 @@ func (b *Builder) Clean(opts build.CleanOptions) error {
 	return nil
 }
 
-func (b *Builder) AddDependency(name string, _ string) error {
+func (b *CMakeBuilder) AddDependency(name string, _ string) error {
 	fmt.Printf("%s⚠ CMake-only projects don't have built-in dependency management%s\n\n", colors.Yellow, colors.Reset)
 	fmt.Printf("To add dependencies, consider one of these options:\n\n")
 
@@ -471,11 +471,11 @@ func (b *Builder) AddDependency(name string, _ string) error {
 	return nil
 }
 
-func (b *Builder) RemoveDependency(_ string) error {
+func (b *CMakeBuilder) RemoveDependency(_ string) error {
 	return fmt.Errorf("CMake-only projects don't have built-in dependency management\n  hint: manually remove the dependency from CMakeLists.txt or FetchContent")
 }
 
-func (b *Builder) ListDependencies() ([]build.Dependency, error) {
+func (b *CMakeBuilder) ListDependencies() ([]build.Dependency, error) {
 	fmt.Printf("%sNote: CMake-only projects don't have a standard dependency manifest%s\n", colors.Yellow, colors.Reset)
 	fmt.Printf("Check your CMakeLists.txt for:\n")
 	fmt.Printf("  - find_package() calls\n")
@@ -484,15 +484,15 @@ func (b *Builder) ListDependencies() ([]build.Dependency, error) {
 	return nil, nil
 }
 
-func (b *Builder) SearchDependencies(_ string) ([]build.Dependency, error) {
+func (b *CMakeBuilder) SearchDependencies(_ string) ([]build.Dependency, error) {
 	return nil, fmt.Errorf("CMake-only projects don't have a package registry\n  hint: search on GitHub, vcpkg ports, or Conan packages")
 }
 
-func (b *Builder) DependencyInfo(_ string) (*build.DependencyInfo, error) {
+func (b *CMakeBuilder) DependencyInfo(_ string) (*build.DependencyInfo, error) {
 	return nil, fmt.Errorf("CMake-only projects don't have dependency info\n  hint: check the package's GitHub page or documentation")
 }
 
-func (b *Builder) ListTargets() ([]string, error) {
+func (b *CMakeBuilder) ListTargets() ([]string, error) {
 	// Try to find a build directory
 	buildDirs := []string{
 		filepath.Join(common.NativeCacheDir(), string(common.VariantDebug)),
@@ -536,7 +536,7 @@ func (b *Builder) ListTargets() ([]string, error) {
 	return targets, nil
 }
 
-func (b *Builder) parseTargetsFromCMakeLists() ([]string, error) {
+func (b *CMakeBuilder) parseTargetsFromCMakeLists() ([]string, error) {
 	data, err := os.ReadFile(common.CMakeListsFile)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read CMakeLists.txt: %w", err)
@@ -566,7 +566,7 @@ func (b *Builder) parseTargetsFromCMakeLists() ([]string, error) {
 	return targets, nil
 }
 
-func (b *Builder) GenerateGitignore(projectPath string) error {
+func (b *CMakeBuilder) GenerateGitignore(projectPath string) error {
 	gitignore := templates.GenerateCMakeGitignore()
 	if err := os.WriteFile(filepath.Join(projectPath, common.GitignoreFile), []byte(gitignore), 0644); err != nil {
 		return fmt.Errorf("failed to write %s: %w", common.GitignoreFile, err)
@@ -574,7 +574,7 @@ func (b *Builder) GenerateGitignore(projectPath string) error {
 	return nil
 }
 
-func (b *Builder) GenerateBuildSrc(projectPath string, config build.InitConfig) error {
+func (b *CMakeBuilder) GenerateBuildSrc(projectPath string, config build.InitConfig) error {
 	cmakeLists := templates.GenerateCMakeLists(templates.CMakeOptions{
 		ProjectName:        config.Name,
 		CppStandard:        config.CppStandard,
@@ -591,7 +591,7 @@ func (b *Builder) GenerateBuildSrc(projectPath string, config build.InitConfig) 
 	return nil
 }
 
-func (b *Builder) GenerateBuildTest(projectPath string, config build.InitConfig) error {
+func (b *CMakeBuilder) GenerateBuildTest(projectPath string, config build.InitConfig) error {
 	if config.TestFramework == "" || config.TestFramework == "none" {
 		return nil
 	}
@@ -609,7 +609,7 @@ func (b *Builder) GenerateBuildTest(projectPath string, config build.InitConfig)
 	return nil
 }
 
-func (b *Builder) GenerateBuildBench(projectPath string, config build.InitConfig) error {
+func (b *CMakeBuilder) GenerateBuildBench(projectPath string, config build.InitConfig) error {
 	if config.Benchmark == "" || config.Benchmark == "none" {
 		return nil
 	}
@@ -627,16 +627,16 @@ func (b *Builder) GenerateBuildBench(projectPath string, config build.InitConfig
 	return nil
 }
 
-func (b *Builder) GenerateReadme(config build.InitConfig) string {
+func (b *CMakeBuilder) GenerateReadme(config build.InitConfig) string {
 	return templates.GenerateCMakeReadme(config.Name, config.CppStandard, config.IsLibrary)
 }
 
-func (b *Builder) Update() error {
+func (b *CMakeBuilder) Update() error {
 	return fmt.Errorf("update command not implemented for CMake projects")
 }
 
-func (b *Builder) Upgrade() error {
+func (b *CMakeBuilder) Upgrade() error {
 	return fmt.Errorf("upgrade command not implemented for CMake projects")
 }
 
-var _ build.BuildSystem = (*Builder)(nil)
+var _ build.BuildSystem = (*CMakeBuilder)(nil)

@@ -555,6 +555,6 @@ func TestGenerateGitignore(t *testing.T) {
 }
 
 func TestBuilderImplementsInterface(t *testing.T) {
-	// Compile-time check that Builder implements BuildSystem
-	var _ build.BuildSystem = (*Builder)(nil)
+	// Compile-time check that CMakeBuilder implements BuildSystem
+	var _ build.BuildSystem = (*CMakeBuilder)(nil)
 }

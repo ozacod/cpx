@@ -7,6 +7,27 @@ import (
 	"github.com/ozacod/cpx/internal/utils/naming"
 )
 
+// Framework version constants
+const (
+	// CMake test framework versions
+	VersionGTestCMake   = "v1.14.0"
+	VersionCatch2CMake  = "v3.5.2"
+	VersionDoctestCMake = "v2.4.12"
+
+	// CMake benchmark framework versions
+	VersionGoogleBenchmarkCMake = "v1.8.3"
+	VersionNanobenchCMake       = "v4.3.11"
+
+	// Bazel test framework versions
+	VersionGTestBazel   = "1.15.2"
+	VersionCatch2Bazel  = "3.7.1"
+	VersionDoctestBazel = "2.4.11"
+
+	// Bazel benchmark framework versions
+	VersionGoogleBenchmarkBazel = "1.9.1"
+	VersionNanobenchBazel       = "4.3.11"
+)
+
 func GenerateVersionHpp(projectName, projectVersion string) string {
 	if projectVersion == "" {
 		projectVersion = "1.0.0"
@@ -295,7 +316,7 @@ include(FetchContent)
 FetchContent_Declare(
     googletest
     GIT_REPOSITORY https://github.com/google/googletest.git
-    GIT_TAG v1.14.0
+    GIT_TAG ` + VersionGTestCMake + `
 )
 set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
 FetchContent_MakeAvailable(googletest)
@@ -310,7 +331,7 @@ include(FetchContent)
 FetchContent_Declare(
     Catch2
     GIT_REPOSITORY https://github.com/catchorg/Catch2.git
-    GIT_TAG v3.5.2
+    GIT_TAG ` + VersionCatch2CMake + `
 )
 FetchContent_MakeAvailable(Catch2)
 
@@ -325,7 +346,7 @@ include(FetchContent)
 FetchContent_Declare(
     doctest
     GIT_REPOSITORY https://github.com/doctest/doctest.git
-    GIT_TAG v2.4.12
+    GIT_TAG ` + VersionDoctestCMake + `
 )
 FetchContent_MakeAvailable(doctest)
 
@@ -384,7 +405,7 @@ include(FetchContent)
 FetchContent_Declare(
     benchmark
     GIT_REPOSITORY https://github.com/google/benchmark.git
-    GIT_TAG v1.8.3
+    GIT_TAG ` + VersionGoogleBenchmarkCMake + `
 )
 set(BENCHMARK_ENABLE_TESTING OFF CACHE BOOL "" FORCE)
 set(BENCHMARK_ENABLE_INSTALL OFF CACHE BOOL "" FORCE)
@@ -398,7 +419,7 @@ include(FetchContent)
 FetchContent_Declare(
     Catch2
     GIT_REPOSITORY https://github.com/catchorg/Catch2.git
-    GIT_TAG v3.5.2
+    GIT_TAG ` + VersionCatch2CMake + `
 )
 FetchContent_MakeAvailable(Catch2)
 
@@ -410,7 +431,7 @@ include(FetchContent)
 FetchContent_Declare(
     nanobench
     GIT_REPOSITORY https://github.com/martinus/nanobench.git
-    GIT_TAG v4.3.11
+    GIT_TAG ` + VersionNanobenchCMake + `
 )
 FetchContent_MakeAvailable(nanobench)
 
@@ -694,28 +715,28 @@ bazel_dep(name = "rules_cc", version = "0.1.1")
 	// Add test framework dependency
 	switch testFramework {
 	case "googletest":
-		content += `bazel_dep(name = "googletest", version = "1.15.2")
+		content += `bazel_dep(name = "googletest", version = "` + VersionGTestBazel + `")
 `
 	case "catch2":
-		content += `bazel_dep(name = "catch2", version = "3.7.1")
+		content += `bazel_dep(name = "catch2", version = "` + VersionCatch2Bazel + `")
 `
 	case "doctest":
-		content += `bazel_dep(name = "doctest", version = "2.4.11")
+		content += `bazel_dep(name = "doctest", version = "` + VersionDoctestBazel + `")
 `
 	}
 
 	// Add benchmark framework dependency
 	switch benchmarkFramework {
 	case "google-benchmark", "googlebenchmark":
-		content += `bazel_dep(name = "google_benchmark", version = "1.9.1")
+		content += `bazel_dep(name = "google_benchmark", version = "` + VersionGoogleBenchmarkBazel + `")
 `
 	case "nanobench":
-		content += `bazel_dep(name = "nanobench", version = "4.3.11")
+		content += `bazel_dep(name = "nanobench", version = "` + VersionNanobenchBazel + `")
 `
 	case "catch2-benchmark":
 		// Catch2 already includes benchmark support
 		if testFramework != "catch2" {
-			content += `bazel_dep(name = "catch2", version = "3.7.1")
+			content += `bazel_dep(name = "catch2", version = "` + VersionCatch2Bazel + `")
 `
 		}
 	}
