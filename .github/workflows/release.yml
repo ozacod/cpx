@@ -54,10 +54,17 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Generate Changelog
         run: |
-          git log --oneline --format='- %s' ${{ github.ref_name }}^..HEAD > CHANGELOG.md
+          PREV_TAG=$(git describe --tags --abbrev=0 ${{ github.ref_name }}^ 2>/dev/null || echo "")
+          if [ -n "$PREV_TAG" ]; then
+            git log --oneline --format='- %s' ${PREV_TAG}..${{ github.ref_name }} > CHANGELOG.md
+          else
+            git log --oneline --format='- %s' ${{ github.ref_name }} > CHANGELOG.md
+          fi
 
       - name: Download artifacts
         uses: actions/download-artifact@v4
