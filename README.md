@@ -169,6 +169,7 @@ Google's multi-language build system. `cpx` manages `MODULE.bazel` (Bzlmod).
 | `hooks`                    | Install git hooks                                                      |
 | `workflow`                 | Generate CI/CD workflow files                                          |
 | `self-upgrade`             | Self-update cpx to the latest version                                  |
+| `env`                      | Print environment information (OS, compilers, tools)                   |
 
 ### Cross-Compilation & Toolchains
 
@@ -215,6 +216,7 @@ toolchains:
 | Command                 | Description              |
 |-------------------------|--------------------------|
 | `config set-vcpkg-root` | Set vcpkg root directory |
+| `config show`           | Show all config values   |
 
 ### Self-Upgrade Commands (`cpx self-upgrade`)
 
