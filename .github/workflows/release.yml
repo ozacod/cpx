@@ -52,6 +52,13 @@ jobs:
     needs: [build]
     runs-on: ubuntu-latest
     steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Generate Changelog
+        run: |
+          git log --oneline --format='- %s' ${{ github.ref_name }}^..HEAD > CHANGELOG.md
+
       - name: Download artifacts
         uses: actions/download-artifact@v4
         with:
@@ -59,14 +66,14 @@ jobs:
           path: bin/
 
       - name: Create Release
-        uses: softprops/action-gh-release@v1
+        uses: softprops/action-gh-release@v2
         with:
+          body_path: CHANGELOG.md
           files: |
             bin/cpx-linux-amd64
             bin/cpx-linux-arm64
             bin/cpx-darwin-amd64
             bin/cpx-darwin-arm64
             bin/cpx-windows-amd64.exe
-          generate_release_notes: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
