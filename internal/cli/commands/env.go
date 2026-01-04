@@ -4,9 +4,11 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"runtime"
 	"strings"
 
+	"github.com/ozacod/cpx/internal/config"
 	"github.com/ozacod/cpx/internal/utils"
 	"github.com/ozacod/cpx/internal/utils/colors"
 	"github.com/spf13/cobra"
@@ -51,7 +53,7 @@ func runEnv(_ *cobra.Command, _ []string) error {
 	showTool("ninja", "Ninja")
 	showTool("meson", "Meson")
 	showTool("bazel", "Bazel")
-	showTool("vcpkg", "vcpkg")
+	showVcpkg()
 	fmt.Println()
 
 	fmt.Printf("%sEnvironment Variables%s\n", colors.Bold, colors.Reset)
@@ -127,6 +129,40 @@ func showTool(name, description string) {
 	}
 
 	fmt.Printf("  %-12s %s\n", description+":", path)
+}
+
+func showVcpkg() {
+	// Check cpx config first
+	if cfg, err := config.LoadGlobal(); err == nil && cfg.VcpkgRoot != "" {
+		vcpkgPath := filepath.Join(cfg.VcpkgRoot, "vcpkg")
+		if runtime.GOOS == "windows" {
+			vcpkgPath += ".exe"
+		}
+		if _, err := os.Stat(vcpkgPath); err == nil {
+			fmt.Printf("  %-12s %s %s(cpx bundled)%s\n", "vcpkg:", vcpkgPath, colors.Green, colors.Reset)
+			return
+		}
+	}
+
+	// Check VCPKG_ROOT environment variable
+	if vcpkgRoot := os.Getenv("VCPKG_ROOT"); vcpkgRoot != "" {
+		vcpkgPath := filepath.Join(vcpkgRoot, "vcpkg")
+		if runtime.GOOS == "windows" {
+			vcpkgPath += ".exe"
+		}
+		if _, err := os.Stat(vcpkgPath); err == nil {
+			fmt.Printf("  %-12s %s %s(VCPKG_ROOT)%s\n", "vcpkg:", vcpkgPath, colors.Cyan, colors.Reset)
+			return
+		}
+	}
+
+	// Check PATH
+	if path := runCommand("which", "vcpkg"); path != "" {
+		fmt.Printf("  %-12s %s\n", "vcpkg:", path)
+		return
+	}
+
+	fmt.Printf("  %-12s %snot found%s\n", "vcpkg:", colors.Yellow, colors.Reset)
 }
 
 func showEnvVar(name string) {
