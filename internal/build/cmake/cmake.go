@@ -12,6 +12,7 @@ import (
 	"github.com/ozacod/cpx/internal/build/common"
 	"github.com/ozacod/cpx/internal/build/interfaces"
 	"github.com/ozacod/cpx/internal/templates"
+	"github.com/ozacod/cpx/internal/utils"
 	"github.com/ozacod/cpx/internal/utils/colors"
 )
 
@@ -148,7 +149,9 @@ func (b *CMakeBuilder) Build(opts build.BuildOptions) error {
 	if err == nil {
 		for _, exe := range executables {
 			dest := filepath.Join(finalDir, filepath.Base(exe))
-			_ = common.CopyAndSign(exe, dest)
+			if err := common.CopyAndSign(exe, dest); err != nil {
+				utils.PrintError("failed to copy executable %s: %v", filepath.Base(exe), err)
+			}
 		}
 	}
 
@@ -156,7 +159,9 @@ func (b *CMakeBuilder) Build(opts build.BuildOptions) error {
 	if err == nil {
 		for _, lib := range libraries {
 			dest := filepath.Join(finalDir, filepath.Base(lib))
-			_ = common.CopyAndSign(lib, dest)
+			if err := common.CopyAndSign(lib, dest); err != nil {
+				utils.PrintError("failed to copy library %s: %v", filepath.Base(lib), err)
+			}
 		}
 	}
 
@@ -632,11 +637,11 @@ func (b *CMakeBuilder) GenerateReadme(config build.InitConfig) string {
 }
 
 func (b *CMakeBuilder) Update() error {
-	return fmt.Errorf("update command not implemented for CMake projects")
+	return fmt.Errorf("update not implemented for CMake projects\n  hint: manually update dependency versions in CMakeLists.txt")
 }
 
 func (b *CMakeBuilder) Upgrade() error {
-	return fmt.Errorf("upgrade command not implemented for CMake projects")
+	return fmt.Errorf("upgrade not implemented for CMake projects")
 }
 
 var _ build.BuildSystem = (*CMakeBuilder)(nil)

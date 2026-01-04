@@ -17,6 +17,7 @@ import (
 	"github.com/ozacod/cpx/internal/build/interfaces"
 	"github.com/ozacod/cpx/internal/config"
 	"github.com/ozacod/cpx/internal/templates"
+	"github.com/ozacod/cpx/internal/utils"
 	"github.com/ozacod/cpx/internal/utils/colors"
 )
 
@@ -154,7 +155,9 @@ func (b *VcpkgBuilder) copyBuildArtifacts(cacheBuildDir, finalBuildDir string) e
 	if err == nil {
 		for _, exe := range executables {
 			dest := filepath.Join(finalBuildDir, filepath.Base(exe))
-			_ = common.CopyAndSign(exe, dest)
+			if err := common.CopyAndSign(exe, dest); err != nil {
+				utils.PrintError("failed to copy executable %s: %v", filepath.Base(exe), err)
+			}
 		}
 	}
 
@@ -162,7 +165,9 @@ func (b *VcpkgBuilder) copyBuildArtifacts(cacheBuildDir, finalBuildDir string) e
 	if err == nil {
 		for _, lib := range libraries {
 			dest := filepath.Join(finalBuildDir, filepath.Base(lib))
-			_ = common.CopyAndSign(lib, dest)
+			if err := common.CopyAndSign(lib, dest); err != nil {
+				utils.PrintError("failed to copy library %s: %v", filepath.Base(lib), err)
+			}
 		}
 	}
 
@@ -414,8 +419,12 @@ func (b *VcpkgBuilder) Build(opts build.BuildOptions) error {
 		if opts.Verbose {
 			fmt.Printf("%s  Cleaning build directory...%s\n", colors.Cyan, colors.Reset)
 		}
-		_ = os.RemoveAll(cacheBuildDir)
-		_ = os.RemoveAll(finalBuildDir)
+		if err := os.RemoveAll(cacheBuildDir); err != nil {
+			utils.PrintError("failed to clean cache directory: %v", err)
+		}
+		if err := os.RemoveAll(finalBuildDir); err != nil {
+			utils.PrintError("failed to clean build directory: %v", err)
+		}
 	}
 
 	// Ensure cache directory exists
@@ -800,7 +809,7 @@ func (b *VcpkgBuilder) printUsageInfo(pkgName string) {
 	}
 	defer func() {
 		if err := resp.Body.Close(); err != nil {
-			fmt.Fprintf(os.Stderr, "Error closing response body: %v\n", err)
+			utils.PrintError("error closing response body: %v", err)
 		}
 	}()
 

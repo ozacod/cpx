@@ -111,6 +111,6 @@ func runRun(cmd *cobra.Command, args []string) error {
 		builder := vcpkg.New()
 		return builder.Run(opts)
 	default:
-		return fmt.Errorf("unsupported project type")
+		return fmt.Errorf("unsupported project type %q (supported: vcpkg, bazel, meson, cmake)\n  hint: run 'cpx new' to create a project", projectType)
 	}
 }

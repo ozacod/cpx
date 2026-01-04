@@ -66,7 +66,7 @@ func runBenchCmd(cmd *cobra.Command) error {
 	case utils.ProjectTypeVcpkg:
 		builder = vcpkg.New()
 	default:
-		return fmt.Errorf("unsupported project type")
+		return fmt.Errorf("unsupported project type %q (supported: vcpkg, bazel, meson, cmake)\n  hint: run 'cpx new' to create a project", projectType)
 	}
 	return builder.Bench(opts)
 }

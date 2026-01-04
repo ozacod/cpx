@@ -47,12 +47,12 @@ func SelfUpgrade(_ []string) {
 	// Get latest version from GitHub releases API
 	resp, err := http.Get("https://api.github.com/repos/ozacod/cpx/releases/latest")
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "%sError:%s Failed to check for updates: %v\n", colors.Red, colors.Reset, err)
+		utils.PrintError("failed to check for updates: %v", err)
 		os.Exit(1)
 	}
 	defer func() {
 		if err := resp.Body.Close(); err != nil {
-			_, _ = fmt.Fprintf(os.Stderr, "Error closing response body: %v\n", err)
+			utils.PrintError("error closing response body: %v", err)
 		}
 	}()
 
@@ -64,7 +64,7 @@ func SelfUpgrade(_ []string) {
 
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
-		fmt.Fprintf(os.Stderr, "%sError:%s Failed to check for updates (status %d): %s\n", colors.Red, colors.Reset, resp.StatusCode, string(body))
+		utils.PrintError("failed to check for updates (status %d): %s", resp.StatusCode, string(body))
 		os.Exit(1)
 	}
 
@@ -73,7 +73,7 @@ func SelfUpgrade(_ []string) {
 		HTMLURL string `json:"html_url"`
 	}
 	if err := json.NewDecoder(resp.Body).Decode(&release); err != nil {
-		fmt.Fprintf(os.Stderr, "%sError:%s Failed to parse release info: %v\n", colors.Red, colors.Reset, err)
+		utils.PrintError("failed to parse release info: %v", err)
 		os.Exit(1)
 	}
 
@@ -101,7 +101,7 @@ func SelfUpgrade(_ []string) {
 	case "windows":
 		binaryName = fmt.Sprintf("cpx-windows-%s.exe", goarch)
 	default:
-		fmt.Fprintf(os.Stderr, "%sError:%s Unsupported platform: %s\n", colors.Red, colors.Reset, goos)
+		utils.PrintError("unsupported platform: %s", goos)
 		os.Exit(1)
 	}
 
@@ -111,30 +111,30 @@ func SelfUpgrade(_ []string) {
 	// Download the new binary
 	resp, err = http.Get(downloadURL)
 	if err != nil {
-		_, _ = fmt.Fprintf(os.Stderr, "%sError:%s Failed to download: %v\n", colors.Red, colors.Reset, err)
+		utils.PrintError("failed to download: %v", err)
 		os.Exit(1)
 	}
 	defer func() {
 		if err := resp.Body.Close(); err != nil {
-			_, _ = fmt.Fprintf(os.Stderr, "Error closing response body: %v\n", err)
+			utils.PrintError("error closing response body: %v", err)
 		}
 	}()
 
 	if resp.StatusCode != 200 {
-		fmt.Fprintf(os.Stderr, "%sError:%s Download failed with status %d\n", colors.Red, colors.Reset, resp.StatusCode)
+		utils.PrintError("download failed with status %d", resp.StatusCode)
 		os.Exit(1)
 	}
 
 	binaryData, err := io.ReadAll(resp.Body)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "%sError:%s Failed to read download: %v\n", colors.Red, colors.Reset, err)
+		utils.PrintError("failed to read download: %v", err)
 		os.Exit(1)
 	}
 
 	// Get current executable path
 	execPath, err := os.Executable()
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "%sError:%s Failed to get executable path: %v\n", colors.Red, colors.Reset, err)
+		utils.PrintError("failed to get executable path: %v", err)
 		os.Exit(1)
 	}
 	execPath, _ = filepath.EvalSymlinks(execPath)
@@ -145,7 +145,7 @@ func SelfUpgrade(_ []string) {
 		// Try writing to temp directory instead
 		tempPath = filepath.Join(os.TempDir(), "cpx-new")
 		if err := os.WriteFile(tempPath, binaryData, 0755); err != nil {
-			fmt.Fprintf(os.Stderr, "%sError:%s Failed to write binary: %v\n", colors.Red, colors.Reset, err)
+			utils.PrintError("failed to write binary: %v", err)
 			os.Exit(1)
 		}
 		fmt.Printf("%s Downloaded to %s%s\n", colors.Green, tempPath, colors.Reset)
@@ -159,7 +159,7 @@ func SelfUpgrade(_ []string) {
 		fmt.Printf("Warning: failed to remove old binary: %v\n", err)
 	}
 	if err := os.Rename(tempPath, execPath); err != nil {
-		fmt.Fprintf(os.Stderr, "%sError:%s Failed to replace binary: %v\n", colors.Red, colors.Reset, err)
+		utils.PrintError("failed to replace binary: %v", err)
 		fmt.Printf("\nTo complete manually, run:\n")
 		fmt.Printf("  sudo mv %s %s\n", tempPath, execPath)
 		os.Exit(1)

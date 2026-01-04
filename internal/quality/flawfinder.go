@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/exec"
 
+	"github.com/ozacod/cpx/internal/utils"
 	"github.com/ozacod/cpx/internal/utils/colors"
 	"github.com/ozacod/cpx/internal/utils/git"
 )
@@ -93,7 +94,7 @@ func RunFlawfinder(opts FlawfinderOptions) error {
 		}
 		defer func() {
 			if err := file.Close(); err != nil {
-				_, _ = fmt.Fprintf(os.Stderr, "Error closing file %s: %v\n", opts.Output, err)
+				utils.PrintError("error closing file %s: %v", opts.Output, err)
 			}
 		}()
 		cmd.Stdout = file

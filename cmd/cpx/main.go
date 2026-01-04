@@ -1,14 +1,13 @@
 package main
 
 import (
-	"fmt"
 	"os"
 	"slices"
 
 	"github.com/ozacod/cpx/internal/build/vcpkg"
 	"github.com/ozacod/cpx/internal/cli/commands"
 	"github.com/ozacod/cpx/internal/cli/root"
-	"github.com/ozacod/cpx/internal/utils/colors"
+	"github.com/ozacod/cpx/internal/utils"
 )
 
 func main() {
@@ -69,8 +68,8 @@ func main() {
 					// Initialize without error check as it might just need PATH
 					builder := vcpkg.New()
 					if err := builder.RunCommand(os.Args[1:]); err != nil {
-						fmt.Fprintf(os.Stderr, "%sError:%s Failed to run vcpkg command: %v\n", colors.Red, colors.Reset, err)
-						fmt.Fprintf(os.Stderr, "Make sure vcpkg is installed and configured: cpx config set-vcpkg-root <path>\n")
+						utils.PrintError("failed to run vcpkg command: %v", err)
+						utils.PrintError("make sure vcpkg is installed and configured: 'cpx config set-vcpkg-root <path>'")
 						os.Exit(1)
 					}
 					return

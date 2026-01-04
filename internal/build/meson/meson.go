@@ -12,6 +12,7 @@ import (
 	"github.com/ozacod/cpx/internal/build/common"
 	"github.com/ozacod/cpx/internal/build/interfaces"
 	"github.com/ozacod/cpx/internal/templates"
+	"github.com/ozacod/cpx/internal/utils"
 	"github.com/ozacod/cpx/internal/utils/colors"
 )
 
@@ -109,8 +110,9 @@ func (b *MesonBuilder) Build(opts build.BuildOptions) error {
 		reconfigCmd := execCommand("meson", reconfigArgs...)
 		reconfigCmd.Stdout = os.Stdout
 		reconfigCmd.Stderr = os.Stderr
-		// Ignore reconfigure errors - may fail if no changes needed
-		_ = reconfigCmd.Run()
+		if err := reconfigCmd.Run(); err != nil {
+			utils.PrintError("reconfigure failed (may be no changes needed): %v", err)
+		}
 	}
 
 	// Build
@@ -158,7 +160,9 @@ func (b *MesonBuilder) Build(opts build.BuildOptions) error {
 	`, outputDir, common.MesonBuildDir))
 	copyCmd.Stdout = os.Stdout
 	copyCmd.Stderr = os.Stderr
-	_ = copyCmd.Run()
+	if err := copyCmd.Run(); err != nil {
+		utils.PrintError("failed to copy artifacts: %v", err)
+	}
 
 	fmt.Printf("%s✓ Build successful%s\n", colors.Green, colors.Reset)
 	fmt.Printf("  Artifacts in: %s/\n", outputDir)
@@ -434,17 +438,15 @@ func (b *MesonBuilder) ListDependencies() ([]build.Dependency, error) {
 }
 
 func (b *MesonBuilder) SearchDependencies(_ string) ([]build.Dependency, error) {
-	// WrapDB search would require HTTP calls to wrapdb.mesonbuild.com
-	// For now, return an error indicating this is not implemented
-	return nil, fmt.Errorf("SearchDependencies not implemented for Meson - use https://wrapdb.mesonbuild.com to search")
+	return nil, fmt.Errorf("search not implemented for Meson\n  hint: browse available packages at https://wrapdb.mesonbuild.com")
+}
+
+func (b *MesonBuilder) DependencyInfo(_ string) (*build.DependencyInfo, error) {
+	return nil, fmt.Errorf("dependency info not implemented for Meson\n  hint: check https://wrapdb.mesonbuild.com for package details")
 }
 
 func (b *MesonBuilder) Name() string {
 	return "meson"
-}
-
-func (b *MesonBuilder) DependencyInfo(_ string) (*build.DependencyInfo, error) {
-	return nil, fmt.Errorf("dependency info not implemented for Meson")
 }
 
 func (b *MesonBuilder) ListTargets() ([]string, error) {
@@ -594,11 +596,11 @@ func (b *MesonBuilder) GenerateReadme(config build.InitConfig) string {
 }
 
 func (b *MesonBuilder) Update() error {
-	return fmt.Errorf("update command not implemented for Meson projects")
+	return fmt.Errorf("update not implemented for Meson projects\n  hint: manually update dependency versions in meson.build or use 'meson wrap install <dep>@<version>'")
 }
 
 func (b *MesonBuilder) Upgrade() error {
-	return fmt.Errorf("upgrade command not implemented for Meson projects")
+	return fmt.Errorf("upgrade not implemented for Meson projects\n  hint: use 'meson wrap install <dep>@<version>' to update dependencies")
 }
 
 func (b *MesonBuilder) downloadWrap(projectPath, wrapName string) error {

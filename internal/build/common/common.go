@@ -265,9 +265,9 @@ func CopyAndSign(src, dest string) error {
 	// On macOS/Darwin, force ad-hoc codesign
 	if runtime.GOOS == "darwin" {
 		cmd := exec.Command("codesign", "-s", "-", "--force", dest)
-		// We ignore error here because codesign might not be available or needed
-		// , but it fixes the ASan issue most of the time
-		_ = cmd.Run()
+		if err := cmd.Run(); err != nil {
+			fmt.Fprintf(os.Stderr, "Warning: codesign failed (continuing anyway): %v\n", err)
+		}
 	}
 	return nil
 }
@@ -325,7 +325,7 @@ func RunCMakeBuild(buildArgs []string, verbose bool, currentStep, totalSteps int
 	go func() {
 		waitCh <- cmd.Wait()
 		if err := pw.Close(); err != nil {
-			_, _ = fmt.Fprintf(os.Stderr, "Error closing pipe writer: %v\n", err)
+			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		}
 	}()
 

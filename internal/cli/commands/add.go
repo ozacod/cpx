@@ -62,7 +62,7 @@ func runAdd(_ *cobra.Command, args []string) error {
 	case utils.ProjectTypeCMake:
 		builder = cmake.New()
 	default:
-		return fmt.Errorf("unsupported project type")
+		return fmt.Errorf("unsupported project type %q (add is supported for: vcpkg, bazel, meson)\n  hint: CMake-only projects use vcpkg for dependencies", projectType)
 	}
 
 	return builder.AddDependency(name, version)

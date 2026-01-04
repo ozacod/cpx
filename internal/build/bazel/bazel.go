@@ -13,6 +13,7 @@ import (
 	"github.com/ozacod/cpx/internal/build/common"
 	"github.com/ozacod/cpx/internal/build/interfaces"
 	"github.com/ozacod/cpx/internal/templates"
+	"github.com/ozacod/cpx/internal/utils"
 	"github.com/ozacod/cpx/internal/utils/colors"
 )
 
@@ -300,7 +301,9 @@ func (b *BazelBuilder) Build(opts build.BuildOptions) error {
 	copyCmd := execCommand("bash", "-c", script)
 	copyCmd.Stdout = os.Stdout
 	copyCmd.Stderr = os.Stderr
-	_ = copyCmd.Run() // Ignore errors - may have no artifacts
+	if err := copyCmd.Run(); err != nil {
+		utils.PrintError("failed to copy artifacts: %v", err)
+	}
 
 	fmt.Printf("%s✓ Build successful%s\n", colors.Green, colors.Reset)
 	fmt.Printf("  Artifacts in: %s/\n", outputDir)
@@ -844,11 +847,11 @@ func (b *BazelBuilder) GenerateReadme(config build.InitConfig) string {
 }
 
 func (b *BazelBuilder) Update() error {
-	return fmt.Errorf("update command not implemented for Bazel projects")
+	return fmt.Errorf("update not applicable to Bazel projects\n  hint: dependencies are pinned in MODULE.bazel - manually update the version")
 }
 
 func (b *BazelBuilder) Upgrade() error {
-	return fmt.Errorf("upgrade command not implemented for Bazel projects")
+	return fmt.Errorf("upgrade not applicable to Bazel projects\n  hint: use 'bazel run //:bazel_deps' to update dependencies or manually edit MODULE.bazel")
 }
 
 var _ build.BuildSystem = (*BazelBuilder)(nil)
