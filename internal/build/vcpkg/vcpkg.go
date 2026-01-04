@@ -445,28 +445,15 @@ func (b *VcpkgBuilder) Build(opts build.BuildOptions) error {
 	cxxFlags += sanCFlags
 	linkerFlags := sanLFlags
 
-	optLabel := "default (-O0)"
-	if release {
-		optLabel = "-O2 (Release)"
-	}
-	if opts.OptLevel != "" {
-		optLabel = "-O" + opts.OptLevel
-	}
-	if opts.Sanitizer != "" {
-		optLabel += "+" + opts.Sanitizer
-	}
+	optLabel := common.GetBuildOptLabel(release, opts.OptLevel, opts.Sanitizer)
 
 	// Customize header based on build type
-	buildHeader := "Build"
+	buildHeader := buildType
 	if opts.EnableTesting {
-		buildHeader = "Build (tests)"
+		buildHeader = buildType + "+tests"
 	} else if opts.EnableBenchmarks {
-		buildHeader = "Build (bench)"
+		buildHeader = buildType + "+bench"
 	}
-
-	fmt.Printf("\n%s▸ %s%s %s %s(%s)%s %s[opt: %s]%s\n",
-		colors.Cyan, buildHeader, colors.Reset, projectName, colors.Gray, buildType, colors.Reset,
-		colors.Gray, optLabel, colors.Reset)
 
 	// Configure CMake if needed
 	needsConfigure := false
@@ -474,27 +461,40 @@ func (b *VcpkgBuilder) Build(opts build.BuildOptions) error {
 		needsConfigure = true
 	}
 
-	// Determine total steps
-	totalSteps := 1
-	currentStep := 0
+	// Define steps based on what we need to do
+	var stepNames []string
+	configureIdx, buildIdx, copyIdx := -1, -1, -1
+
 	if needsConfigure {
-		totalSteps = 2
+		configureIdx = len(stepNames)
+		stepNames = append(stepNames, "Configuring")
+	}
+	buildIdx = len(stepNames)
+	stepNames = append(stepNames, "Building")
+
+	// Only add copy step for non-test/bench builds
+	if !opts.EnableTesting && !opts.EnableBenchmarks {
+		copyIdx = len(stepNames)
+		stepNames = append(stepNames, "Copying")
 	}
 
-	if needsConfigure {
-		currentStep++
-		configMsg := "Configuring CMake"
-		if opts.EnableTesting {
-			configMsg = "Configuring CMake (with testing enabled)"
-		} else if opts.EnableBenchmarks {
-			configMsg = "Configuring CMake (with benchmarks enabled)"
-		}
+	// Create step progress tracker
+	sp := common.NewStepProgress(projectName, buildHeader, optLabel, stepNames, opts.Verbose)
 
-		if opts.Verbose {
-			fmt.Printf("%s  • %s%s\n", colors.Cyan, configMsg, colors.Reset)
-		} else {
-			fmt.Printf("\r\033[2K%s[%d/%d]%s Configuring...", colors.Cyan, currentStep, totalSteps, colors.Reset)
-		}
+	// Mark steps without parsable progress as indeterminate
+	if configureIdx >= 0 {
+		sp.SetIndeterminate(configureIdx, true)
+	}
+	if copyIdx >= 0 {
+		sp.SetIndeterminate(copyIdx, true)
+	}
+
+	sp.Start()
+
+	buildStart := time.Now()
+
+	if needsConfigure {
+		sp.StartStep(configureIdx)
 
 		if err := b.configureCMake(configureOptions{
 			buildDir:         cacheBuildDir,
@@ -505,18 +505,17 @@ func (b *VcpkgBuilder) Build(opts build.BuildOptions) error {
 			enableBenchmarks: opts.EnableBenchmarks,
 			verbose:          opts.Verbose,
 		}); err != nil {
-			fmt.Println()
+			sp.FailStep(configureIdx)
+			sp.Finish(false)
 			return err
 		}
 
-		if !opts.Verbose {
-			fmt.Printf("\r\033[2K%s[%d/%d]%s Configured ✓\n", colors.Cyan, currentStep, totalSteps, colors.Reset)
-		}
+		sp.CompleteStep(configureIdx)
 	}
 
-	// Build specific target if provided
-	buildStart := time.Now()
-	// Build in .cache directory
+	// Build
+	sp.StartStep(buildIdx)
+
 	var buildArgs []string
 	if opts.Verbose {
 		buildArgs = []string{"--build", cacheBuildDir, "--config", buildType, "--verbose"}
@@ -535,19 +534,31 @@ func (b *VcpkgBuilder) Build(opts build.BuildOptions) error {
 		buildArgs = append(buildArgs, "--target", opts.Target)
 	}
 
-	currentStep++
-	if err := common.RunCMakeBuild(buildArgs, opts.Verbose, currentStep, totalSteps); err != nil {
+	if err := common.RunCMakeBuildWithSteps(buildArgs, sp, buildIdx, opts.Verbose); err != nil {
+		sp.FailStep(buildIdx)
+		sp.Finish(false)
 		return fmt.Errorf("build failed: %w", err)
 	}
 
+	sp.CompleteStep(buildIdx)
+
 	// Copy artifacts to final build directory (skip for test/bench builds)
 	if !opts.EnableTesting && !opts.EnableBenchmarks {
+		sp.StartStep(copyIdx)
+
 		if err := b.copyBuildArtifacts(cacheBuildDir, finalBuildDir); err != nil {
+			sp.FailStep(copyIdx)
+			sp.Finish(false)
 			return err
 		}
+
+		sp.CompleteStep(copyIdx)
+		sp.Finish(true)
+
 		fmt.Printf("%s  ✔ Build complete%s %s[%s]%s\n", colors.Green, colors.Reset, colors.Gray, time.Since(buildStart).Round(10*time.Millisecond), colors.Reset)
 		fmt.Printf("  Artifacts in: %s/\n\n", finalBuildDir)
 	} else {
+		sp.Finish(true)
 		fmt.Printf("%s  ✔ Build complete%s %s[%s]%s\n", colors.Green, colors.Reset, colors.Gray, time.Since(buildStart).Round(10*time.Millisecond), colors.Reset)
 	}
 

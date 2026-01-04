@@ -271,6 +271,7 @@ func CopyAndSign(src, dest string) error {
 }
 
 var progressRe = regexp.MustCompile(`^\[\s*\d+%]`)
+var fileRe = regexp.MustCompile(`(?:Building|Compiling)\s+(?:CXX|C|ASM)\s+object\s+(.+?)\.o`)
 
 func RunCMakeBuild(buildArgs []string, verbose bool, currentStep, totalSteps int) error {
 	cmd := ExecCommand("cmake", buildArgs...)
@@ -371,6 +372,83 @@ func extractPercent(line string) int {
 		return -1
 	}
 	return pct
+}
+
+// RunCMakeBuildWithSteps runs cmake build and updates the StepProgress
+func RunCMakeBuildWithSteps(buildArgs []string, sp *StepProgress, stepIndex int, verbose bool) error {
+	cmd := ExecCommand("cmake", buildArgs...)
+
+	if verbose {
+		cmd.Stdout = os.Stdout
+		cmd.Stderr = os.Stderr
+		return cmd.Run()
+	}
+
+	pr, pw := io.Pipe()
+	cmd.Stdout = pw
+	cmd.Stderr = pw
+
+	if err := cmd.Start(); err != nil {
+		return err
+	}
+
+	var nonProgress bytes.Buffer
+	lastPercent := -1
+
+	waitCh := make(chan error, 1)
+	go func() {
+		waitCh <- cmd.Wait()
+		if err := pw.Close(); err != nil {
+			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		}
+	}()
+
+	sc := bufio.NewScanner(pr)
+	sc.Buffer(make([]byte, 0, 64*1024), 512*1024)
+	for sc.Scan() {
+		line := sc.Text()
+
+		// Try to extract progress percentage
+		if match := progressRe.FindString(line); match != "" {
+			pct := extractPercent(line)
+			if pct >= 0 && pct != lastPercent {
+				// Try to extract file being compiled
+				detail := ""
+				if fileMatch := fileRe.FindStringSubmatch(line); len(fileMatch) > 1 {
+					detail = fileMatch[1]
+				}
+				sp.UpdateProgress(pct, detail)
+				lastPercent = pct
+			}
+			continue
+		}
+
+		// Check if this line has file info even without percentage
+		if fileMatch := fileRe.FindStringSubmatch(line); len(fileMatch) > 1 {
+			sp.UpdateProgress(lastPercent, fileMatch[1])
+		}
+
+		nonProgress.WriteString(line)
+		nonProgress.WriteByte('\n')
+	}
+
+	err := <-waitCh
+
+	if err != nil {
+		if nonProgress.Len() > 0 {
+			// Clear the step display before printing errors
+			sp.Finish(false)
+			fmt.Fprintln(os.Stderr, nonProgress.String())
+		}
+		return err
+	}
+
+	return nil
+}
+
+// RunCMakeConfigureWithSteps runs cmake configure (for compatibility, just wraps RunCMakeConfigure)
+func RunCMakeConfigureWithSteps(cmd *exec.Cmd, sp *StepProgress, stepIndex int, verbose bool) error {
+	return RunCMakeConfigure(cmd, verbose)
 }
 
 func RunCMakeConfigure(cmd *exec.Cmd, verbose bool) error {
