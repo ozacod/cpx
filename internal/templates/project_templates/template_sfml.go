@@ -87,21 +87,22 @@ func (t *SFMLTemplate) generateMainCpp(projectName string) string {
 #include <SFML/Graphics.hpp>
 #include <SFML/Window.hpp>
 #include <cmath>
+#include <cstdint>
 
 int main() {
-    // Create window
-    sf::RenderWindow window(sf::VideoMode(800, 600), "%s");
+    // Create window (SFML 3.x API)
+    sf::RenderWindow window(sf::VideoMode({800, 600}), "%s");
     window.setFramerateLimit(60);
 
     // Create shapes
     sf::CircleShape circle(50.f);
     circle.setFillColor(sf::Color::Red);
-    circle.setPosition(375.f, 275.f);
-    circle.setOrigin(50.f, 50.f);
+    circle.setPosition({375.f, 275.f});
+    circle.setOrigin({50.f, 50.f});
 
-    sf::RectangleShape rectangle(sf::Vector2f(100.f, 60.f));
+    sf::RectangleShape rectangle({100.f, 60.f});
     rectangle.setFillColor(sf::Color::Blue);
-    rectangle.setPosition(100.f, 100.f);
+    rectangle.setPosition({100.f, 100.f});
 
     // Animation variables
     float time = 0.f;
@@ -109,14 +110,13 @@ int main() {
 
     // Main loop
     while (window.isOpen()) {
-        // Event handling
-        sf::Event event;
-        while (window.pollEvent(event)) {
-            if (event.type == sf::Event::Closed) {
+        // Event handling (SFML 3.x style)
+        while (const std::optional event = window.pollEvent()) {
+            if (event->is<sf::Event::Closed>()) {
                 window.close();
             }
-            if (event.type == sf::Event::KeyPressed) {
-                if (event.key.code == sf::Keyboard::Escape) {
+            if (const auto* keyPressed = event->getIf<sf::Event::KeyPressed>()) {
+                if (keyPressed->code == sf::Keyboard::Key::Escape) {
                     window.close();
                 }
             }
@@ -128,15 +128,15 @@ int main() {
 
         // Animate circle (pulsing and color changing)
         float scale = 1.0f + 0.2f * std::sin(time * 3.0f);
-        circle.setScale(scale, scale);
+        circle.setScale({scale, scale});
 
-        sf::Uint8 r = static_cast<sf::Uint8>(128 + 127 * std::sin(time * 2.0f));
-        sf::Uint8 g = static_cast<sf::Uint8>(128 + 127 * std::sin(time * 2.5f));
-        sf::Uint8 b = static_cast<sf::Uint8>(128 + 127 * std::sin(time * 3.0f));
+        std::uint8_t r = static_cast<std::uint8_t>(128 + 127 * std::sin(time * 2.0f));
+        std::uint8_t g = static_cast<std::uint8_t>(128 + 127 * std::sin(time * 2.5f));
+        std::uint8_t b = static_cast<std::uint8_t>(128 + 127 * std::sin(time * 3.0f));
         circle.setFillColor(sf::Color(r, g, b));
 
         // Animate rectangle (rotating)
-        rectangle.rotate(60.f * dt);
+        rectangle.rotate(sf::degrees(60.f * dt));
 
         // Render
         window.clear(sf::Color(30, 30, 40));
@@ -158,8 +158,8 @@ set(CMAKE_CXX_STANDARD %d)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-# Find SFML
-find_package(SFML COMPONENTS system window graphics CONFIG REQUIRED)
+# Find SFML 3.x (no separate system component)
+find_package(SFML COMPONENTS Network Graphics Window Audio CONFIG REQUIRED)
 
 # Add executable
 add_executable(${PROJECT_NAME}
@@ -170,10 +170,10 @@ target_include_directories(${PROJECT_NAME} PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/include
 )
 
+# Link against SFML 3.x namespaced targets
 target_link_libraries(${PROJECT_NAME} PRIVATE
-    sfml-system
-    sfml-window
-    sfml-graphics
+    SFML::Graphics
+    SFML::Window
 )
 
 # Copy compile_commands.json to project root
