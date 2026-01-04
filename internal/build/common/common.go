@@ -61,14 +61,12 @@ const (
 	BazelModuleFile = "MODULE.bazel"
 	BazelBuildFile  = "BUILD.bazel"
 	BazelRcFile     = ".bazelrc"
-	BazelWorkspace  = "WORKSPACE"
 )
 
 // Common project file constants
 const (
 	GitignoreFile   = ".gitignore"
 	ClangFormatFile = ".clang-format"
-	ClangTidyFile   = ".clang-tidy"
 )
 
 // NativeCacheDir returns the path to the native cache directory (.cache/native)
@@ -242,7 +240,7 @@ func FindLibraries(buildDir string) ([]string, error) {
 }
 
 func CopyAndSign(src, dest string) error {
-	// Remove destination to ensure clean copy
+	// Remove destination to ensure a clean copy
 	if err := os.Remove(dest); err != nil && !os.IsNotExist(err) {
 		fmt.Printf("Warning: failed to remove %s: %v\n", dest, err)
 	}
