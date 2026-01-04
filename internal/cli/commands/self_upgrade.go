@@ -2,6 +2,7 @@ package commands
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -16,6 +17,19 @@ import (
 	"github.com/ozacod/cpx/internal/utils/colors"
 	"github.com/spf13/cobra"
 )
+
+type UpgradeError struct {
+	Msg  string
+	Hint string
+}
+
+func (e *UpgradeError) Error() string {
+	return e.Msg
+}
+
+func (e *UpgradeError) Unwrap() error {
+	return errors.New(e.Msg)
+}
 
 func SelfUpgradeCmd() *cobra.Command {
 	cmd := &cobra.Command{
@@ -37,35 +51,37 @@ func SelfUpgradeCmd() *cobra.Command {
 }
 
 func runSelfUpgrade(_ *cobra.Command, args []string) error {
-	SelfUpgrade(args)
-	return nil
+	return SelfUpgrade(args)
 }
 
-func SelfUpgrade(_ []string) {
+func SelfUpgrade(args []string) error {
+	return SelfUpgradeWithClient(http.DefaultClient, args)
+}
+
+func SelfUpgradeWithClient(client *http.Client, _ []string) error {
 	fmt.Printf("%s Checking for updates...%s\n", colors.Cyan, colors.Reset)
 
-	// Get latest version from GitHub releases API
-	resp, err := http.Get("https://api.github.com/repos/ozacod/cpx/releases/latest")
+	resp, err := client.Get("https://api.github.com/repos/ozacod/cpx/releases/latest")
 	if err != nil {
-		utils.PrintError("failed to check for updates: %v", err)
-		os.Exit(1)
-	}
-	defer func() {
-		if err := resp.Body.Close(); err != nil {
-			utils.PrintError("error closing response body: %v", err)
+		return &UpgradeError{
+			Msg:  fmt.Sprintf("failed to check for updates: %v", err),
+			Hint: "Check your internet connection",
 		}
-	}()
+	}
+	defer resp.Body.Close()
 
 	if resp.StatusCode == http.StatusNotFound {
 		fmt.Printf("%s  No releases found. This may be the first version.%s\n", colors.Yellow, colors.Reset)
 		fmt.Printf("   Repository: https://github.com/ozacod/cpx\n")
-		return
+		return nil
 	}
 
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
-		utils.PrintError("failed to check for updates (status %d): %s", resp.StatusCode, string(body))
-		os.Exit(1)
+		return &UpgradeError{
+			Msg:  fmt.Sprintf("failed to check for updates (status %d): %s", resp.StatusCode, string(body)),
+			Hint: "GitHub API may be temporarily unavailable",
+		}
 	}
 
 	var release struct {
@@ -73,8 +89,10 @@ func SelfUpgrade(_ []string) {
 		HTMLURL string `json:"html_url"`
 	}
 	if err := json.NewDecoder(resp.Body).Decode(&release); err != nil {
-		utils.PrintError("failed to parse release info: %v", err)
-		os.Exit(1)
+		return &UpgradeError{
+			Msg:  fmt.Sprintf("failed to parse release info: %v", err),
+			Hint: "GitHub API response may have changed",
+		}
 	}
 
 	latestVersion := strings.TrimPrefix(release.TagName, "v")
@@ -82,13 +100,12 @@ func SelfUpgrade(_ []string) {
 
 	if latestVersion == currentVersion {
 		fmt.Printf("%s You're already running the latest version (%s)%s\n", colors.Green, currentVersion, colors.Reset)
-		return
+		return nil
 	}
 
 	fmt.Printf("%s New version available: %s  %s%s\n", colors.Yellow, currentVersion, latestVersion, colors.Reset)
 	fmt.Printf("   Release: %s\n", release.HTMLURL)
 
-	// Determine platform and architecture
 	goos := runtime.GOOS
 	goarch := runtime.GOARCH
 
@@ -101,77 +118,79 @@ func SelfUpgrade(_ []string) {
 	case "windows":
 		binaryName = fmt.Sprintf("cpx-windows-%s.exe", goarch)
 	default:
-		utils.PrintError("unsupported platform: %s", goos)
-		os.Exit(1)
+		return &UpgradeError{
+			Msg:  fmt.Sprintf("unsupported platform: %s", goos),
+			Hint: "cpx supports darwin, linux, and windows",
+		}
 	}
 
 	downloadURL := fmt.Sprintf("https://github.com/ozacod/cpx/releases/download/%s/%s", release.TagName, binaryName)
 	fmt.Printf("%s Downloading %s...%s\n", colors.Cyan, binaryName, colors.Reset)
 
-	// Download the new binary
-	resp, err = http.Get(downloadURL)
+	resp, err = client.Get(downloadURL)
 	if err != nil {
-		utils.PrintError("failed to download: %v", err)
-		os.Exit(1)
-	}
-	defer func() {
-		if err := resp.Body.Close(); err != nil {
-			utils.PrintError("error closing response body: %v", err)
+		return &UpgradeError{
+			Msg:  fmt.Sprintf("failed to download: %v", err),
+			Hint: "Check your internet connection",
 		}
-	}()
+	}
+	defer resp.Body.Close()
 
 	if resp.StatusCode != 200 {
-		utils.PrintError("download failed with status %d", resp.StatusCode)
-		os.Exit(1)
+		return &UpgradeError{
+			Msg:  fmt.Sprintf("download failed with status %d", resp.StatusCode),
+			Hint: "GitHub releases may be temporarily unavailable",
+		}
 	}
 
 	binaryData, err := io.ReadAll(resp.Body)
 	if err != nil {
-		utils.PrintError("failed to read download: %v", err)
-		os.Exit(1)
+		return &UpgradeError{
+			Msg:  fmt.Sprintf("failed to read download: %v", err),
+			Hint: "Network interruption during download",
+		}
 	}
 
-	// Get current executable path
 	execPath, err := os.Executable()
 	if err != nil {
-		utils.PrintError("failed to get executable path: %v", err)
-		os.Exit(1)
+		return &UpgradeError{
+			Msg:  fmt.Sprintf("failed to get executable path: %v", err),
+			Hint: "Unable to determine cpx installation location",
+		}
 	}
 	execPath, _ = filepath.EvalSymlinks(execPath)
 
-	// Write to temp file first
 	tempPath := execPath + ".new"
 	if err := os.WriteFile(tempPath, binaryData, 0755); err != nil {
-		// Try writing to temp directory instead
 		tempPath = filepath.Join(os.TempDir(), "cpx-new")
 		if err := os.WriteFile(tempPath, binaryData, 0755); err != nil {
-			utils.PrintError("failed to write binary: %v", err)
-			os.Exit(1)
+			return &UpgradeError{
+				Msg:  fmt.Sprintf("failed to write binary: %v", err),
+				Hint: fmt.Sprintf("Try running with sudo or write to %s manually", tempPath),
+			}
 		}
 		fmt.Printf("%s Downloaded to %s%s\n", colors.Green, tempPath, colors.Reset)
 		fmt.Printf("\nTo complete the upgrade, run:\n")
 		fmt.Printf("  sudo mv %s %s\n", tempPath, execPath)
-		return
+		return nil
 	}
 
-	// Remove old binary and rename new one
 	if err := os.Remove(execPath); err != nil && !os.IsNotExist(err) {
 		fmt.Printf("Warning: failed to remove old binary: %v\n", err)
 	}
 	if err := os.Rename(tempPath, execPath); err != nil {
-		utils.PrintError("failed to replace binary: %v", err)
-		fmt.Printf("\nTo complete manually, run:\n")
-		fmt.Printf("  sudo mv %s %s\n", tempPath, execPath)
-		os.Exit(1)
+		return &UpgradeError{
+			Msg:  fmt.Sprintf("failed to replace binary: %v", err),
+			Hint: fmt.Sprintf("To complete manually, run:\n  sudo mv %s %s", tempPath, execPath),
+		}
 	}
 
 	fmt.Printf("%s Successfully upgraded to %s!%s\n", colors.Green, latestVersion, colors.Reset)
 	fmt.Printf("  Run %scpx version%s to verify.\n", colors.Cyan, colors.Reset)
+	return nil
 }
 
-// runSelfUpgradeVcpkg updates vcpkg by running git pull in its directory
 func runSelfUpgradeVcpkg(_ *cobra.Command, _ []string) error {
-	// Load global config to get vcpkg root
 	cfg, err := config.LoadGlobal()
 	if err != nil {
 		return fmt.Errorf("failed to load config: %w", err)
@@ -179,7 +198,6 @@ func runSelfUpgradeVcpkg(_ *cobra.Command, _ []string) error {
 
 	vcpkgRoot := cfg.VcpkgRoot
 	if vcpkgRoot == "" {
-		// Try VCPKG_ROOT environment variable
 		vcpkgRoot = os.Getenv("VCPKG_ROOT")
 	}
 
@@ -187,12 +205,10 @@ func runSelfUpgradeVcpkg(_ *cobra.Command, _ []string) error {
 		return fmt.Errorf("vcpkg root not configured. Run 'cpx config set-vcpkg-root <path>' or set VCPKG_ROOT environment variable")
 	}
 
-	// Check if directory exists
 	if _, err := os.Stat(vcpkgRoot); os.IsNotExist(err) {
 		return fmt.Errorf("vcpkg directory not found: %s", vcpkgRoot)
 	}
 
-	// Check if it's a git repository
 	gitDir := filepath.Join(vcpkgRoot, ".git")
 	if _, err := os.Stat(gitDir); os.IsNotExist(err) {
 		return fmt.Errorf("vcpkg directory is not a git repository: %s", vcpkgRoot)
@@ -200,7 +216,6 @@ func runSelfUpgradeVcpkg(_ *cobra.Command, _ []string) error {
 
 	fmt.Printf("%s Updating vcpkg in %s...%s\n", colors.Cyan, vcpkgRoot, colors.Reset)
 
-	// Run git pull
 	cmd := exec.Command("git", "pull")
 	cmd.Dir = vcpkgRoot
 	cmd.Stdout = os.Stdout
@@ -210,7 +225,6 @@ func runSelfUpgradeVcpkg(_ *cobra.Command, _ []string) error {
 		return fmt.Errorf("git pull failed: %w", err)
 	}
 
-	// Run bootstrap to ensure vcpkg binary is up to date
 	fmt.Printf("%s Running bootstrap...%s\n", colors.Cyan, colors.Reset)
 
 	var bootstrapCmd *exec.Cmd
