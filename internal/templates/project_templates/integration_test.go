@@ -110,13 +110,19 @@ func TestProjectTemplates_Integration(t *testing.T) {
 			// Use vcpkg builder to verify build/test/clean
 			builder := vcpkg.New()
 
+			// Determine output mode based on test verbosity
+			outputMode := build.OutputModeUI
+			if testing.Verbose() {
+				outputMode = build.OutputModeVerbose
+			}
+
 			// Build with 6 parallel jobs
 			t.Log("Building...")
 			err = builder.Build(build.BuildOptions{
-				Release: false,
-				Clean:   true,
-				Jobs:    6,
-				Verbose: testing.Verbose(),
+				Release:    false,
+				Clean:      true,
+				Jobs:       6,
+				OutputMode: outputMode,
 			})
 			require.NoError(t, err, "Build failed")
 

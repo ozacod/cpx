@@ -233,7 +233,7 @@ func (b *BazelBuilder) Build(opts build.BuildOptions) error {
 	}
 
 	fmt.Printf("%sBuilding with Bazel [%s]...%s\n", colors.Cyan, optLabel, colors.Reset)
-	if opts.Verbose {
+	if opts.OutputMode == build.OutputModeVerbose {
 		fmt.Printf("  Running: bazel %v\n", bazelArgs)
 	} else {
 		// Suppress progress bars for cleaner output (like vcpkg)

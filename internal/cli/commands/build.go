@@ -39,6 +39,7 @@ func BuildCmd() *cobra.Command {
 	cmd.Flags().BoolP("clean", "c", false, "Clean build directory before building")
 	cmd.Flags().StringP("opt", "O", "", "Override optimization level: 0,1,2,3,s,fast")
 	cmd.Flags().BoolP("verbose", "v", false, "Show full build output")
+	cmd.Flags().BoolP("quiet", "q", false, "Quiet mode (only exit code/minimal status)")
 	cmd.Flags().Bool("asan", false, "Build with AddressSanitizer")
 	cmd.Flags().Bool("tsan", false, "Build with ThreadSanitizer")
 	cmd.Flags().Bool("msan", false, "Build with MemorySanitizer")
@@ -134,14 +135,26 @@ func runBuild(cmd *cobra.Command, _ []string) error {
 		return nil
 	}
 
+	quiet, _ := cmd.Flags().GetBool("quiet")
+	if verbose && quiet {
+		return fmt.Errorf("cannot use both --verbose and --quiet")
+	}
+
+	outputMode := build.OutputModeUI
+	if verbose {
+		outputMode = build.OutputModeVerbose
+	} else if quiet {
+		outputMode = build.OutputModeQuiet
+	}
+
 	buildOpts := build.BuildOptions{
-		Release:   release,
-		OptLevel:  optLevel,
-		Sanitizer: sanitizer,
-		Target:    "",
-		Jobs:      jobs,
-		Clean:     clean,
-		Verbose:   verbose,
+		Release:    release,
+		OptLevel:   optLevel,
+		Sanitizer:  sanitizer,
+		Target:     "",
+		Jobs:       jobs,
+		Clean:      clean,
+		OutputMode: outputMode,
 	}
 
 	var builder build.BuildSystem

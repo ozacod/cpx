@@ -8,16 +8,13 @@ import (
 	"io"
 	"os"
 	"os/exec"
-	"os/signal"
 	"path/filepath"
 	"regexp"
 	"runtime"
 	"sort"
 	"strings"
-	"syscall"
 
 	"github.com/ozacod/cpx/internal/utils/colors"
-	"github.com/schollz/progressbar/v3"
 )
 
 // Build directory constants
@@ -273,41 +270,16 @@ func CopyAndSign(src, dest string) error {
 var progressRe = regexp.MustCompile(`^\[\s*\d+%]`)
 var fileRe = regexp.MustCompile(`(?:Building|Compiling)\s+(?:CXX|C|ASM)\s+object\s+(.+?)\.o`)
 
-func RunCMakeBuild(buildArgs []string, verbose bool, currentStep, totalSteps int) error {
+// RunCMakeBuild runs cmake build with the specified StepProgress tracker.
+// The StepProgress handles output mode internally (UI, Verbose, or Quiet).
+func RunCMakeBuild(buildArgs []string, sp *StepProgress) error {
 	cmd := ExecCommand("cmake", buildArgs...)
 
-	if verbose {
+	if sp.IsVerbose() {
 		cmd.Stdout = os.Stdout
 		cmd.Stderr = os.Stderr
 		return cmd.Run()
 	}
-
-	// Create a progress bar for the build percentage
-	bar := progressbar.NewOptions(100,
-		progressbar.OptionSetWriter(os.Stderr),
-		progressbar.OptionEnableColorCodes(true),
-		progressbar.OptionSetWidth(20),
-		progressbar.OptionSetDescription(fmt.Sprintf("[cyan][%d/%d][reset] Compiling", currentStep, totalSteps)),
-		progressbar.OptionSetTheme(progressbar.Theme{
-			Saucer:        "[cyan]█[reset]",
-			SaucerHead:    "[cyan]▸[reset]",
-			SaucerPadding: "░",
-			BarStart:      "[",
-			BarEnd:        "]",
-		}),
-		progressbar.OptionClearOnFinish(),
-	)
-
-	// Ensure cursor is restored on interrupt
-	sigCh := make(chan os.Signal, 1)
-	signal.Notify(sigCh, os.Interrupt, syscall.SIGTERM)
-	defer signal.Stop(sigCh)
-	go func() {
-		<-sigCh
-		_ = bar.Clear()
-		fmt.Print("\033[?25h") // Show cursor
-		os.Exit(1)
-	}()
 
 	pr, pw := io.Pipe()
 	cmd.Stdout = pw
@@ -332,26 +304,33 @@ func RunCMakeBuild(buildArgs []string, verbose bool, currentStep, totalSteps int
 	sc.Buffer(make([]byte, 0, 64*1024), 512*1024)
 	for sc.Scan() {
 		line := sc.Text()
+
+		// In UI mode, extract and display progress
 		if match := progressRe.FindString(line); match != "" {
-			pct := extractPercent(match)
+			pct := extractPercent(line)
 			if pct >= 0 && pct != lastPercent {
-				_ = bar.Set(pct)
+				detail := ""
+				if fileMatch := fileRe.FindStringSubmatch(line); len(fileMatch) > 1 {
+					detail = fileMatch[1]
+				}
+				sp.UpdateProgress(pct, detail)
 				lastPercent = pct
 			}
 			continue
 		}
+		if fileMatch := fileRe.FindStringSubmatch(line); len(fileMatch) > 1 {
+			sp.UpdateProgress(lastPercent, fileMatch[1])
+		}
+
+		// Store output for error reporting
 		nonProgress.WriteString(line)
 		nonProgress.WriteByte('\n')
 	}
 
 	err := <-waitCh
 
-	// Complete the progress bar
-	_ = bar.Set(100)
-	_ = bar.Clear()
-
 	if err != nil {
-		if nonProgress.Len() > 0 {
+		if !sp.IsQuiet() && nonProgress.Len() > 0 {
 			fmt.Fprintln(os.Stderr, nonProgress.String())
 		}
 		return err
@@ -372,78 +351,6 @@ func extractPercent(line string) int {
 		return -1
 	}
 	return pct
-}
-
-// RunCMakeBuildWithSteps runs cmake build and updates the StepProgress
-func RunCMakeBuildWithSteps(buildArgs []string, sp *StepProgress, stepIndex int, verbose bool) error {
-	cmd := ExecCommand("cmake", buildArgs...)
-
-	if verbose {
-		cmd.Stdout = os.Stdout
-		cmd.Stderr = os.Stderr
-		return cmd.Run()
-	}
-
-	pr, pw := io.Pipe()
-	cmd.Stdout = pw
-	cmd.Stderr = pw
-
-	if err := cmd.Start(); err != nil {
-		return err
-	}
-
-	var nonProgress bytes.Buffer
-	lastPercent := -1
-
-	waitCh := make(chan error, 1)
-	go func() {
-		waitCh <- cmd.Wait()
-		if err := pw.Close(); err != nil {
-			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-		}
-	}()
-
-	sc := bufio.NewScanner(pr)
-	sc.Buffer(make([]byte, 0, 64*1024), 512*1024)
-	for sc.Scan() {
-		line := sc.Text()
-
-		// Try to extract progress percentage
-		if match := progressRe.FindString(line); match != "" {
-			pct := extractPercent(line)
-			if pct >= 0 && pct != lastPercent {
-				// Try to extract file being compiled
-				detail := ""
-				if fileMatch := fileRe.FindStringSubmatch(line); len(fileMatch) > 1 {
-					detail = fileMatch[1]
-				}
-				sp.UpdateProgress(pct, detail)
-				lastPercent = pct
-			}
-			continue
-		}
-
-		// Check if this line has file info even without percentage
-		if fileMatch := fileRe.FindStringSubmatch(line); len(fileMatch) > 1 {
-			sp.UpdateProgress(lastPercent, fileMatch[1])
-		}
-
-		nonProgress.WriteString(line)
-		nonProgress.WriteByte('\n')
-	}
-
-	err := <-waitCh
-
-	if err != nil {
-		if nonProgress.Len() > 0 {
-			// Clear the step display before printing errors
-			sp.Finish(false)
-			fmt.Fprintln(os.Stderr, nonProgress.String())
-		}
-		return err
-	}
-
-	return nil
 }
 
 // RunCMakeConfigureWithSteps runs cmake configure (for compatibility, just wraps RunCMakeConfigure)

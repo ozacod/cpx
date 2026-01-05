@@ -7,6 +7,7 @@ import (
 	"sync"
 	"time"
 
+	build "github.com/ozacod/cpx/internal/build/interfaces"
 	"github.com/ozacod/cpx/internal/utils/colors"
 )
 
@@ -37,7 +38,7 @@ type StepProgress struct {
 	currentStep  int
 	startTime    time.Time
 	stepStart    time.Time
-	verbose      bool
+	mode         build.OutputMode
 	lineCount    int // number of lines we've printed (for clearing)
 	spinnerFrame int
 	stopCh       chan struct{} // channel to stop the spinner goroutine
@@ -52,7 +53,7 @@ const (
 )
 
 // NewStepProgress creates a new step progress tracker
-func NewStepProgress(projectName, buildType, optLabel string, stepNames []string, verbose bool) *StepProgress {
+func NewStepProgress(projectName, buildType, optLabel string, stepNames []string, mode build.OutputMode) *StepProgress {
 	steps := make([]*Step, len(stepNames))
 	for i, name := range stepNames {
 		steps[i] = &Step{
@@ -68,13 +69,24 @@ func NewStepProgress(projectName, buildType, optLabel string, stepNames []string
 		steps:       steps,
 		currentStep: -1,
 		startTime:   time.Now(),
-		verbose:     verbose,
+		mode:        mode,
 	}
+}
+
+// IsVerbose returns true if in verbose output mode
+func (sp *StepProgress) IsVerbose() bool {
+	return sp.mode == build.OutputModeVerbose
+}
+
+// IsQuiet returns true if in quiet output mode
+func (sp *StepProgress) IsQuiet() bool {
+	return sp.mode == build.OutputModeQuiet
 }
 
 // Start begins the progress display and starts spinner animation
 func (sp *StepProgress) Start() {
-	if sp.verbose {
+	// Only UI mode needs the spinner animation
+	if sp.mode != build.OutputModeUI {
 		return
 	}
 
@@ -114,10 +126,12 @@ func (sp *StepProgress) StartStep(index int) {
 	sp.steps[index].Progress = 0
 	sp.stepStart = time.Now()
 
-	if !sp.verbose {
+	switch sp.mode {
+	case build.OutputModeUI:
 		sp.render()
-	} else {
+	case build.OutputModeVerbose:
 		fmt.Printf("%s  • %s%s\n", colors.Cyan, sp.steps[index].Name, colors.Reset)
+		// OutputModeQuiet: no output
 	}
 }
 
@@ -163,11 +177,13 @@ func (sp *StepProgress) CompleteStep(index int) {
 	sp.steps[index].Duration = time.Since(sp.stepStart)
 	sp.steps[index].Detail = ""
 
-	if !sp.verbose {
+	switch sp.mode {
+	case build.OutputModeUI:
 		sp.render()
-	} else {
+	case build.OutputModeVerbose:
 		fmt.Printf("%s  ✓ %s complete (%s)%s\n",
 			colors.Green, sp.steps[index].Name, formatDuration(sp.steps[index].Duration), colors.Reset)
+		// OutputModeQuiet: no output
 	}
 }
 
@@ -183,8 +199,12 @@ func (sp *StepProgress) FailStep(index int) {
 	sp.steps[index].State = StepFailed
 	sp.steps[index].Duration = time.Since(sp.stepStart)
 
-	if !sp.verbose {
+	switch sp.mode {
+	case build.OutputModeUI:
 		sp.render()
+	case build.OutputModeVerbose:
+		fmt.Printf("%s  ✗ %s failed%s\n", colors.Red, sp.steps[index].Name, colors.Reset)
+		// OutputModeQuiet: no output
 	}
 }
 
@@ -199,7 +219,8 @@ func (sp *StepProgress) Finish(success bool) {
 	sp.mu.Lock()
 	defer sp.mu.Unlock()
 
-	if sp.verbose {
+	// Only UI mode needs the final state rendering
+	if sp.mode != build.OutputModeUI {
 		return
 	}
 

@@ -188,9 +188,6 @@ type BuildOptions struct {
 	// Clean indicates whether to clean before building.
 	Clean bool
 
-	// Verbose enables verbose output.
-	Verbose bool
-
 	// Toolchain specifies a custom toolchain to use.
 	Toolchain string
 
@@ -199,7 +196,19 @@ type BuildOptions struct {
 
 	// EnableBenchmarks enables building benchmark targets (-DENABLE_BENCHMARKS=ON).
 	EnableBenchmarks bool
+
+	// OutputMode controls build output verbosity (UI, Verbose, or Quiet)
+	OutputMode OutputMode
 }
+
+// OutputMode represents the build output verbosity mode
+type OutputMode int
+
+const (
+	OutputModeUI      OutputMode = iota // Default: show progress UI
+	OutputModeVerbose                   // Show full build output
+	OutputModeQuiet                     // Minimal output
+)
 
 // TestOptions contains options for running tests.
 type TestOptions struct {

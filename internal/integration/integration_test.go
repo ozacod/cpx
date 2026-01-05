@@ -212,8 +212,8 @@ func TestScaffoldBuild_CMake_Executable(t *testing.T) {
 	// Build the project
 	builder := cmake.New()
 	err = builder.Build(build.BuildOptions{
-		Release: false,
-		Verbose: true,
+		Release:    false,
+		OutputMode: build.OutputModeVerbose,
 	})
 	require.NoError(t, err)
 
@@ -246,8 +246,8 @@ func TestScaffoldBuild_CMake_Library(t *testing.T) {
 
 	builder := cmake.New()
 	err = builder.Build(build.BuildOptions{
-		Release: false,
-		Verbose: true,
+		Release:    false,
+		OutputMode: build.OutputModeVerbose,
 	})
 	require.NoError(t, err)
 
@@ -276,7 +276,7 @@ func TestFullWorkflow_CMake(t *testing.T) {
 	builder := cmake.New()
 
 	// Build
-	err = builder.Build(build.BuildOptions{Verbose: true})
+	err = builder.Build(build.BuildOptions{OutputMode: build.OutputModeVerbose})
 	require.NoError(t, err, "build should succeed")
 
 	// Run (may fail if executable doesn't exit cleanly, but build should work)
@@ -316,8 +316,8 @@ func TestScaffoldBuild_Meson_Executable(t *testing.T) {
 
 	builder := meson.New()
 	err = builder.Build(build.BuildOptions{
-		Release: false,
-		Verbose: true,
+		Release:    false,
+		OutputMode: build.OutputModeVerbose,
 	})
 	require.NoError(t, err)
 
@@ -351,8 +351,8 @@ func TestScaffoldBuild_Meson_Library(t *testing.T) {
 
 	builder := meson.New()
 	err = builder.Build(build.BuildOptions{
-		Release: false,
-		Verbose: true,
+		Release:    false,
+		OutputMode: build.OutputModeVerbose,
 	})
 	require.NoError(t, err)
 
@@ -382,7 +382,7 @@ func TestFullWorkflow_Meson(t *testing.T) {
 	builder := meson.New()
 
 	// Build
-	err = builder.Build(build.BuildOptions{Verbose: true})
+	err = builder.Build(build.BuildOptions{OutputMode: build.OutputModeVerbose})
 	require.NoError(t, err, "build should succeed")
 
 	// Run
@@ -446,8 +446,8 @@ func TestScaffoldBuild_CMake_Release(t *testing.T) {
 
 	builder := cmake.New()
 	err = builder.Build(build.BuildOptions{
-		Release: true,
-		Verbose: true,
+		Release:    true,
+		OutputMode: build.OutputModeVerbose,
 	})
 	require.NoError(t, err)
 
@@ -481,8 +481,8 @@ func TestScaffoldBuild_Meson_Release(t *testing.T) {
 
 	builder := meson.New()
 	err = builder.Build(build.BuildOptions{
-		Release: true,
-		Verbose: true,
+		Release:    true,
+		OutputMode: build.OutputModeVerbose,
 	})
 	require.NoError(t, err)
 

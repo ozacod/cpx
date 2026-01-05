@@ -245,6 +245,7 @@ toolchains:
 | `clean`                         |               | `cl`, `cls` |
 | `build`, `run`, `test`, `bench` | `--toolchain` | `-t`        |
 | `build`, `run`                  | `--verbose`   | `-v`        |
+| `build`                         | `--quiet`     | `-q`        |
 | `run`                           | `--release`   | `-r`        |
 | `test`                          | `--filter`    | `-f`        |
 | `fmt`                           | `--check`     | `-c`        |

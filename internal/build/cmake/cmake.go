@@ -81,8 +81,8 @@ func (b *CMakeBuilder) Build(opts build.BuildOptions) error {
 	copyIdx = len(stepNames)
 	stepNames = append(stepNames, "Copying")
 
-	// Create step progress tracker
-	sp := common.NewStepProgress(projectName, buildType, optLabel, stepNames, opts.Verbose)
+	// Create step progress tracker - handles all modes (UI, Verbose, Quiet) internally
+	sp := common.NewStepProgress(projectName, buildType, optLabel, stepNames, opts.OutputMode)
 
 	// Mark steps without parsable progress as indeterminate
 	if configureIdx >= 0 {
@@ -117,7 +117,7 @@ func (b *CMakeBuilder) Build(opts build.BuildOptions) error {
 		}
 
 		configCmd := execCommand("cmake", configArgs...)
-		if err := common.RunCMakeConfigure(configCmd, opts.Verbose); err != nil {
+		if err := common.RunCMakeConfigure(configCmd, sp.IsVerbose()); err != nil {
 			sp.FailStep(configureIdx)
 			sp.Finish(false)
 			return fmt.Errorf("cmake configure failed: %w", err)
@@ -141,11 +141,7 @@ func (b *CMakeBuilder) Build(opts build.BuildOptions) error {
 		buildArgs = append(buildArgs, "--target", opts.Target)
 	}
 
-	if opts.Verbose {
-		buildArgs = append(buildArgs, "--verbose")
-	}
-
-	if err := common.RunCMakeBuildWithSteps(buildArgs, sp, buildIdx, opts.Verbose); err != nil {
+	if err := common.RunCMakeBuild(buildArgs, sp); err != nil {
 		sp.FailStep(buildIdx)
 		sp.Finish(false)
 		return fmt.Errorf("cmake build failed: %w", err)
@@ -185,8 +181,10 @@ func (b *CMakeBuilder) Build(opts build.BuildOptions) error {
 	sp.CompleteStep(copyIdx)
 	sp.Finish(true)
 
-	fmt.Printf("%s  ✔ Build complete%s\n", colors.Green, colors.Reset)
-	fmt.Printf("  Artifacts in: %s/\n\n", finalDir)
+	if !sp.IsQuiet() {
+		fmt.Printf("%s  ✔ Build complete%s\n", colors.Green, colors.Reset)
+		fmt.Printf("  Artifacts in: %s/\n\n", finalDir)
+	}
 
 	return nil
 }
@@ -248,9 +246,21 @@ func (b *CMakeBuilder) Test(opts build.TestOptions) error {
 	// Build tests
 	currentStep++
 	buildArgs := []string{"--build", buildDir}
-	if err := common.RunCMakeBuild(buildArgs, opts.Verbose, currentStep, totalSteps); err != nil {
+	// Create a minimal StepProgress for the build
+	buildMode := build.OutputModeQuiet
+	if opts.Verbose {
+		buildMode = build.OutputModeVerbose
+	}
+	sp := common.NewStepProgress(projectName, "test", "", []string{"Building"}, buildMode)
+	sp.Start()
+	sp.StartStep(0)
+	if err := common.RunCMakeBuild(buildArgs, sp); err != nil {
+		sp.FailStep(0)
+		sp.Finish(false)
 		return fmt.Errorf("failed to build tests: %w", err)
 	}
+	sp.CompleteStep(0)
+	sp.Finish(true)
 
 	// Run tests with CTest
 	currentStep++
@@ -279,13 +289,19 @@ func (b *CMakeBuilder) Test(opts build.TestOptions) error {
 }
 
 func (b *CMakeBuilder) Run(opts build.RunOptions) error {
+	// Determine output mode
+	outputMode := build.OutputModeUI
+	if opts.Verbose {
+		outputMode = build.OutputModeVerbose
+	}
+
 	// Build first
 	if err := b.Build(build.BuildOptions{
-		Release:   opts.Release,
-		OptLevel:  opts.OptLevel,
-		Sanitizer: opts.Sanitizer,
-		Target:    opts.Target,
-		Verbose:   opts.Verbose,
+		Release:    opts.Release,
+		OptLevel:   opts.OptLevel,
+		Sanitizer:  opts.Sanitizer,
+		Target:     opts.Target,
+		OutputMode: outputMode,
 	}); err != nil {
 		return fmt.Errorf("build failed: %w", err)
 	}
@@ -404,9 +420,21 @@ func (b *CMakeBuilder) Bench(opts build.BenchOptions) error {
 	}
 	buildArgs = append(buildArgs, "--parallel", fmt.Sprintf("%d", runtime.NumCPU()))
 
-	if err := common.RunCMakeBuild(buildArgs, opts.Verbose, currentStep, totalSteps); err != nil {
+	// Create a minimal StepProgress for the build
+	benchBuildMode := build.OutputModeQuiet
+	if opts.Verbose {
+		benchBuildMode = build.OutputModeVerbose
+	}
+	sp := common.NewStepProgress(projectName, "bench", "", []string{"Building"}, benchBuildMode)
+	sp.Start()
+	sp.StartStep(0)
+	if err := common.RunCMakeBuild(buildArgs, sp); err != nil {
+		sp.FailStep(0)
+		sp.Finish(false)
 		return fmt.Errorf("failed to build benchmarks: %w", err)
 	}
+	sp.CompleteStep(0)
+	sp.Finish(true)
 
 	// Run benchmarks
 	currentStep++

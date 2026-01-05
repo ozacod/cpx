@@ -71,7 +71,7 @@ add_executable(testproj src/main.cpp)
 		optLevel      string
 		target        string
 		clean         bool
-		verbose       bool
+		outputMode    build.OutputMode
 		sanitizer     string
 		wantBuildType string
 	}{
@@ -121,12 +121,12 @@ add_executable(testproj src/main.cpp)
 			require.NoError(t, os.RemoveAll(".bin"))
 
 			opts := build.BuildOptions{
-				Release:   tt.release,
-				OptLevel:  tt.optLevel,
-				Target:    tt.target,
-				Clean:     tt.clean,
-				Verbose:   tt.verbose,
-				Sanitizer: tt.sanitizer,
+				Release:    tt.release,
+				OptLevel:   tt.optLevel,
+				Target:     tt.target,
+				Clean:      tt.clean,
+				OutputMode: tt.outputMode,
+				Sanitizer:  tt.sanitizer,
 			}
 
 			err := builder.Build(opts)

@@ -54,7 +54,7 @@ func TestBuild(t *testing.T) {
 		release    bool
 		target     string
 		clean      bool
-		verbose    bool
+		outputMode build.OutputMode
 		sanitizer  string
 		wantConfig string
 	}{
@@ -63,7 +63,7 @@ func TestBuild(t *testing.T) {
 			release:    false,
 			target:     "",
 			clean:      false,
-			verbose:    false,
+			outputMode: build.OutputModeUI,
 			wantConfig: "--config=debug",
 		},
 		{
@@ -71,7 +71,7 @@ func TestBuild(t *testing.T) {
 			release:    true,
 			target:     "",
 			clean:      false,
-			verbose:    false,
+			outputMode: build.OutputModeUI,
 			wantConfig: "--config=release",
 		},
 		{
@@ -79,7 +79,7 @@ func TestBuild(t *testing.T) {
 			release:    false,
 			target:     "//src:mylib",
 			clean:      false,
-			verbose:    false,
+			outputMode: build.OutputModeUI,
 			wantConfig: "--config=debug",
 		},
 		{
@@ -87,7 +87,7 @@ func TestBuild(t *testing.T) {
 			release:    false,
 			target:     "",
 			clean:      true,
-			verbose:    false,
+			outputMode: build.OutputModeUI,
 			wantConfig: "--config=debug",
 		},
 		{
@@ -95,7 +95,7 @@ func TestBuild(t *testing.T) {
 			release:    false,
 			target:     "",
 			clean:      false,
-			verbose:    true,
+			outputMode: build.OutputModeVerbose,
 			wantConfig: "--config=debug",
 		},
 		{
@@ -103,7 +103,7 @@ func TestBuild(t *testing.T) {
 			release:    false,
 			target:     "",
 			clean:      false,
-			verbose:    false,
+			outputMode: build.OutputModeUI,
 			sanitizer:  "asan",
 			wantConfig: "--config=debug",
 		},
@@ -116,11 +116,11 @@ func TestBuild(t *testing.T) {
 			capturedArgs = nil
 
 			opts := build.BuildOptions{
-				Release:   tt.release,
-				Target:    tt.target,
-				Clean:     tt.clean,
-				Verbose:   tt.verbose,
-				Sanitizer: tt.sanitizer,
+				Release:    tt.release,
+				Target:     tt.target,
+				Clean:      tt.clean,
+				OutputMode: tt.outputMode,
+				Sanitizer:  tt.sanitizer,
 			}
 
 			err := builder.Build(opts)
@@ -135,7 +135,7 @@ func TestBuild(t *testing.T) {
 					if tt.target != "" {
 						assert.Contains(t, args, tt.target)
 					}
-					if tt.verbose {
+					if tt.outputMode == build.OutputModeVerbose {
 						// When verbose, --noshow_progress should NOT be added
 						assert.NotContains(t, args, "--noshow_progress")
 					} else {

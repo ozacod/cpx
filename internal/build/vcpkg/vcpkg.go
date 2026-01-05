@@ -416,7 +416,7 @@ func (b *VcpkgBuilder) Build(opts build.BuildOptions) error {
 	finalBuildDir := filepath.Join(common.NativeOutputDir(), outDirName)
 
 	if opts.Clean {
-		if opts.Verbose {
+		if opts.OutputMode == build.OutputModeVerbose {
 			fmt.Printf("%s  Cleaning build directory...%s\n", colors.Cyan, colors.Reset)
 		}
 		if err := os.RemoveAll(cacheBuildDir); err != nil {
@@ -478,8 +478,8 @@ func (b *VcpkgBuilder) Build(opts build.BuildOptions) error {
 		stepNames = append(stepNames, "Copying")
 	}
 
-	// Create step progress tracker
-	sp := common.NewStepProgress(projectName, buildHeader, optLabel, stepNames, opts.Verbose)
+	// Create step progress tracker - handles all modes (UI, Verbose, Quiet) internally
+	sp := common.NewStepProgress(projectName, buildHeader, optLabel, stepNames, opts.OutputMode)
 
 	// Mark steps without parsable progress as indeterminate
 	if configureIdx >= 0 {
@@ -503,7 +503,7 @@ func (b *VcpkgBuilder) Build(opts build.BuildOptions) error {
 			linkerFlags:      linkerFlags,
 			enableTesting:    opts.EnableTesting,
 			enableBenchmarks: opts.EnableBenchmarks,
-			verbose:          opts.Verbose,
+			verbose:          sp.IsVerbose(),
 		}); err != nil {
 			sp.FailStep(configureIdx)
 			sp.Finish(false)
@@ -517,7 +517,7 @@ func (b *VcpkgBuilder) Build(opts build.BuildOptions) error {
 	sp.StartStep(buildIdx)
 
 	var buildArgs []string
-	if opts.Verbose {
+	if sp.IsVerbose() {
 		buildArgs = []string{"--build", cacheBuildDir, "--config", buildType, "--verbose"}
 	} else {
 		buildArgs = []string{"--build", cacheBuildDir, "--config", buildType}
@@ -534,7 +534,7 @@ func (b *VcpkgBuilder) Build(opts build.BuildOptions) error {
 		buildArgs = append(buildArgs, "--target", opts.Target)
 	}
 
-	if err := common.RunCMakeBuildWithSteps(buildArgs, sp, buildIdx, opts.Verbose); err != nil {
+	if err := common.RunCMakeBuild(buildArgs, sp); err != nil {
 		sp.FailStep(buildIdx)
 		sp.Finish(false)
 		return fmt.Errorf("build failed: %w", err)
@@ -555,11 +555,15 @@ func (b *VcpkgBuilder) Build(opts build.BuildOptions) error {
 		sp.CompleteStep(copyIdx)
 		sp.Finish(true)
 
-		fmt.Printf("%s  ✔ Build complete%s %s[%s]%s\n", colors.Green, colors.Reset, colors.Gray, time.Since(buildStart).Round(10*time.Millisecond), colors.Reset)
-		fmt.Printf("  Artifacts in: %s/\n\n", finalBuildDir)
+		if !sp.IsQuiet() {
+			fmt.Printf("%s  ✔ Build complete%s %s[%s]%s\n", colors.Green, colors.Reset, colors.Gray, time.Since(buildStart).Round(10*time.Millisecond), colors.Reset)
+			fmt.Printf("  Artifacts in: %s/\n\n", finalBuildDir)
+		}
 	} else {
 		sp.Finish(true)
-		fmt.Printf("%s  ✔ Build complete%s %s[%s]%s\n", colors.Green, colors.Reset, colors.Gray, time.Since(buildStart).Round(10*time.Millisecond), colors.Reset)
+		if !sp.IsQuiet() {
+			fmt.Printf("%s  ✔ Build complete%s %s[%s]%s\n", colors.Green, colors.Reset, colors.Gray, time.Since(buildStart).Round(10*time.Millisecond), colors.Reset)
+		}
 	}
 
 	return nil
@@ -571,11 +575,17 @@ func (b *VcpkgBuilder) Test(opts build.TestOptions) error {
 		return fmt.Errorf("failed to get project name from CMakeLists.txt")
 	}
 
+	// Determine output mode
+	outputMode := build.OutputModeUI
+	if opts.Verbose {
+		outputMode = build.OutputModeVerbose
+	}
+
 	// Use Build with EnableTesting to build tests
 	buildOpts := build.BuildOptions{
 		EnableTesting: true,
 		Target:        projectName + "_tests",
-		Verbose:       opts.Verbose,
+		OutputMode:    outputMode,
 	}
 
 	if err := b.Build(buildOpts); err != nil {
@@ -618,13 +628,19 @@ func (b *VcpkgBuilder) Run(opts build.RunOptions) error {
 		projectName = "project"
 	}
 
+	// Determine output mode
+	outputMode := build.OutputModeUI
+	if opts.Verbose {
+		outputMode = build.OutputModeVerbose
+	}
+
 	// Use Build to compile the project
 	buildOpts := build.BuildOptions{
-		Release:   opts.Release,
-		OptLevel:  opts.OptLevel,
-		Sanitizer: opts.Sanitizer,
-		Target:    opts.Target,
-		Verbose:   opts.Verbose,
+		Release:    opts.Release,
+		OptLevel:   opts.OptLevel,
+		Sanitizer:  opts.Sanitizer,
+		Target:     opts.Target,
+		OutputMode: outputMode,
 	}
 
 	if err := b.Build(buildOpts); err != nil {
@@ -704,11 +720,17 @@ func (b *VcpkgBuilder) Bench(opts build.BenchOptions) error {
 		benchTarget = opts.Target
 	}
 
+	// Determine output mode
+	outputMode := build.OutputModeUI
+	if opts.Verbose {
+		outputMode = build.OutputModeVerbose
+	}
+
 	// Use Build with EnableBenchmarks to build benchmarks (forces Release mode)
 	buildOpts := build.BuildOptions{
 		EnableBenchmarks: true,
 		Target:           benchTarget,
-		Verbose:          opts.Verbose,
+		OutputMode:       outputMode,
 	}
 
 	if err := b.Build(buildOpts); err != nil {

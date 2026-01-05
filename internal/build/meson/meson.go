@@ -121,7 +121,7 @@ func (b *MesonBuilder) Build(opts build.BuildOptions) error {
 	if opts.Target != "" {
 		compileArgs = append(compileArgs, opts.Target)
 	}
-	if opts.Verbose {
+	if opts.OutputMode == build.OutputModeVerbose {
 		compileArgs = append(compileArgs, "-v")
 	}
 	buildCmd := execCommand("meson", compileArgs...)
@@ -174,7 +174,11 @@ func (b *MesonBuilder) Test(opts build.TestOptions) error {
 
 	// Ensure common.MesonBuildDir exists - need build first
 	if _, err := os.Stat(common.MesonBuildDir); os.IsNotExist(err) {
-		if err := b.Build(build.BuildOptions{Verbose: opts.Verbose}); err != nil {
+		outputMode := build.OutputModeUI
+		if opts.Verbose {
+			outputMode = build.OutputModeVerbose
+		}
+		if err := b.Build(build.BuildOptions{OutputMode: outputMode}); err != nil {
 			return fmt.Errorf("build failed: %w", err)
 		}
 	}
@@ -211,13 +215,19 @@ func (b *MesonBuilder) Test(opts build.TestOptions) error {
 }
 
 func (b *MesonBuilder) Run(opts build.RunOptions) error {
+	// Determine output mode
+	outputMode := build.OutputModeUI
+	if opts.Verbose {
+		outputMode = build.OutputModeVerbose
+	}
+
 	// Ensure project is built first
 	if err := b.Build(build.BuildOptions{
-		Release:   opts.Release,
-		OptLevel:  opts.OptLevel,
-		Sanitizer: opts.Sanitizer,
-		Target:    opts.Target,
-		Verbose:   opts.Verbose,
+		Release:    opts.Release,
+		OptLevel:   opts.OptLevel,
+		Sanitizer:  opts.Sanitizer,
+		Target:     opts.Target,
+		OutputMode: outputMode,
 	}); err != nil {
 		return fmt.Errorf("build failed: %w", err)
 	}
@@ -284,7 +294,11 @@ func (b *MesonBuilder) Bench(opts build.BenchOptions) error {
 
 	// Ensure builddir exists
 	if _, err := os.Stat(common.MesonBuildDir); os.IsNotExist(err) {
-		if err := b.Build(build.BuildOptions{Verbose: opts.Verbose}); err != nil {
+		outputMode := build.OutputModeUI
+		if opts.Verbose {
+			outputMode = build.OutputModeVerbose
+		}
+		if err := b.Build(build.BuildOptions{OutputMode: outputMode}); err != nil {
 			return fmt.Errorf("build failed: %w", err)
 		}
 	}
