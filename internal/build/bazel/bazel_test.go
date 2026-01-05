@@ -2,12 +2,11 @@ package bazel
 
 import (
 	"bytes"
-	"fmt"
 	"os"
-	"os/exec"
 	"testing"
 
 	"github.com/ozacod/cpx/internal/build/interfaces"
+	"github.com/ozacod/cpx/internal/build/testutil"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -15,13 +14,7 @@ import (
 // TestHelperProcess isn't a real test. It's used as a helper process
 // for mocking exec.Command.
 func TestHelperProcess(t *testing.T) {
-	if os.Getenv("GO_WANT_HELPER_PROCESS") != "1" {
-		return
-	}
-	if out := os.Getenv("MOCK_OUTPUT"); out != "" {
-		fmt.Print(out)
-	}
-	os.Exit(0)
+	testutil.TestHelperProcess(t)
 }
 
 func TestBuild(t *testing.T) {
@@ -30,17 +23,7 @@ func TestBuild(t *testing.T) {
 	defer func() { execCommand = oldExecCommand }()
 
 	var capturedArgs [][]string
-
-	execCommand = func(name string, arg ...string) *exec.Cmd {
-		args := append([]string{name}, arg...)
-		capturedArgs = append(capturedArgs, args)
-
-		cs := []string{"-test.run=TestHelperProcess", "--", name}
-		cs = append(cs, arg...)
-		cmd := exec.Command(os.Args[0], cs...)
-		cmd.Env = append(os.Environ(), "GO_WANT_HELPER_PROCESS=1")
-		return cmd
-	}
+	execCommand = testutil.MockExecCommand(&capturedArgs)
 
 	// Use temp dir
 	tmpDir := t.TempDir()
@@ -173,17 +156,7 @@ func TestRun(t *testing.T) {
 	defer func() { execCommand = oldExecCommand }()
 
 	var capturedArgs [][]string
-
-	execCommand = func(name string, arg ...string) *exec.Cmd {
-		args := append([]string{name}, arg...)
-		capturedArgs = append(capturedArgs, args)
-
-		cs := []string{"-test.run=TestHelperProcess", "--", name}
-		cs = append(cs, arg...)
-		cmd := exec.Command(os.Args[0], cs...)
-		cmd.Env = append(os.Environ(), "GO_WANT_HELPER_PROCESS=1")
-		return cmd
-	}
+	execCommand = testutil.MockExecCommand(&capturedArgs)
 
 	// Use temp dir
 	tmpDir := t.TempDir()
@@ -221,17 +194,7 @@ func TestTest(t *testing.T) {
 	defer func() { execCommand = oldExecCommand }()
 
 	var capturedArgs [][]string
-
-	execCommand = func(name string, arg ...string) *exec.Cmd {
-		args := append([]string{name}, arg...)
-		capturedArgs = append(capturedArgs, args)
-
-		cs := []string{"-test.run=TestHelperProcess", "--", name}
-		cs = append(cs, arg...)
-		cmd := exec.Command(os.Args[0], cs...)
-		cmd.Env = append(os.Environ(), "GO_WANT_HELPER_PROCESS=1")
-		return cmd
-	}
+	execCommand = testutil.MockExecCommand(&capturedArgs)
 
 	builder := New()
 
@@ -253,17 +216,7 @@ func TestBench(t *testing.T) {
 	defer func() { execCommand = oldExecCommand }()
 
 	var capturedArgs [][]string
-
-	execCommand = func(name string, arg ...string) *exec.Cmd {
-		args := append([]string{name}, arg...)
-		capturedArgs = append(capturedArgs, args)
-
-		cs := []string{"-test.run=TestHelperProcess", "--", name}
-		cs = append(cs, arg...)
-		cmd := exec.Command(os.Args[0], cs...)
-		cmd.Env = append(os.Environ(), "GO_WANT_HELPER_PROCESS=1")
-		return cmd
-	}
+	execCommand = testutil.MockExecCommand(&capturedArgs)
 
 	builder := New()
 
@@ -286,17 +239,7 @@ func TestClean(t *testing.T) {
 	defer func() { execCommand = oldExecCommand }()
 
 	var capturedArgs [][]string
-
-	execCommand = func(name string, arg ...string) *exec.Cmd {
-		args := append([]string{name}, arg...)
-		capturedArgs = append(capturedArgs, args)
-
-		cs := []string{"-test.run=TestHelperProcess", "--", name}
-		cs = append(cs, arg...)
-		cmd := exec.Command(os.Args[0], cs...)
-		cmd.Env = append(os.Environ(), "GO_WANT_HELPER_PROCESS=1")
-		return cmd
-	}
+	execCommand = testutil.MockExecCommand(&capturedArgs)
 
 	// Use temp dir
 	tmpDir := t.TempDir()
@@ -467,20 +410,12 @@ func TestListTargets(t *testing.T) {
 	defer func() { execCommand = oldExecCommand }()
 
 	var capturedArgs [][]string
-	execCommand = func(name string, arg ...string) *exec.Cmd {
-		args := append([]string{name}, arg...)
-		capturedArgs = append(capturedArgs, args)
-
-		cs := []string{"-test.run=TestHelperProcess", "--", name}
-		cs = append(cs, arg...)
-		cmd := exec.Command(os.Args[0], cs...)
-		cmd.Env = append(os.Environ(), "GO_WANT_HELPER_PROCESS=1")
-
-		if name == "bazel" && len(arg) > 0 && arg[0] == "query" {
-			cmd.Env = append(cmd.Env, "MOCK_OUTPUT=cc_binary rule //src:main\ncc_library rule //src:mylib")
+	execCommand = testutil.MockExecCommandWithOutput(&capturedArgs, func(name string, args []string) string {
+		if name == "bazel" && len(args) > 0 && args[0] == "query" {
+			return "cc_binary rule //src:main\ncc_library rule //src:mylib"
 		}
-		return cmd
-	}
+		return ""
+	})
 
 	builder := New()
 	targets, err := builder.ListTargets()

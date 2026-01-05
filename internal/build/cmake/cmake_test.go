@@ -1,7 +1,6 @@
 package cmake
 
 import (
-	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -9,6 +8,7 @@ import (
 
 	"github.com/ozacod/cpx/internal/build/common"
 	"github.com/ozacod/cpx/internal/build/interfaces"
+	"github.com/ozacod/cpx/internal/build/testutil"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -16,26 +16,7 @@ import (
 // TestHelperProcess isn't a real test. It's used as a helper process
 // for mocking exec.Command.
 func TestHelperProcess(t *testing.T) {
-	if os.Getenv("GO_WANT_HELPER_PROCESS") != "1" {
-		return
-	}
-	if out := os.Getenv("MOCK_OUTPUT"); out != "" {
-		fmt.Print(out)
-	}
-	os.Exit(0)
-}
-
-func mockExecCommand(capturedArgs *[][]string) func(string, ...string) *exec.Cmd {
-	return func(name string, arg ...string) *exec.Cmd {
-		args := append([]string{name}, arg...)
-		*capturedArgs = append(*capturedArgs, args)
-
-		cs := []string{"-test.run=TestHelperProcess", "--", name}
-		cs = append(cs, arg...)
-		cmd := exec.Command(os.Args[0], cs...)
-		cmd.Env = append(os.Environ(), "GO_WANT_HELPER_PROCESS=1")
-		return cmd
-	}
+	testutil.TestHelperProcess(t)
 }
 
 func TestBuild(t *testing.T) {
@@ -47,7 +28,7 @@ func TestBuild(t *testing.T) {
 	}()
 
 	var capturedArgs [][]string
-	mockCmd := mockExecCommand(&capturedArgs)
+	mockCmd := testutil.MockExecCommand(&capturedArgs)
 	execCommand = mockCmd
 	common.ExecCommand = mockCmd
 
@@ -171,7 +152,7 @@ func TestRun(t *testing.T) {
 	}()
 
 	var capturedArgs [][]string
-	mockCmd := mockExecCommand(&capturedArgs)
+	mockCmd := testutil.MockExecCommand(&capturedArgs)
 	execCommand = mockCmd
 	common.ExecCommand = mockCmd
 
@@ -218,7 +199,7 @@ func TestTest(t *testing.T) {
 	}()
 
 	var capturedArgs [][]string
-	mockCmd := mockExecCommand(&capturedArgs)
+	mockCmd := testutil.MockExecCommand(&capturedArgs)
 	execCommand = mockCmd
 	common.ExecCommand = mockCmd
 
@@ -270,7 +251,7 @@ func TestBench(t *testing.T) {
 	}()
 
 	var capturedArgs [][]string
-	mockCmd := mockExecCommand(&capturedArgs)
+	mockCmd := testutil.MockExecCommand(&capturedArgs)
 	execCommand = mockCmd
 	common.ExecCommand = mockCmd
 
