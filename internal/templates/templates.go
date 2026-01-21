@@ -499,31 +499,15 @@ func GenerateClangFormat(style string) string {
 		style = "Google"
 	}
 
-	// Common clang-format configurations
+	// Only override ColumnLimit (default is 80 in most styles, 100 is more practical)
 	baseConfig := `Language: Cpp
 BasedOnStyle: %s
-IndentWidth: 2
 ColumnLimit: 100
-AllowShortFunctionsOnASingleLine: Inline
-AllowShortIfStatementsOnASingleLine: true
-AllowShortLoopsOnASingleLine: true
-BreakBeforeBraces: Attach
-IndentCaseLabels: true
 `
 
 	switch style {
-	case "Google":
-		return fmt.Sprintf(baseConfig, "Google")
-	case "LLVM":
-		return fmt.Sprintf(baseConfig, "LLVM")
-	case "Chromium":
-		return fmt.Sprintf(baseConfig, "Chromium")
-	case "Mozilla":
-		return fmt.Sprintf(baseConfig, "Mozilla")
-	case "WebKit":
-		return fmt.Sprintf(baseConfig, "WebKit")
-	case "Microsoft":
-		return fmt.Sprintf(baseConfig, "Microsoft")
+	case "Google", "LLVM", "Chromium", "Mozilla", "WebKit", "Microsoft":
+		return fmt.Sprintf(baseConfig, style)
 	default:
 		return fmt.Sprintf(baseConfig, "Google")
 	}
