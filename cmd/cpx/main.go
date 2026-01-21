@@ -38,6 +38,7 @@ func main() {
 	rootCmd.AddCommand(commands.UpdateCmd())
 	rootCmd.AddCommand(commands.UpgradeCmd())
 	rootCmd.AddCommand(commands.EnvCmd())
+	rootCmd.AddCommand(commands.IdeCmd())
 
 	// Toolchain, Runner management (simplified design)
 	rootCmd.AddCommand(commands.AddToolchainCmd())

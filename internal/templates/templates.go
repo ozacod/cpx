@@ -65,7 +65,6 @@ func GenerateVersionHpp(projectName, projectVersion string) string {
 func GenerateMainCpp(projectName string) string {
 	safeName := naming.SafeIdent(projectName)
 	return fmt.Sprintf(`#include <%s/%s.hpp>
-#include <iostream>
 
 int main() {
     %s::greet();
@@ -457,6 +456,7 @@ out/
 # IDE
 .idea/
 .vscode/
+.zed/
 *.swp
 *.swo
 *~
@@ -982,6 +982,7 @@ build/
 # IDE
 .idea/
 .vscode/
+.zed/
 *.swp
 *.swo
 *~
@@ -1293,6 +1294,7 @@ build/
 # IDE
 .idea/
 .vscode/
+.zed/
 *.swp
 *.swo
 *~
@@ -1503,6 +1505,7 @@ out/
 # IDE
 .idea/
 .vscode/
+.zed/
 *.swp
 *.swo
 *~

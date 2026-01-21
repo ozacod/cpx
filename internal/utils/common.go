@@ -35,6 +35,21 @@ func PrintError(format string, args ...interface{}) {
 	fmt.Fprintf(os.Stderr, "%s✗ %s%s\n", colors.Red, msg, colors.Reset)
 }
 
+func PrintSuccess(format string, args ...interface{}) {
+	msg := fmt.Sprintf(format, args...)
+	fmt.Printf("%s✓ %s%s\n", colors.Green, msg, colors.Reset)
+}
+
+func PrintWarning(format string, args ...interface{}) {
+	msg := fmt.Sprintf(format, args...)
+	fmt.Printf("%s! %s%s\n", colors.Yellow, msg, colors.Reset)
+}
+
+func PrintInfo(format string, args ...interface{}) {
+	msg := fmt.Sprintf(format, args...)
+	fmt.Printf("%s• %s%s\n", colors.Cyan, msg, colors.Reset)
+}
+
 type ProjectType string
 
 const (
