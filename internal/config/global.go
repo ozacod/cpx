@@ -13,6 +13,7 @@ type GlobalConfig struct {
 	VcpkgRoot  string `yaml:"vcpkg_root"`
 	BcrRoot    string `yaml:"bcr_root"`    // Bazel Central Registry path
 	WrapdbRoot string `yaml:"wrapdb_root"` // Meson WrapDB path
+	Ccache     bool   `yaml:"ccache"`      // Enable ccache for builds
 }
 
 func GetConfigDir() (string, error) {

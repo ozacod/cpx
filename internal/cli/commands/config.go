@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
 
 	"github.com/ozacod/cpx/internal/config"
 	"github.com/ozacod/cpx/internal/utils/colors"
@@ -55,6 +56,15 @@ func ConfigCmd() *cobra.Command {
 	}
 	cmd.AddCommand(setWrapdbRootCmd)
 
+	setCmd := &cobra.Command{
+		Use:   "set <key> <value>",
+		Short: "Set a config value",
+		Long:  "Set a configuration value by key. Supported keys: ccache (true/false)",
+		RunE:  runConfigSet,
+		Args:  cobra.ExactArgs(2),
+	}
+	cmd.AddCommand(setCmd)
+
 	return cmd
 }
 
@@ -78,6 +88,10 @@ func runConfigSetWrapdbRoot(_ *cobra.Command, args []string) error {
 	return setWrapdbRoot(args[0])
 }
 
+func runConfigSet(_ *cobra.Command, args []string) error {
+	return setConfigValue(args[0], args[1])
+}
+
 func showConfig() error {
 	configPath, err := config.GetConfigPath()
 	if err != nil {
@@ -97,6 +111,7 @@ func showConfig() error {
 	fmt.Printf("  vcpkg_root:  %s\n", cfg.VcpkgRoot)
 	fmt.Printf("  bcr_root:    %s\n", cfg.BcrRoot)
 	fmt.Printf("  wrapdb_root: %s\n", cfg.WrapdbRoot)
+	fmt.Printf("  ccache:      %t\n", cfg.Ccache)
 	return nil
 }
 
@@ -115,6 +130,9 @@ func getConfig(key string) error {
 		return nil
 	case "wrapdb_root", "wrapdb-root":
 		fmt.Println(cfg.WrapdbRoot)
+		return nil
+	case "ccache":
+		fmt.Println(cfg.Ccache)
 		return nil
 	default:
 		return fmt.Errorf("unknown config key: %s", key)
@@ -216,5 +234,33 @@ func setWrapdbRoot(path string) error {
 	}
 
 	fmt.Printf("%s✓ Set wrapdb_root to %s%s\n", colors.Green, absPath, colors.Reset)
+	return nil
+}
+
+func setConfigValue(key, value string) error {
+	cfg, err := config.LoadGlobal()
+	if err != nil {
+		cfg = &config.GlobalConfig{}
+	}
+
+	switch key {
+	case "ccache":
+		val := strings.ToLower(value)
+		if val == "true" || val == "1" || val == "yes" || val == "on" {
+			cfg.Ccache = true
+		} else if val == "false" || val == "0" || val == "no" || val == "off" {
+			cfg.Ccache = false
+		} else {
+			return fmt.Errorf("invalid value for ccache: %s (use true/false)", value)
+		}
+	default:
+		return fmt.Errorf("unknown config key: %s\n  hint: use 'cpx config set-vcpkg-root' for paths", key)
+	}
+
+	if err := config.SaveGlobal(cfg); err != nil {
+		return fmt.Errorf("failed to save config: %w", err)
+	}
+
+	fmt.Printf("%s✓ Set %s to %s%s\n", colors.Green, key, value, colors.Reset)
 	return nil
 }

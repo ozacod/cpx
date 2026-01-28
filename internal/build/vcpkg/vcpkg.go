@@ -14,7 +14,7 @@ import (
 	"time"
 
 	"github.com/ozacod/cpx/internal/build/common"
-	"github.com/ozacod/cpx/internal/build/interfaces"
+	build "github.com/ozacod/cpx/internal/build/interfaces"
 	"github.com/ozacod/cpx/internal/config"
 	"github.com/ozacod/cpx/internal/templates"
 	"github.com/ozacod/cpx/internal/utils"
@@ -92,6 +92,7 @@ type configureOptions struct {
 	enableTesting    bool
 	enableBenchmarks bool
 	verbose          bool
+	ccache           bool
 }
 
 func (b *VcpkgBuilder) configureCMake(opts configureOptions) error {
@@ -134,6 +135,11 @@ func (b *VcpkgBuilder) configureCMake(opts configureOptions) error {
 				break
 			}
 		}
+	}
+
+	// Add ccache support if enabled and available
+	if opts.ccache && common.IsCcacheAvailable() {
+		cmdArgs = append(cmdArgs, common.GetCcacheCMakeArgs()...)
 	}
 
 	cmd := execCommand("cmake", cmdArgs...)
@@ -504,6 +510,7 @@ func (b *VcpkgBuilder) Build(opts build.BuildOptions) error {
 			enableTesting:    opts.EnableTesting,
 			enableBenchmarks: opts.EnableBenchmarks,
 			verbose:          sp.IsVerbose(),
+			ccache:           opts.Ccache,
 		}); err != nil {
 			sp.FailStep(configureIdx)
 			sp.Finish(false)

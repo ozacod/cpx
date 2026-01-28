@@ -2,12 +2,15 @@ package commands
 
 import (
 	"fmt"
+	"os"
+	"strings"
 
 	"github.com/ozacod/cpx/internal/build/bazel"
 	"github.com/ozacod/cpx/internal/build/cmake"
-	"github.com/ozacod/cpx/internal/build/interfaces"
+	build "github.com/ozacod/cpx/internal/build/interfaces"
 	"github.com/ozacod/cpx/internal/build/meson"
 	"github.com/ozacod/cpx/internal/build/vcpkg"
+	"github.com/ozacod/cpx/internal/config"
 	"github.com/ozacod/cpx/internal/utils"
 	"github.com/ozacod/cpx/internal/utils/colors"
 	"github.com/spf13/cobra"
@@ -26,6 +29,7 @@ func BuildCmd() *cobra.Command {
   cpx build -O3          # Maximum optimization
   cpx build -j 8         # Use 8 parallel jobs
   cpx build --clean      # Clean rebuild
+  cpx build --ccache     # Enable ccache for faster rebuilds
   cpx build --asan       # Build with AddressSanitizer
   cpx build --tsan       # Build with ThreadSanitizer
   cpx build all          # Build all toolchains (Docker)`,
@@ -45,6 +49,8 @@ func BuildCmd() *cobra.Command {
 	cmd.Flags().Bool("msan", false, "Build with MemorySanitizer")
 	cmd.Flags().Bool("ubsan", false, "Build with UndefinedBehaviorSanitizer")
 	cmd.Flags().Bool("list", false, "List available build targets")
+	cmd.Flags().Bool("ccache", false, "Enable ccache for faster rebuilds (or set CPX_CCACHE=1)")
+	cmd.Flags().Bool("no-ccache", false, "Disable ccache (overrides CPX_CCACHE env var)")
 
 	//todo: all should be tested
 	allCmd := &cobra.Command{
@@ -147,6 +153,8 @@ func runBuild(cmd *cobra.Command, _ []string) error {
 		outputMode = build.OutputModeQuiet
 	}
 
+	ccache := resolveCcacheFlag(cmd)
+
 	buildOpts := build.BuildOptions{
 		Release:    release,
 		OptLevel:   optLevel,
@@ -155,6 +163,7 @@ func runBuild(cmd *cobra.Command, _ []string) error {
 		Jobs:       jobs,
 		Clean:      clean,
 		OutputMode: outputMode,
+		Ccache:     ccache,
 	}
 
 	var builder build.BuildSystem
@@ -176,4 +185,34 @@ func runBuild(cmd *cobra.Command, _ []string) error {
 	}
 
 	return builder.Build(buildOpts)
+}
+
+// resolveCcacheFlag determines whether ccache should be enabled based on:
+// 1. --no-ccache flag (highest priority, disables ccache)
+// 2. --ccache flag (enables ccache)
+// 3. CPX_CCACHE environment variable (1, true, yes, on = enabled)
+// 4. Global config file (~/.config/cpx/config.yaml)
+func resolveCcacheFlag(cmd *cobra.Command) bool {
+	noCcache, _ := cmd.Flags().GetBool("no-ccache")
+	if noCcache {
+		return false
+	}
+
+	ccacheFlag, _ := cmd.Flags().GetBool("ccache")
+	if ccacheFlag {
+		return true
+	}
+
+	// Check environment variable
+	envVal := strings.ToLower(os.Getenv("CPX_CCACHE"))
+	if envVal == "1" || envVal == "true" || envVal == "yes" || envVal == "on" {
+		return true
+	}
+
+	// Check global config
+	if cfg, err := config.LoadGlobal(); err == nil {
+		return cfg.Ccache
+	}
+
+	return false
 }

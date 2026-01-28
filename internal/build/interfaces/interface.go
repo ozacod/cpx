@@ -199,6 +199,9 @@ type BuildOptions struct {
 
 	// OutputMode controls build output verbosity (UI, Verbose, or Quiet)
 	OutputMode OutputMode
+
+	// Ccache enables ccache compiler caching for faster rebuilds.
+	Ccache bool
 }
 
 // OutputMode represents the build output verbosity mode

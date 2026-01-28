@@ -10,7 +10,7 @@ import (
 	"strings"
 
 	"github.com/ozacod/cpx/internal/build/common"
-	"github.com/ozacod/cpx/internal/build/interfaces"
+	build "github.com/ozacod/cpx/internal/build/interfaces"
 	"github.com/ozacod/cpx/internal/templates"
 	"github.com/ozacod/cpx/internal/utils"
 	"github.com/ozacod/cpx/internal/utils/colors"
@@ -114,6 +114,11 @@ func (b *CMakeBuilder) Build(opts build.BuildOptions) error {
 		}
 		if sanLFlags != "" {
 			configArgs = append(configArgs, "-DCMAKE_EXE_LINKER_FLAGS="+sanLFlags, "-DCMAKE_SHARED_LINKER_FLAGS="+sanLFlags)
+		}
+
+		// Add ccache support if enabled and available
+		if opts.Ccache && common.IsCcacheAvailable() {
+			configArgs = append(configArgs, common.GetCcacheCMakeArgs()...)
 		}
 
 		configCmd := execCommand("cmake", configArgs...)

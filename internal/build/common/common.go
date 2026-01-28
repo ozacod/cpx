@@ -76,6 +76,20 @@ func NativeOutputDir() string {
 	return filepath.Join(OutputDir, NativeDir)
 }
 
+// IsCcacheAvailable checks if ccache is installed and available in PATH
+func IsCcacheAvailable() bool {
+	_, err := exec.LookPath("ccache")
+	return err == nil
+}
+
+// GetCcacheCMakeArgs returns CMake arguments to enable ccache as a compiler launcher.
+func GetCcacheCMakeArgs() []string {
+	return []string{
+		"-DCMAKE_C_COMPILER_LAUNCHER=ccache",
+		"-DCMAKE_CXX_COMPILER_LAUNCHER=ccache",
+	}
+}
+
 // ExecCommand is a variable that points to exec.Command by default.
 // It can be overridden in tests to mock command execution.
 var ExecCommand = exec.Command
